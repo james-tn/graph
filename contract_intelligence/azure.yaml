@@ -1,0 +1,40 @@
+name: contract-intelligence
+metadata:
+  template: contract-intelligence
+infra:
+  provider: bicep
+  path: infra
+  parameters:
+    baseName:
+      value: contract-intel
+    environmentName:
+      value: ${AZD_ENV_NAME}
+    tags:
+      value:
+        project: contract-intelligence
+        environment: ${AZD_ENV_NAME}
+    serverName:
+      value: ${AZD_ENV_NAME}-pgflex
+    administratorLogin:
+      value: pgadmin
+    administratorPassword:
+      value: ${POSTGRES_ADMIN_PASSWORD}
+    availabilityZone:
+      value: ${POSTGRES_AVAILABILITY_ZONE}
+    enableHighAvailability:
+      value: false
+    enablePublicAccess:
+      value: true
+    storageSizeGB:
+      value: 256
+    backupRetentionDays:
+      value: 14
+    databaseName:
+      value: cipgraph
+    extensions:
+      value:
+        - vector
+        - pg_trgm
+        - hstore
+        - citext
+        - age

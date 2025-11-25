@@ -1,0 +1,1174 @@
+2025-11-24 17:46:31.0320 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=1, delay=2.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 17:46:33.0791 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=2, delay=4.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 17:46:38.0467 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=3, delay=8.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 17:46:46.0741 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=4, delay=16.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 17:47:03.0522 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=5, delay=32.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 17:47:36.0492 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=6, delay=64.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 17:48:41.0151 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=7, delay=128.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 17:50:50.0047 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=8, delay=256.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 17:55:06.0857 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=9, delay=512.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:03:39.0752 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=10, delay=1024.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:13:03.0965 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=1, delay=2.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:13:06.0211 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=2, delay=4.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:13:10.0862 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=3, delay=8.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:13:19.0063 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=4, delay=16.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:13:35.0519 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=5, delay=32.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:14:07.0732 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=6, delay=64.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:15:12.0737 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=7, delay=128.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:17:21.0799 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=8, delay=256.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:21:38.0346 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=9, delay=512.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:30:10.0993 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=10, delay=1024.0, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:47:15.0621 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Max retries exceeded, retries=10, max_retries=10, exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:47:15.0632 - ERROR - graphrag.language_model.providers.litellm.request_wrappers.with_logging - with_logging: Async request failed with exception=litellm.APIError: AzureException APIError - Resource not found
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 599, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 473, in acompletion
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 421, in acompletion
+    headers, response = await self.make_azure_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 179, in make_azure_openai_chat_completion_request
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\llms\azure\azure.py", line 166, in make_azure_openai_chat_completion_request
+    raw_response = await azure_client.chat.completions.with_raw_response.create(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2672, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\openai\_base_client.py", line 1594, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'code': '404', 'message': 'Resource not found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\request_wrappers\with_logging.py", line 49, in _wrapped_with_logging_async
+    return await async_fn(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\request_wrappers\with_retries.py", line 52, in _wrapped_with_retries_async
+    return await retry_service.aretry(func=async_fn, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\services\retry\exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\graphrag\language_model\providers\litellm\chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1642, in wrapper_async
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\utils.py", line 1488, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\main.py", line 618, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2328, in exception_type
+    raise e
+  File "C:\testing\graph\contract_intelligence\.venv\Lib\site-packages\litellm\litellm_core_utils\exception_mapping_utils.py", line 2166, in exception_type
+    raise APIError(
+litellm.exceptions.APIError: litellm.APIError: AzureException APIError - Resource not found
+2025-11-24 18:47:15.0779 - ERROR - graphrag.index.validate_config - LLM configuration error detected.
+litellm.APIError: AzureException APIError - Resource not found

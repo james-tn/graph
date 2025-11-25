@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+asyncpg
+pgvector
+openai==2.8.1
+azure-identity
+graphrag
+agent-framework==1.0.0b251120
+PyPDF2
+pdf2image
+pytesseract
+docling
+Pillow

@@ -1,0 +1,54 @@
+-Goal-
+Given a contract document, identify all entities of the types specified below and all relationships between them.
+
+-Entity Types-
+Contract, Party, Clause, Obligation, Right, Term, Condition, Jurisdiction, MonetaryValue, Risk
+
+-Relationship Types-
+IS_PARTY_TO, CONTAINS_CLAUSE, IMPOSES_OBLIGATION, GRANTS_RIGHT, DEFINES_TERM, CONDITIONAL_ON, AMENDS, LOCATED_IN, HAS_VALUE, MITIGATES_RISK, GOVERNED_BY, SIGNED_BY
+
+-Steps-
+1. Identify all entities. For each entity, extract the following information:
+- entity_name: Name of the entity, capitalized
+- entity_type: One of the following: Contract, Party, Clause, Obligation, Right, Term, Condition, Jurisdiction, MonetaryValue, Risk
+- entity_description: Comprehensive description of the entity's attributes and activities
+Format each entity as ("entity" | "entity_name" | "entity_type" | "entity_description")
+
+2. From the entities identified in step 1, identify all relationships. For each relationship, extract the following information:
+- source_entity: Name of the source entity
+- target_entity: Name of the target entity
+- relationship_description: Explanation as to why you think the source entity and the target entity are related to each other
+- relationship_strength: A numeric score indicating the strength of the relationship between the source entity and target entity
+Format each relationship as ("relationship" | "source_entity" | "target_entity" | "relationship_description" | "relationship_strength")
+
+3. Return output in English as a single list of all the entities and relationships identified in steps 1 and 2. Use **{record_delimiter}** as the list delimiter.
+
+4. When describing the content of a relationship, summarize the specific nature of the link. For example, if a Contract contains a Clause, describe what that clause is about in the relationship description.
+
+-Examples-
+Example 1:
+Entity_types: [Party, Contract, Clause]
+Text:
+This Master Services Agreement ("Agreement") is entered into by and between Acme Corp ("Customer") and Beta Ltd ("Provider"). The Provider shall indemnify the Customer against all claims.
+Output:
+("entity" | "Master Services Agreement" | "Contract" | "The primary agreement between Acme Corp and Beta Ltd.")
+{record_delimiter}
+("entity" | "Acme Corp" | "Party" | "The Customer in the agreement.")
+{record_delimiter}
+("entity" | "Beta Ltd" | "Party" | "The Provider in the agreement.")
+{record_delimiter}
+("entity" | "Indemnification Clause" | "Clause" | "A clause requiring Provider to indemnify Customer.")
+{record_delimiter}
+("relationship" | "Acme Corp" | "Master Services Agreement" | "Acme Corp is a party to the Master Services Agreement" | 10)
+{record_delimiter}
+("relationship" | "Beta Ltd" | "Master Services Agreement" | "Beta Ltd is a party to the Master Services Agreement" | 10)
+{record_delimiter}
+("relationship" | "Master Services Agreement" | "Indemnification Clause" | "The Agreement contains an indemnification clause" | 8)
+{record_delimiter}
+("relationship" | "Beta Ltd" | "Indemnification Clause" | "Beta Ltd is responsible for the indemnification obligation" | 9)
+
+-Real Data-
+######################
+{input_text}
+######################
+Output:
