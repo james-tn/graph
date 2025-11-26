@@ -187,24 +187,62 @@ def get_embedding(text: str) -> list[float]:
 
 
 def execute_sql_query(
-    sql_query: Annotated[str, Field(description="SQL query to execute. Must be a valid PostgreSQL SELECT statement. Use proper JOINs and WHERE clauses based on the schema.")],
-    need_embedding: Annotated[bool, Field(description="Set to True if query needs semantic search with embedding vector")] = False,
-    search_text: Annotated[str | None, Field(description="Text to generate embedding for (only if need_embedding=True)")] = None
+    sql_query: Annotated[str, Field(description="""SQL query to execute. Can include:
+    - Standard SQL (SELECT, JOIN, WHERE, GROUP BY, aggregations)
+    - Apache AGE graph queries using cypher() function
+    - Semantic search using pgvector distance operators (<->, <=>)
+    
+    For semantic search with embeddings:
+    - Use %s placeholder in ORDER BY clause: ORDER BY cl.embedding <=> %s LIMIT 20
+    - Set need_embedding=True and provide search_text
+    - The embedding vector will be automatically bound to %s
+    
+    For graph traversal with Apache AGE:
+    - Use: SELECT * FROM cypher('contract_intelligence', $$ MATCH ... RETURN ... $$) as (col1 agtype, col2 agtype, ...)
+    - Example: SELECT * FROM cypher('contract_intelligence', $$
+        MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)
+        WHERE p.name =~ '.*Acme.*'
+        RETURN p.name, c.title
+        LIMIT 20
+      $$) as (party_name agtype, contract_title agtype)
+    - Must include column aliases with agtype for each returned value
+    """)],
+    need_embedding: Annotated[bool, Field(description="Set True if query uses semantic search with %s placeholder for embedding vector")] = False,
+    search_text: Annotated[str | None, Field(description="Text to embed for semantic search (only when need_embedding=True)")] = None
 ) -> str:
     """Execute a SQL query against the PostgreSQL database.
     
-    Use this to:
-    - Query contracts, clauses, parties, and relationships
-    - Perform aggregations and analytics
-    - Filter by dates, risk levels, contract types
-    - Search using ILIKE patterns
-    - Execute semantic similarity searches (when need_embedding=True)
+    This single tool handles ALL query types:
+    1. **Standard SQL**: JOINs, WHERE clauses, aggregations, filtering
+    2. **Semantic Search**: pgvector similarity with %s placeholder
+    3. **Graph Traversal**: Apache AGE cypher() function for relationships
+    
+    SEMANTIC SEARCH EXAMPLE:
+    ```sql
+    SELECT c.contract_identifier, cl.section_label, cl.text_content,
+           1 - (cl.embedding <=> %s) as similarity
+    FROM clauses cl
+    JOIN contracts c ON cl.contract_id = c.id
+    ORDER BY cl.embedding <=> %s
+    LIMIT 20
+    ```
+    Call with: need_embedding=True, search_text="liability limitations"
+    
+    GRAPH TRAVERSAL EXAMPLE:
+    ```sql
+    SELECT * FROM cypher('contract_intelligence', $$
+      MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
+      WHERE p.name =~ '.*Acme.*'
+      RETURN p.name, c.title, o.description
+      LIMIT 20
+    $$) as (party_name agtype, contract_title agtype, obligation_desc agtype)
+    ```
     
     IMPORTANT:
-    - Only SELECT queries are allowed (no INSERT/UPDATE/DELETE)
-    - Use LIMIT to restrict results (recommended: 20-50)
-    - For semantic search, set need_embedding=True and provide search_text
-    - The embedding vector will be automatically inserted as %s placeholder
+    - Only SELECT queries allowed (no INSERT/UPDATE/DELETE)
+    - Always use LIMIT (recommended: 20-50)
+    - For cypher(), must set search_path first (handled automatically)
+    - Use agtype for all cypher() return column types
     """
     try:
         # Validate it's a SELECT query
@@ -219,6 +257,10 @@ def execute_sql_query(
         
         conn = get_db_connection()
         cur = conn.cursor()
+        
+        # If query uses cypher(), set search_path for Apache AGE
+        if 'CYPHER(' in query_upper:
+            cur.execute("SET search_path = ag_catalog, '$user', public;")
         
         # Generate embedding if needed
         params = None
@@ -269,76 +311,6 @@ def execute_sql_query(
         return f"SQL Query Error: {str(e)}\n\nQuery was: {sql_query}"
 
 
-def execute_cypher_query(
-    cypher_pattern: Annotated[str, Field(description="Cypher MATCH pattern and RETURN clause. Do not include the cypher() function wrapper - just the Cypher query itself.")],
-    return_columns: Annotated[str, Field(description="Comma-separated list of column names and types for the RETURN clause, e.g. 'party agtype, contract agtype, count agtype'")] 
-) -> str:
-    """Execute an Apache AGE Cypher graph query for multi-hop relationship traversal.
-    
-    Use this to:
-    - Find obligations for parties (Party -> Contract -> Clause -> Obligation)
-    - Find rights granted to parties (Party -> Right <- Clause <- Contract)
-    - Analyze complete relationship networks
-    - Perform multi-hop graph traversals
-    
-    Example cypher_pattern:
-        MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
-        WHERE p.name =~ '.*Acme.*'
-        RETURN p.name as party, c.title as contract, o.description as obligation
-        LIMIT 20
-    
-    Example return_columns:
-        party agtype, contract agtype, obligation agtype
-    
-    IMPORTANT:
-    - Use =~ for regex matching (case-insensitive: '.*term.*')
-    - Always include LIMIT (max 50)
-    - Node labels: Contract, Clause, Party, Obligation, Right
-    - Relationships: IS_PARTY_TO, CONTAINS_CLAUSE, IMPOSES_OBLIGATION, GRANTS_RIGHT, HOLDS_RIGHT
-    """
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # Set search path for AGE
-        cur.execute("SET search_path = ag_catalog, '$user', public;")
-        
-        # Construct full query
-        full_query = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            {cypher_pattern}
-        $$) as ({return_columns});
-        """
-        
-        cur.execute(full_query)
-        results = cur.fetchall()
-        
-        cur.close()
-        conn.close()
-        
-        if not results:
-            return "Graph query executed successfully but returned no results."
-        
-        # Format results
-        columns = results[0].keys()
-        response = f"Found {len(results)} result(s) via graph traversal:\n\n"
-        
-        for i, row in enumerate(results, 1):
-            response += f"{i}. "
-            for col in columns:
-                value = str(row[col])
-                # Clean up agtype formatting
-                if value.startswith('"') and value.endswith('"'):
-                    value = value[1:-1]
-                response += f"{col}: {value}, "
-            response = response.rstrip(', ') + "\n"
-        
-        return response
-    
-    except Exception as e:
-        return f"Cypher Query Error: {str(e)}\n\nPattern was: {cypher_pattern}\n\nReturn columns: {return_columns}"
-
-
 def get_database_schema() -> str:
     """Get the complete database schema, ontology, and query patterns.
     
@@ -364,59 +336,97 @@ class ContractAgent:
         
         self.agent = ChatAgent(
             chat_client=AzureOpenAIResponsesClient(api_key=api_key),
-            instructions="""You are a Contract Intelligence Assistant with direct access to a PostgreSQL database.
+            instructions="""You are a Contract Intelligence Assistant with direct access to a PostgreSQL database with Apache AGE graph capabilities.
 
-You have TWO powerful capabilities:
+**YOUR TOOL:**
 
-1. **SQL Query Execution** (use execute_sql_query tool)
-   - Write SELECT queries based on the database schema
-   - Join tables, filter data, perform aggregations
-   - Use ILIKE for case-insensitive pattern matching
-   - Execute semantic similarity searches with embeddings
-   - Use full-text search with @@ and ts_rank
-
-2. **Graph Traversal** (use execute_cypher_query tool)
-   - Write Cypher MATCH patterns for multi-hop relationships
-   - Traverse Party -> Contract -> Clause -> Obligation/Right paths
-   - Use graph queries for complex relationship analysis
+execute_sql_query - A single powerful tool that handles:
+  • Standard SQL (JOINs, WHERE, GROUP BY, aggregations)
+  • Semantic search via pgvector (ORDER BY embedding <=> %s)
+  • Graph traversal via Apache AGE cypher() function
 
 **WORKFLOW:**
 
-1. **First**: Call get_database_schema() to see tables, columns, relationships, and query patterns
-2. **Then**: Write appropriate SQL or Cypher queries based on the user's question
-3. **Execute**: Use execute_sql_query for data queries, execute_cypher_query for relationship traversal
-4. **Analyze**: Interpret results and provide insights to the user
+1. **Understand the schema**: Call get_database_schema() FIRST to see tables, columns, graph structure, and examples
+2. **Plan your approach**: Determine what data you need and what query types to use
+3. **Execute queries**: Use execute_sql_query with appropriate SQL/Cypher/semantic patterns
+4. **For complex questions**: Make MULTIPLE tool calls to gather complete information
+   - Example: First get contract list, then analyze each one separately
+   - Example: Get statistical overview, then drill into specific high-risk items
+   - Example: Combine SQL analytics with graph relationship analysis
+5. **Synthesize results**: Combine insights from multiple queries into coherent answer
 
-**QUERY WRITING GUIDELINES:**
+**QUERY PATTERNS:**
 
-- **Always LIMIT results** (20-50 for display, more if needed for analysis)
-- **Use proper JOINs** when querying across tables
-- **Filter by risk_level** when user asks about risks ('high', 'medium', 'low')
-- **Use ILIKE '%term%'** for flexible name/text matching
-- **For semantic search**: Set need_embedding=True and provide search_text
-- **For graph queries**: Use =~ for regex patterns like '.*company.*'
-- **Include relevant columns** in SELECT to provide complete answers
+📊 **Standard SQL** (for analytics, filtering, aggregations):
+```sql
+SELECT c.contract_identifier, COUNT(cl.id) as clause_count
+FROM contracts c
+JOIN clauses cl ON c.id = cl.contract_id
+WHERE c.contract_type = 'Service Agreement'
+GROUP BY c.contract_identifier
+LIMIT 20
+```
 
-**WHEN TO USE EACH TOOL:**
+🔍 **Semantic Search** (for finding similar content):
+```sql
+SELECT c.contract_identifier, cl.section_label, cl.text_content,
+       1 - (cl.embedding <=> %s) as similarity
+FROM clauses cl
+JOIN contracts c ON cl.contract_id = c.id
+ORDER BY cl.embedding <=> %s
+LIMIT 20
+```
+Call with: need_embedding=True, search_text="liability and indemnification"
 
-- **SQL**: Statistics, listings, filtering, searching, analytics
-  Example: "Show contracts by type", "Find clauses about liability", "List high-risk items"
-  
-- **Cypher/Graph**: Relationships, obligations, rights, multi-hop connections
-  Example: "What obligations does Party X have?", "Find rights granted to Party Y", "Analyze contract relationships"
+🕸️ **Graph Traversal** (for relationships and obligations):
+```sql
+SELECT * FROM cypher('contract_intelligence', $$
+  MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
+  WHERE p.name =~ '.*Acme.*'
+  RETURN p.name, c.title, cl.section, o.description
+  LIMIT 20
+$$) as (party_name agtype, contract_title agtype, section agtype, obligation agtype)
+```
+
+**IMPORTANT GUIDELINES:**
+
+✅ **DO:**
+- Always include LIMIT (20-50 for initial queries)
+- Use ILIKE '%term%' for case-insensitive text matching
+- For semantic search: Use %s placeholder, set need_embedding=True
+- For cypher(): Include column aliases with agtype for each return value
+- Make multiple queries for complex questions - don't try to answer everything in one query
+- Combine different query types (SQL + semantic + graph) when appropriate
+- Use WHERE clauses to filter by risk_level, contract_type, dates
+
+❌ **DON'T:**
+- Try to compute embeddings yourself - use need_embedding=True
+- Mix cypher() column aliases with SQL column types (always use agtype)
+- Forget LIMIT clauses
+- Try to answer complex multi-part questions with a single query
+
+**MULTIPLE TOOL CALLS FOR COMPLEX QUESTIONS:**
+
+When users ask complex questions like "analyze all contracts and their risks", break it down:
+1. First query: Get list of contracts with basic stats
+2. Second query: Analyze high-risk clauses separately
+3. Third query: Use graph traversal to find obligation patterns
+4. Synthesize: Combine all findings into comprehensive answer
+
+This approach is MORE effective than trying to write one mega-query!
 
 **OUTPUT FORMAT:**
 
 - Cite specific contracts, sections, and parties
-- Highlight risk levels with emojis: ⚠️ (high), ⚡ (medium), ✓ (low)
-- Provide context and actionable insights
-- If query returns no results, explain why and suggest alternatives
+- Use emojis for risk levels: ⚠️ (high), ⚡ (medium), ✓ (low)
+- Provide actionable insights and recommendations
+- If no results, suggest query refinements
 
-Remember: You are writing queries dynamically based on the schema, not using predefined queries.""",
+Remember: You dynamically write queries based on the schema. For complex questions, use multiple focused queries rather than one complicated query.""",
             tools=[
                 get_database_schema,
                 execute_sql_query,
-                execute_cypher_query,
             ],
         )
         self.thread = self.agent.get_new_thread()
