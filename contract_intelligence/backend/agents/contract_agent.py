@@ -434,10 +434,24 @@ Remember: You dynamically write queries based on the schema. For complex questio
     async def query_async(self, query_text: str) -> dict:
         """Execute a query asynchronously."""
         result = await self.agent.run(query_text, thread=self.thread)
+        
+        # Extract SQL queries from tool calls in the conversation
+        sql_queries = []
+        for message in result.messages:
+            for content in message.contents:
+                # Check if this is a function call to execute_sql_query
+                if hasattr(content, 'name') and content.name == 'execute_sql_query':
+                    # Parse the arguments to get the SQL query
+                    if hasattr(content, 'parse_arguments'):
+                        args = content.parse_arguments()
+                        if args and 'sql_query' in args:
+                            sql_queries.append(args['sql_query'])
+        
         return {
             "query": query_text,
             "response": result.text,
             "source": "PostgreSQL with Apache AGE",
+            "sql_queries": sql_queries,  # List of SQL queries executed
         }
     
     def query(self, query_text: str) -> dict:

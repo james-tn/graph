@@ -144,9 +144,29 @@ export const HybridResultSection: React.FC<HybridResultSectionProps> = ({ result
                   <Database className="w-5 h-5" />
                   PostgreSQL Response
                 </h4>
-                <pre className="text-sm text-blue-100 whitespace-pre-wrap font-mono">
-                  {JSON.stringify(postgres_result, null, 2)}
-                </pre>
+                {postgres_result.sql_queries && postgres_result.sql_queries.length > 0 && (
+                  <div className="mb-3 space-y-2">
+                    <p className="text-xs text-blue-400 font-semibold">SQL {postgres_result.sql_queries.length > 1 ? 'Queries' : 'Query'} Executed:</p>
+                    {postgres_result.sql_queries.map((query: string, idx: number) => (
+                      <div key={idx} className="p-3 bg-slate-900/50 rounded border border-blue-500/20">
+                        {postgres_result.sql_queries.length > 1 && (
+                          <p className="text-xs text-blue-300 mb-1">Query {idx + 1}:</p>
+                        )}
+                        <pre className="text-xs text-blue-200 whitespace-pre-wrap font-mono overflow-x-auto">
+                          {query}
+                        </pre>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs text-blue-400 hover:text-blue-300">
+                    View Full Response JSON
+                  </summary>
+                  <pre className="text-sm text-blue-100 whitespace-pre-wrap font-mono mt-2">
+                    {JSON.stringify(postgres_result, null, 2)}
+                  </pre>
+                </details>
               </div>
             )}
             {graphrag_result && !graphrag_result.error && (
