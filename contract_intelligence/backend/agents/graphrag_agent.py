@@ -68,7 +68,6 @@ class GraphRAGAgent:
         
         # Paths to GraphRAG output (matches GraphRAG config: data/output)
         self.output_dir = root_dir / "data" / "output"
-        self.artifacts_dir = self.output_dir / "artifacts"
         self.lancedb_dir = self.output_dir / "lancedb"
         
         # Initialize models using LiteLLM through ModelManager
@@ -125,97 +124,108 @@ class GraphRAGAgent:
         self._global_search_engine = None
     
     def _load_data(self):
-        """Load GraphRAG indexed data from LanceDB (GraphRAG 2.x format)."""
+        """Load GraphRAG indexed data from parquet files (GraphRAG 2.x format)."""
         if self._entities is not None:
             return  # Already loaded
         
-        print("📚 Loading GraphRAG data from LanceDB...")
+        print("📚 Loading GraphRAG data from storage...")
         
-        # GraphRAG 2.x stores data in LanceDB with JSON attributes
-        # We need to parse the attributes column to get the full data structure
-        import lancedb
-        import json
+        import pandas as pd
         
-        db = lancedb.connect(str(self.lancedb_dir))
+        # GraphRAG 2.7.0 writes parquet files directly to output directory
+        if not self.output_dir.exists():
+            print(f"  ⚠️ Output directory not found: {self.output_dir}")
+            print("  Please run GraphRAG indexing first")
+            raise FileNotFoundError(f"GraphRAG output not found at {self.output_dir}")
         
-        # List available tables
-        table_names = db.table_names()
-        print(f"  Available LanceDB tables: {table_names}")
-        
-        # For now, use simplified approach - just load entities and community reports
-        # The full GraphRAG indexer output structure is complex and may require
-        # using the GraphRAG API's built-in loaders instead of manual parsing
+        # Load parquet files
+        print(f"  Loading from {self.output_dir}")
         
         # Load entities
-        entities_table = db.open_table("default-entity-description")
-        entities_raw = entities_table.to_pandas()
+        entities_path = self.output_dir / "entities.parquet"
+        if entities_path.exists():
+            entities_df = pd.read_parquet(entities_path)
+            print(f"  ✓ Loaded {len(entities_df)} entities")
+        else:
+            print(f"  ⚠️ Entities file not found: {entities_path}")
+            entities_df = pd.DataFrame()
+        
+        # Load relationships  
+        relationships_path = self.output_dir / "relationships.parquet"
+        if relationships_path.exists():
+            relationships_df = pd.read_parquet(relationships_path)
+            print(f"  ✓ Loaded {len(relationships_df)} relationships")
+        else:
+            print(f"  ⚠️ Relationships file not found: {relationships_path}")
+            relationships_df = pd.DataFrame()
+        
+        # Load communities
+        communities_path = self.output_dir / "communities.parquet"
+        if communities_path.exists():
+            communities_df = pd.read_parquet(communities_path)
+            print(f"  ✓ Loaded {len(communities_df)} communities")
+        else:
+            print(f"  ⚠️ Communities file not found: {communities_path}")
+            communities_df = pd.DataFrame()
         
         # Load community reports
-        try:
-            community_reports_table = db.open_table("default-community-full_content")
-            community_reports_raw = community_reports_table.to_pandas()
-            print(f"  ✓ Loaded {len(community_reports_raw)} community reports from LanceDB")
-        except Exception as e:
-            print(f"  ⚠️ No community reports table found: {e}")
-            community_reports_raw = pd.DataFrame()
+        reports_path = self.output_dir / "community_reports.parquet"
+        if reports_path.exists():
+            reports_df = pd.read_parquet(reports_path)
+            print(f"  ✓ Loaded {len(reports_df)} community reports")
+        else:
+            print(f"  ⚠️ Community reports file not found: {reports_path}")
+            reports_df = pd.DataFrame()
         
         # Load text units
-        try:
-            text_units_table = db.open_table("default-text_unit-text")
-            text_units_raw = text_units_table.to_pandas()
-            print(f"  ✓ Loaded {len(text_units_raw)} text units from LanceDB")
-        except Exception as e:
-            print(f"  ⚠️ No text units table found: {e}")
-            text_units_raw = pd.DataFrame()
-        
-        print(f"  ✓ Loaded {len(entities_raw)} entities from LanceDB")
-        
-        # Parse attributes JSON to extract entity metadata
-        # LanceDB stores: id, text (description), vector (embedding), attributes (JSON with title, etc.)
-        if 'attributes' in entities_raw.columns:
-            # Parse JSON attributes
-            entities_raw['attrs'] = entities_raw['attributes'].apply(
-                lambda x: json.loads(x) if isinstance(x, str) else x
-            )
-            # Extract fields from attributes
-            entities_raw['title'] = entities_raw['attrs'].apply(lambda x: x.get('title', '') if isinstance(x, dict) else '')
-            entities_raw['description'] = entities_raw['text']  # The main text column is the description
-            entities_raw['description_embedding'] = entities_raw['vector'].apply(lambda x: x.tolist() if hasattr(x, 'tolist') else x)
-        
-        # Store simplified data for querying
-        # For global search, we mainly need community reports
-        # For local search, we need entities and their embeddings
-        self._entities = []  # Simplified - not using full Entity objects
-        self._relationships = []
-        self._text_units = []
-        self._covariates = []
-        
-        # Parse community reports for global search
-        if not community_reports_raw.empty:
-            self._reports = []
-            for _, row in community_reports_raw.iterrows():
-                # Parse attributes if present
-                attrs = {}
-                if 'attributes' in row and row['attributes']:
-                    try:
-                        attrs = json.loads(row['attributes']) if isinstance(row['attributes'], str) else row['attributes']
-                    except:
-                        pass
-                
-                # Create a simplified report structure
-                self._reports.append({
-                    'id': row['id'],
-                    'title': attrs.get('title', ''),
-                    'content': row['text'],
-                    'embedding': row['vector'].tolist() if hasattr(row['vector'], 'tolist') else row['vector']
-                })
+        text_units_path = self.output_dir / "text_units.parquet"
+        if text_units_path.exists():
+            text_units_df = pd.read_parquet(text_units_path)
+            print(f"  ✓ Loaded {len(text_units_df)} text units")
         else:
-            self._reports = []
+            print(f"  ⚠️ Text units file not found: {text_units_path}")
+            text_units_df = pd.DataFrame()
         
+        # Load covariates (claims) if available
+        covariates_path = self.output_dir / "covariates.parquet"
+        if covariates_path.exists():
+            covariates_df = pd.read_parquet(covariates_path)
+            print(f"  ✓ Loaded {len(covariates_df)} covariates")
+        else:
+            print(f"  ℹ️ No covariates file (optional)")
+            covariates_df = pd.DataFrame()
+        
+        # Convert to GraphRAG data model objects using indexer adapters
+        from graphrag.query.indexer_adapters import (
+            read_indexer_covariates,
+            read_indexer_entities,
+            read_indexer_relationships,
+            read_indexer_reports,
+            read_indexer_text_units,
+        )
+        
+        # Set community level (use max level available)
+        community_level = int(communities_df["level"].max()) if not communities_df.empty else 0
+        print(f"  ℹ️ Using community level: {community_level}")
+        
+        # Parse data using GraphRAG's built-in adapters
+        self._entities = read_indexer_entities(entities_df, communities_df, community_level) if not entities_df.empty else []
+        self._relationships = read_indexer_relationships(relationships_df) if not relationships_df.empty else []
+        self._reports = read_indexer_reports(reports_df, communities_df, community_level) if not reports_df.empty else []
+        self._text_units = read_indexer_text_units(text_units_df) if not text_units_df.empty else []
+        self._covariates = read_indexer_covariates(covariates_df) if not covariates_df.empty else []
+        self._communities = communities_df
+        
+        print(f"  ✓ Parsed {len(self._entities)} entities")
+        print(f"  ✓ Parsed {len(self._relationships)} relationships")
         print(f"  ✓ Parsed {len(self._reports)} community reports")
-        print(f"  ✓ Parsed {len(entities_raw)} entities")
+        print(f"  ✓ Parsed {len(self._text_units)} text units")
+        print(f"  ✓ Parsed {len(self._covariates)} covariates")
         
         # Setup entity embedding store (LanceDB)
+        from graphrag.vector_stores.lancedb import LanceDBVectorStore
+        from graphrag.config.models.vector_store_schema_config import VectorStoreSchemaConfig
+        
         schema_config = VectorStoreSchemaConfig(
             id_field="id",
             vector_field="vector",
@@ -231,18 +241,54 @@ class GraphRAGAgent:
         )
         self._description_embedding_store.connect(db_uri=str(self.lancedb_dir))
         
-        # Store raw dataframes for custom querying
-        self._entities_df = entities_raw
-        self._community_reports_df = community_reports_raw
-        self._text_units_df = text_units_raw
-        
         print("  ✓ Connected to entity embedding store")
     
     def _setup_local_search(self):
-        """Setup local search engine - not implemented for simplified version."""
+        """Setup local search engine using GraphRAG factory."""
         self._load_data()
-        print("  ℹ️ Local search not available (requires full GraphRAG indexer output)")
-        self._local_search_engine = "not_available"
+        
+        if not self._entities:
+            print("  ⚠️ No entities loaded, cannot setup local search")
+            self._local_search_engine = "not_available"
+            return
+        
+        print("  Setting up local search engine...")
+        
+        try:
+            from graphrag.query.factory import get_local_search_engine
+            from graphrag.config.models.graph_rag_config import GraphRagConfig
+            
+            # Load GraphRAG config
+            from graphrag.config.load_config import load_config
+            config_dir = self.root_dir / "graphrag_config"
+            config = load_config(config_dir)
+            
+            print(f"  Config loaded, creating search engine...")
+            print(f"  Entities: {len(self._entities)}, Reports: {len(self._reports)}")
+            
+            # Create local search engine using GraphRAG factory
+            self._local_search_engine = get_local_search_engine(
+                config=config,
+                reports=self._reports,
+                text_units=self._text_units,
+                entities=self._entities,
+                relationships=self._relationships,
+                covariates={"claims": self._covariates},
+                response_type="multiple paragraphs",
+                description_embedding_store=self._description_embedding_store,
+            )
+            
+            if self._local_search_engine is None:
+                raise ValueError("get_local_search_engine returned None")
+            
+            print(f"  Local search engine ready: {type(self._local_search_engine)}")
+            print(f"  Has search method: {hasattr(self._local_search_engine, 'search')}")
+        except Exception as e:
+            print(f"  Could not initialize local search: {e}")
+            import traceback
+            traceback.print_exc()
+            print("  -> Will fall back to global search")
+            self._local_search_engine = "not_available"
     
     def _setup_global_search(self):
         """Setup global search engine - simplified version using community reports directly."""
@@ -269,22 +315,42 @@ class GraphRAGAgent:
         """
         self._setup_local_search()
         
-        # Simplified version: fallback to global search
+        # If local search setup failed, fallback to global search
         if self._local_search_engine == "not_available":
-            print("  → Falling back to global search")
+            print("  -> Falling back to global search")
             return await self.global_search(query)
         
-        result = await self._local_search_engine.asearch(query)
-        
-        return {
-            "query": query,
-            "search_type": "local",
-            "response": result.response,
-            "context_data": getattr(result, "context_data", {}),
-            "context_text": getattr(result, "context_text", ""),
-            "completion_time": getattr(result, "completion_time", 0),
-            "llm_calls": getattr(result, "llm_calls", 0),
-        }
+        # Execute local search
+        try:
+            # LocalSearch.search() is async
+            result = await self._local_search_engine.search(query)
+            
+            # Convert context_data to serializable format (GraphRAG returns DataFrames)
+            context_data = getattr(result, "context_data", {})
+            if context_data:
+                serializable_context = {}
+                for key, value in context_data.items():
+                    if hasattr(value, 'to_dict'):  # pandas DataFrame
+                        serializable_context[key] = value.to_dict('records')
+                    else:
+                        serializable_context[key] = value
+                context_data = serializable_context
+            
+            return {
+                "query": query,
+                "search_type": "local",
+                "response": result.response,
+                "context_data": context_data,
+                "context_text": getattr(result, "context_text", ""),
+                "completion_time": getattr(result, "completion_time", 0),
+                "llm_calls": getattr(result, "llm_calls", 0),
+            }
+        except Exception as e:
+            print(f"  Local search failed: {e}")
+            import traceback
+            traceback.print_exc()
+            print("  -> Falling back to global search")
+            return await self.global_search(query)
     
     async def global_search(self, query: str) -> dict:
         """
@@ -302,8 +368,35 @@ class GraphRAGAgent:
         if self._global_search_engine == "simplified":
             # Search through community reports
             relevant_reports = []
-            for report in self._reports[:10]:  # Top 10 reports
-                relevant_reports.append(report['content'])
+            print(f"  Processing {len(self._reports)} community reports...")
+            
+            for i, report in enumerate(self._reports[:10]):  # Top 10 reports
+                # CommunityReport objects have attributes, not dict keys
+                # Try different attribute names
+                report_text = None
+                for attr in ['full_content', 'content', 'summary', 'title']:
+                    report_text = getattr(report, attr, None)
+                    if report_text:
+                        break
+                
+                if report_text:
+                    relevant_reports.append(report_text)
+                    print(f"    Report {i}: {len(report_text)} chars")
+                else:
+                    print(f"    Report {i}: No content found. Available attrs: {dir(report)[:10]}")
+            
+            if not relevant_reports:
+                return {
+                    "query": query,
+                    "search_type": "global",
+                    "response": "No community reports available to answer this query. Please check if GraphRAG indexing completed successfully.",
+                    "context_data": {},
+                    "context_text": "",
+                    "completion_time": 0,
+                    "llm_calls": 0,
+                }
+            
+            print(f"  Using {len(relevant_reports)} reports as context")
             
             # Combine reports as context
             context = "\n\n".join(relevant_reports)
@@ -316,7 +409,43 @@ Question: {query}
 Reports:
 {context}
 
-Provide a comprehensive answer based on the reports above."""
+**IMPORTANT - FORMAT YOUR RESPONSE WITH RICH MARKDOWN:**
+
+Your response will be rendered with a Markdown visualizer. Use these formatting features creatively:
+
+📝 **Rich Formatting:**
+- Use **bold** for key findings, *italics* for emphasis
+- Create clear sections with ## and ### headers
+- Use > blockquotes for critical insights
+- Add --- horizontal rules between major sections
+- Strategic emojis: 📊 (data), 🔍 (findings), 💡 (insights), ⚠️ (risks), ✓ (positive)
+
+📊 **Tables for Comparisons:**
+```markdown
+| Category | Finding | Impact |
+|----------|---------|--------|
+| Payment Terms | 30-60 days | Standard |
+```
+
+📈 **Mermaid Charts for Patterns:**
+
+Use Mermaid diagrams to visualize patterns, trends, or distributions:
+
+```mermaid
+pie title Contract Distribution
+    "High Risk" : 25
+    "Medium Risk" : 45
+    "Low Risk" : 30
+```
+
+```mermaid
+graph LR
+    A[Common Pattern] --> B[Variant 1]
+    A --> C[Variant 2]
+    A --> D[Outlier]
+```
+
+Provide a comprehensive, well-formatted answer based on the reports above."""
             
             # Simple completion call
             from openai import OpenAI
@@ -325,13 +454,21 @@ Provide a comprehensive answer based on the reports above."""
                 base_url=self.api_base,
             )
             
+            print(f"  Calling LLM with {len(prompt)} chars of prompt...")
+            
             response = client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model=self.llm_deployment,
-                max_completion_tokens=2000
+                max_completion_tokens=8000  # Increased for reasoning models
             )
             
             answer = response.choices[0].message.content
+            print(f"  LLM returned: {len(answer) if answer else 0} chars")
+            
+            if not answer:
+                print(f"  WARNING: Empty response from LLM!")
+                print(f"  Response object: {response}")
+                answer = "No response generated from the LLM."
             
             return {
                 "query": query,
@@ -346,11 +483,22 @@ Provide a comprehensive answer based on the reports above."""
         
         result = await self._global_search_engine.asearch(query)
         
+        # Convert context_data to serializable format (GraphRAG returns DataFrames)
+        context_data = getattr(result, "context_data", {})
+        if context_data:
+            serializable_context = {}
+            for key, value in context_data.items():
+                if hasattr(value, 'to_dict'):  # pandas DataFrame
+                    serializable_context[key] = value.to_dict('records')
+                else:
+                    serializable_context[key] = value
+            context_data = serializable_context
+        
         return {
             "query": query,
             "search_type": "global",
             "response": result.response,
-            "context_data": getattr(result, "context_data", {}),
+            "context_data": context_data,
             "context_text": getattr(result, "context_text", ""),
             "completion_time": getattr(result, "completion_time", 0),
             "llm_calls": getattr(result, "llm_calls", 0),

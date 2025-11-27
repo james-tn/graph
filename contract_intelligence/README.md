@@ -1,37 +1,21 @@
 # Contract Intelligence Platform
 
-Enterprise-grade contract intelligence system using **Azure OpenAI**, **PostgreSQL with pgvector and Apache AGE**, and **Microsoft Agent Framework**.
-
-## Features
-
-- 🤖 **LLM-Powered Extraction** - Comprehensive entity and relationship extraction from contracts
-- 📊 **Graph Database** - Apache AGE for multi-hop relationship queries
-- 🔍 **Semantic Search** - pgvector with Azure OpenAI embeddings (1536d)
-- 🎯 **AI Agent** - Natural language queries with automatic tool selection
-- ⚖️ **Risk Analysis** - Automated clause classification and risk detection
+Hybrid contract intelligence system combining **PostgreSQL + GraphRAG** with AI agents for natural language contract analysis.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Contract Intelligence                     │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │  Ingestion   │  │    Graph     │  │   AI Agent   │     │
-│  │   Pipeline   │→ │   Builder    │→ │  w/ Tools    │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘     │
-│         │                  │                   │            │
-│         └──────────────────┴───────────────────┘            │
-│                            ↓                                │
-│              ┌──────────────────────────┐                   │
-│              │   PostgreSQL Database    │                   │
-│              │  • pgvector (embeddings) │                   │
-│              │  • Apache AGE (graph)    │                   │
-│              │  • Full-text search      │                   │
-│              └──────────────────────────┘                   │
-└─────────────────────────────────────────────────────────────┘
+PostgreSQL Agent ←→ Router Agent ←→ GraphRAG Agent
+       ↓                                   ↓
+   PostgreSQL                          GraphRAG
+   + pgvector                      Knowledge Graph
+   + Apache AGE
 ```
+
+**Dual Backend Strategy:**
+- **PostgreSQL**: Precise SQL queries, graph traversal, semantic search
+- **GraphRAG**: Cross-document patterns, global insights, community detection
+- **Router**: Auto-selects optimal backend or combines both
 
 ## Quick Start
 
@@ -66,158 +50,88 @@ This will:
 2. **Build graph** in Apache AGE (nodes and relationships)
 3. **Run AI agent** with SQL, vector search, and graph traversal queries
 
+## Key Features
+
+- 🔍 **Hybrid Search**: Intelligently routes queries between PostgreSQL and GraphRAG
+- 🤖 **AI Agents**: Natural language queries with tool selection
+- 📊 **Contract Relationships**: Parent-child hierarchies (MSAs → SOWs → Amendments)
+- 🔗 **Graph Traversal**: Multi-hop queries via Apache AGE
+- 📈 **Semantic Search**: Vector similarity with pgvector (1536d embeddings)
+
+## Example Queries
+
+```
+"Show contract hierarchy for MSA-ZEN-202403-197"
+"Find all amendments to DPA-SUM-202502-324"
+"What obligations does Acme Corp have?"
+"Compare payment terms across all contracts"
+```
+
 ## Project Structure
 
 ```
 contract_intelligence/
-├── scripts/
-│   ├── ingestion/
-│   │   └── ingest.py              # LLM-based contract ingestion
-│   ├── graph/
-│   │   └── build_graph.py         # Apache AGE graph builder
-│   ├── agent/
-│   │   └── run_agent.py           # AI agent with graph tools
-│   └── tests/                     # Test and validation scripts
+├── data_ingestion/          # Dual ingestion pipeline
+│   ├── contract_extractor.py
+│   ├── postgres_ingestion.py
+│   ├── graphrag_ingestion.py
+│   └── ingestion_pipeline.py
 ├── backend/
-│   ├── schema.sql                 # PostgreSQL schema
-│   └── requirements.txt           # Python dependencies
+│   ├── agents/              # PostgreSQL, GraphRAG, Router agents
+│   └── app/                 # FastAPI backend
+├── frontend/                # React UI with hybrid search
 ├── data/
-│   ├── input/                     # Contract files (markdown)
-│   └── output/                    # Processing results
-├── infra/                         # Azure infrastructure (Bicep)
-├── README.md                      # This file
-├── README_TECHNICAL.md            # Technical deep-dive
-├── DESIGN.md                      # Architecture design
-└── start.bat                      # Main startup script
+│   ├── input/              # Contract markdown files
+│   └── output/             # GraphRAG artifacts
+└── graphrag_config/        # GraphRAG settings
 ```
 
-## Extracted Entities
+## Database Schema
 
-The system extracts rich structured data from contracts:
+**Core Tables:**
+- `contracts` - Contract metadata with `reference_number` (MSA-XXX-YYYYMM-NNN)
+- `contract_relationships` - Parent-child links (MSAs, SOWs, amendments)
+- `parties` - Legal entities with roles
+- `clauses` - Sections with embeddings and risk levels
+- `obligations` / `rights` - Extracted actions with parties
 
-- **Contracts** - Metadata, dates, governing law
-- **Parties** - Legal entities with roles and jurisdictions
-- **Clauses** - Sections with classification and risk levels
-- **Obligations** - Mandatory actions with parties and penalties
-- **Rights** - Permissive actions with holders
-- **Terms** - Defined terminology
-- **Monetary Values** - Amounts with context
-- **Conditions** - Trigger events
-
-## Graph Relationships
-
-Apache AGE enables multi-hop queries via relationships:
-
-- `IS_PARTY_TO` - Party ↔ Contract
-- `CONTAINS_CLAUSE` - Contract ↔ Clause
-- `IMPOSES_OBLIGATION` - Clause ↔ Obligation
-- `RESPONSIBLE_FOR` - Party ↔ Obligation
-- `GRANTS_RIGHT` - Clause ↔ Right
-- `HOLDS_RIGHT` - Party ↔ Right
-- `DEFINES_TERM` - Contract ↔ Term
-
-## Example Queries
-
-### Simple Analytics
-```
-"What contracts do we have?"
-"Show contracts involving Acme Corp"
-"Find high-risk clauses"
-```
-
-### Semantic Search
-```
-"Find clauses about data protection"
-"Show liability limitation clauses"
-```
-
-### Graph Traversal (Multi-Hop)
-```
-"What obligations does Acme Corp have?"
-"What rights does the vendor hold?"
-"Analyze all relationships for contract_000"
-```
+**Graph (Apache AGE):**
+- Party → Contract → Clause → Obligation/Right relationships
 
 ## Agent Tools
 
-The AI agent has 9 specialized tools:
+**PostgreSQL Agent:**
+- `execute_sql_query()` - SQL/Cypher with CTE and WITH RECURSIVE support
+- `get_contract_family()` - Recursive hierarchy traversal
+- Supports semantic search, graph queries, analytics
 
-### SQL-Based Tools
-1. `get_contract_statistics()` - Portfolio analytics
-2. `search_contracts_by_party()` - Party filtering
-3. `search_clauses_semantic()` - Vector similarity search
-4. `search_clauses_keyword()` - Full-text keyword search
-5. `find_high_risk_clauses()` - Risk analysis
-6. `list_contract_clauses()` - Contract navigation
-
-### Graph Tools
-7. `find_party_obligations()` - Multi-hop obligation discovery
-8. `find_party_rights()` - Multi-hop right discovery
-9. `analyze_contract_relationships()` - Complete relationship network
+**GraphRAG Agent:**
+- Local search (entity-centric)
+- Global search (corpus-wide summaries)
+- Community-based insights
 
 ## Technology Stack
 
-- **LLM**: Azure OpenAI (gpt-4.1 for extraction, text-embedding-3-small for embeddings)
-- **Database**: PostgreSQL 16 Flexible Server
-- **Extensions**: pgvector (vector), Apache AGE (graph), pg_trgm (full-text)
-- **Agent Framework**: Microsoft Agent Framework (Python)
-- **Infrastructure**: Azure (Bicep templates)
-
-## Documentation
-
-- **[README_TECHNICAL.md](README_TECHNICAL.md)** - Technical implementation details, LLM prompts, performance characteristics
-- **[DESIGN.md](DESIGN.md)** - Architecture design, ontology, data model
-- **[QUICKSTART.md](QUICKSTART.md)** - Step-by-step setup guide
-
-## Key Advantages
-
-### vs Pure SQL
-✅ Multi-hop relationship queries  
-✅ Complex network analysis  
-✅ Path finding and traversal  
-
-### vs Pure Vector Search
-✅ Structured relationships  
-✅ Exact entity linkage  
-✅ Explainable connections  
-
-### vs Keyword Matching
-✅ Semantic understanding  
-✅ Context preservation  
-✅ Rich entity extraction  
+- **Backend**: Python, FastAPI, Microsoft Agent Framework
+- **Database**: PostgreSQL 16 with pgvector + Apache AGE
+- **LLM**: Azure OpenAI (gpt-4o, text-embedding-3-small)
+- **GraphRAG**: Microsoft GraphRAG for knowledge graphs
+- **Frontend**: React + TypeScript
 
 ## Development
 
-### Running Individual Components
-
 ```bash
-# Ingestion only
-uv run scripts\ingestion\ingest.py
+# Run agents directly
+uv run python backend\agents\contract_agent.py
+uv run python backend\agents\router_agent.py
 
-# Graph building only
-uv run scripts\graph\build_graph.py
+# Test ingestion
+uv run python data_ingestion\ingestion_pipeline.py
 
-# Agent only
-uv run scripts\agent\run_agent.py
+# Generate seed data
+uv run python scripts\generate_seed_data.py
 ```
-
-### Testing
-
-```bash
-# Validate PostgreSQL extensions
-uv run scripts\tests\test_postgres_graph_vector.py
-
-# Test deprecated ingestion (for comparison)
-uv run scripts\tests\deprecated_ingest.py
-```
-
-## Support
-
-For questions or issues:
-- Review [README_TECHNICAL.md](README_TECHNICAL.md) for implementation details
-- Check [DESIGN.md](DESIGN.md) for architecture
-- Examine `backend/schema.sql` for database structure
 
 ---
 
-**Built with ❤️ using Azure OpenAI, PostgreSQL, and Microsoft Agent Framework**
+**Hybrid Intelligence**: Combines structured SQL precision with GraphRAG's cross-document reasoning for comprehensive contract analysis.

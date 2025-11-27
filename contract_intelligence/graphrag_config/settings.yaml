@@ -9,16 +9,16 @@ models:
     model: gpt-4o
     max_completion_tokens: 4000
     model_supports_json: true
-    api_base: ${GRAPHRAG_API_BASE}
-    api_version: ${GRAPHRAG_API_VERSION}
-    deployment_name: ${GRAPHRAG_LLM_DEPLOYMENT_NAME}
+    api_base: https://eastus2oai.openai.azure.com
+    api_version: 2024-12-01-preview
+    deployment_name: gpt-5.1
   default_embedding_model:
     api_key: ${GRAPHRAG_API_KEY}
     type: embedding
     model_provider: azure
     model: text-embedding-3-small
-    api_base: ${GRAPHRAG_API_BASE}
-    api_version: ${GRAPHRAG_API_VERSION}
+    api_base: https://eastus2oai.openai.azure.com
+    api_version: 2024-12-01-preview
     deployment_name: ${GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME}
 
 parallelization:
@@ -37,23 +37,25 @@ input:
   file_pattern: ".*\\.md$$"
   storage:
     type: file
-    base_dir: "data/input"
+    base_dir: "../data/input"
 
 cache:
   type: file
-  base_dir: "cache"
+  base_dir: "../cache"
 
 output:
   type: file
-  base_dir: "data/output"
+  base_dir: "../data/output"
 
 reporting:
   type: file
-  base_dir: "logs"
+  base_dir: "../logs"
 
 extract_graph:
-  prompt: "graphrag_config/prompts/entity_extraction.txt"
-  tuple_delimiter: "|"
+  prompt: "prompts/entity_extraction.txt"
+  tuple_delimiter: " | "
+  record_delimiter: "##"
+  completion_delimiter: "<|COMPLETE|>"
   entity_types: [
     "Contract",
     "Party",
@@ -69,17 +71,17 @@ extract_graph:
   max_gleanings: 1
 
 summarize_descriptions:
-  prompt: "graphrag_config/prompts/summarize_descriptions.txt"
+  prompt: "prompts/summarize_descriptions.txt"
   max_length: 500
 
 extract_claims:
   enabled: true
-  prompt: "graphrag_config/prompts/claim_extraction.txt"
+  prompt: "prompts/claim_extraction.txt"
   description: "Extract contractual obligations, rights, and key terms."
   max_gleanings: 1
 
 community_reports:
-  prompt: "graphrag_config/prompts/community_report.txt"
+  prompt: "prompts/community_report.txt"
   max_length: 2000
   max_input_length: 8000
 
@@ -94,8 +96,14 @@ umap:
 
 snapshots:
   graphml: false
-  raw_entities: false
-  top_level_nodes: false
+  raw_entities: true
+  top_level_nodes: true
+
+vector_store:
+  default_vector_store:
+    type: lancedb
+    db_uri: ../data/output/lancedb
+    overwrite: true
 
 local_search:
   text_unit_prop: 0.5

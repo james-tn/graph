@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Loader2, Sparkles, GitBranch, Database, Brain, Shield } from 'lucide-react';
+import { Search, Loader2, Sparkles, GitBranch, Database, Brain } from 'lucide-react';
 import { runHybridQuery } from '../api';
 
 interface HybridQuerySectionProps {
@@ -7,103 +7,103 @@ interface HybridQuerySectionProps {
 }
 
 const SAMPLE_QUERIES = [
-  // Graph Traversal Queries (PostgreSQL + Apache AGE)
+  // Contract Relationships & Hierarchies (NEW)
   {
-    text: "Map all obligations and penalties for Acme Corp across their contracts",
+    text: "Show the complete contract family tree for Zenith Technologies Master Services Agreement MSA-ZEN-202403-197",
     type: "postgres",
-    desc: "Multi-hop graph: Party → Contract → Clause → Obligations",
+    desc: "Master agreement → SOWs → Amendments hierarchy (3 children)",
     icon: "graph"
   },
   {
-    text: "Find all parties with indemnification obligations and trace to which contracts",
+    text: "Find all amendments and addenda to the Data Processing Agreement DPA-SUM-202502-324",
     type: "postgres",
-    desc: "Reverse graph: Obligation ← Clause ← Contract ← Party",
+    desc: "Contract relationship tracking + modification history (4 children)",
     icon: "graph"
   },
   {
-    text: "Show termination rights granted to each party and their triggering conditions",
+    text: "List all SOWs and work orders under the Phoenix Industries Master Agreement MSA-PHO-202508-344",
     type: "postgres",
-    desc: "Rights traversal: Party → Right ← Clause ← Contract",
+    desc: "Relationship hierarchy + SOW tracking (3 SOWs)",
     icon: "graph"
   },
   
-  // Legal Domain Queries (SQL + Vector Search)
+  // Vendor-Specific Analysis
   {
-    text: "Identify high-risk liability limitations clauses across all service agreements",
+    text: "What are all obligations and penalties for Acme Corp across their contracts?",
     type: "postgres",
-    desc: "Risk analysis + semantic search",
-    icon: "risk"
+    desc: "Multi-hop graph: Party → Contract → Clause → Obligations (55 contracts)",
+    icon: "graph"
   },
   {
-    text: "Find contracts with unusual warranty disclaimer language compared to industry standards",
+    text: "Find all high-risk liability limitation clauses in Phoenix Industries contracts",
     type: "postgres",
-    desc: "Vector similarity + deviation detection",
+    desc: "Semantic search + vendor filtering + risk analysis (41 contracts)",
     icon: "semantic"
   },
   {
-    text: "List all force majeure clauses and group by coverage scope (COVID, natural disasters, etc.)",
+    text: "Show the contract hierarchy for Pinnacle Services Data Processing Agreement DPA-PIN-202411-069",
     type: "postgres",
-    desc: "Full-text search + semantic clustering",
+    desc: "Relationship traversal + hierarchy visualization (4 children)",
+    icon: "graph"
+  },
+  
+  // Semantic Search & Contract-Specific Queries
+  {
+    text: "Find confidentiality and data processing clauses similar to Epsilon Group contracts",
+    type: "postgres",
+    desc: "Vector search + similarity ranking (32 contracts)",
+    icon: "semantic"
+  },
+  {
+    text: "Search for force majeure clauses mentioning pandemic or natural disasters in Gamma Inc service agreements",
+    type: "postgres",
+    desc: "Vector similarity + vendor filtering + text matching (29 contracts)",
+    icon: "semantic"
+  },
+  {
+    text: "Identify unusual warranty disclaimers in Atlas Ventures and Nexus Corporation software license agreements",
+    type: "postgres",
+    desc: "Multi-vendor semantic search + deviation detection (34+31 contracts)",
     icon: "semantic"
   },
   
-  // Compliance & Due Diligence (Graph + Knowledge)
+  // Cross-Document Intelligence (Microsoft GraphRAG)
   {
-    text: "Audit trail: Which contracts have mutual confidentiality obligations vs one-way?",
-    type: "postgres",
-    desc: "Bilateral relationship analysis",
-    icon: "graph"
-  },
-  {
-    text: "Find all auto-renewal clauses and their notice periods across vendor contracts",
-    type: "postgres",
-    desc: "Temporal clause extraction + grouping",
-    icon: "temporal"
-  },
-  {
-    text: "Map intellectual property ownership chains: who owns what in which contracts?",
-    type: "postgres",
-    desc: "IP rights graph traversal",
-    icon: "graph"
-  },
-  
-  // Cross-Document Pattern Analysis (Microsoft GraphRAG)
-  {
-    text: "What are the common dispute resolution patterns across our contract portfolio?",
+    text: "Compare payment terms across all Delta LLC contracts and identify outliers",
     type: "graphrag",
-    desc: "Global knowledge graph reasoning",
+    desc: "Cross-document comparison + benchmarking (33 contracts)",
     icon: "knowledge"
   },
   {
-    text: "Compare payment term structures: identify outliers and benchmark against portfolio",
+    text: "Summarize all GDPR and data privacy obligations across Epsilon Group agreements",
     type: "graphrag",
-    desc: "Cross-document comparison + clustering",
+    desc: "Multi-document synthesis + compliance analysis (32 contracts)",
     icon: "knowledge"
   },
   {
-    text: "Summarize all data privacy and GDPR compliance obligations across contracts",
+    text: "What are common dispute resolution patterns in our Master Service Agreements?",
     type: "graphrag",
-    desc: "Multi-document synthesis + legal analysis",
+    desc: "Global knowledge graph reasoning + pattern detection",
     icon: "knowledge"
   },
   
-  // Hybrid Intelligence Queries
+  // Hybrid Intelligence (PostgreSQL + GraphRAG)
   {
-    text: "Full risk assessment: high-risk clauses + cross-contract inconsistencies + missing protections",
+    text: "Full risk assessment for Cascade Enterprises: high-risk clauses + cross-contract inconsistencies + missing protections",
     type: "hybrid",
-    desc: "SQL risk filter + GraphRAG pattern detection",
+    desc: "SQL risk filter + GraphRAG pattern detection (39 contracts)",
     icon: "hybrid"
   },
   {
-    text: "Contract relationship network: show dependencies, cross-references, and conflicting terms",
+    text: "Analyze Delta LLC contract network: show MSA dependencies, SOW relationships, and amendment impacts",
     type: "hybrid",
-    desc: "Graph structure + semantic conflict detection",
+    desc: "Graph structure + semantic conflict detection (33 contracts)",
     icon: "hybrid"
   },
   {
-    text: "Generate negotiation leverage report: find weak positions and favorable terms to replicate",
+    text: "Generate negotiation leverage report for Pinnacle Services: compare our terms vs. their proposed changes",
     type: "hybrid",
-    desc: "Graph power analysis + GraphRAG benchmarking",
+    desc: "Historical analysis + power dynamics + benchmarking",
     icon: "hybrid"
   }
 ];
@@ -235,14 +235,15 @@ export const HybridQuerySection: React.FC<HybridQuerySectionProps> = ({ onResult
         
         {/* Query Categories */}
         <div className="space-y-6">
-          {/* Graph Traversal Section */}
+          {/* Graph Traversal & Semantic Search Section */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 mb-3">
               <GitBranch className="w-4 h-4 text-blue-400" />
-              <h4 className="text-sm font-bold text-blue-300 uppercase tracking-wider">Graph Traversal Queries</h4>
+              <h4 className="text-sm font-bold text-blue-300 uppercase tracking-wider">Graph Traversal & Semantic Search</h4>
               <div className="flex-1 h-px bg-gradient-to-r from-blue-500/30 to-transparent"></div>
             </div>
-            {SAMPLE_QUERIES.slice(0, 3).map((sample, idx) => (
+            <p className="text-xs text-blue-300/70 mb-3 italic">Real-world vendor and contract-specific queries combining graph relationships and vector search</p>
+            {SAMPLE_QUERIES.slice(0, 9).map((sample, idx) => (
               <button
                 key={idx}
                 onClick={() => handleSearch(sample.text, 'auto')}
@@ -258,7 +259,7 @@ export const HybridQuerySection: React.FC<HybridQuerySectionProps> = ({ onResult
                       <span className="text-xs px-3 py-1 rounded-full font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30">
                         {sample.desc}
                       </span>
-                      <span className="text-xs text-blue-400/60">Apache AGE</span>
+                      <span className="text-xs text-blue-400/60">PostgreSQL + Apache AGE + Vectors</span>
                     </div>
                   </div>
                   <Search className="w-5 h-5 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -267,71 +268,7 @@ export const HybridQuerySection: React.FC<HybridQuerySectionProps> = ({ onResult
             ))}
           </div>
           
-          {/* SQL + Vector Search Section */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-3">
-              <Database className="w-4 h-4 text-cyan-400" />
-              <h4 className="text-sm font-bold text-cyan-300 uppercase tracking-wider">Legal Domain Analysis</h4>
-              <div className="flex-1 h-px bg-gradient-to-r from-cyan-500/30 to-transparent"></div>
-            </div>
-            {SAMPLE_QUERIES.slice(3, 6).map((sample, idx) => (
-              <button
-                key={idx + 3}
-                onClick={() => handleSearch(sample.text, 'auto')}
-                disabled={loading}
-                className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-cyan-900/30 hover:to-slate-800/50 rounded-xl border border-cyan-500/20 hover:border-cyan-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-cyan-500/20"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-cyan-100 group-hover:text-white transition-colors font-medium mb-2">
-                      {sample.text}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs px-3 py-1 rounded-full font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
-                        {sample.desc}
-                      </span>
-                      <span className="text-xs text-cyan-400/60">PostgreSQL + Vectors</span>
-                    </div>
-                  </div>
-                  <Search className="w-5 h-5 text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-              </button>
-            ))}
-          </div>
-          
-          {/* Compliance Section */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-3">
-              <Shield className="w-4 h-4 text-amber-400" />
-              <h4 className="text-sm font-bold text-amber-300 uppercase tracking-wider">Compliance & Due Diligence</h4>
-              <div className="flex-1 h-px bg-gradient-to-r from-amber-500/30 to-transparent"></div>
-            </div>
-            {SAMPLE_QUERIES.slice(6, 9).map((sample, idx) => (
-              <button
-                key={idx + 6}
-                onClick={() => handleSearch(sample.text, 'auto')}
-                disabled={loading}
-                className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-amber-900/30 hover:to-slate-800/50 rounded-xl border border-amber-500/20 hover:border-amber-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-amber-500/20"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-amber-100 group-hover:text-white transition-colors font-medium mb-2">
-                      {sample.text}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs px-3 py-1 rounded-full font-semibold bg-amber-500/20 text-amber-300 border border-amber-400/30">
-                        {sample.desc}
-                      </span>
-                      <span className="text-xs text-amber-400/60">Graph + SQL</span>
-                    </div>
-                  </div>
-                  <Search className="w-5 h-5 text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-              </button>
-            ))}
-          </div>
-          
-          {/* GraphRAG Knowledge Section */}
+          {/* Cross-Document Intelligence Section */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 mb-3">
               <Brain className="w-4 h-4 text-green-400" />

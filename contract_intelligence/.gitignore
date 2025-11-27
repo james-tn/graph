@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+*.egg-info/
+
+# Debug & Test files
+debug_*.py
+debug_*.txt
+test_*.py
+*_test.py
+contract_analysis.txt
+
+# Logs
+logs/
+*.log
+
+# Cache
+cache/
+.cache/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+data/output/*.parquet
+data/output/lancedb/
+data/output/*.json
+test_graphrag/

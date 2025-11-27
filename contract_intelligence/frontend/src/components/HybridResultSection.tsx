@@ -1,6 +1,52 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { CheckCircle2, Database, Brain, GitBranch, AlertCircle, Sparkles, ExternalLink } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import mermaid from 'mermaid';
+
+// Initialize mermaid
+if (typeof window !== 'undefined') {
+  mermaid.initialize({ 
+    startOnLoad: true, 
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#a855f7',
+      primaryTextColor: '#fff',
+      primaryBorderColor: '#9333ea',
+      lineColor: '#c084fc',
+      secondaryColor: '#ec4899',
+      tertiaryColor: '#3b82f6',
+      background: '#1e293b',
+      mainBkg: '#1e293b',
+      textColor: '#e2e8f0',
+      fontSize: '14px'
+    }
+  });
+}
+
+// Mermaid component for rendering diagrams
+const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (ref.current && chart) {
+      try {
+        mermaid.render(`mermaid-${Math.random()}`, chart).then(({ svg }) => {
+          if (ref.current) {
+            ref.current.innerHTML = svg;
+          }
+        });
+      } catch (error) {
+        console.error('Mermaid rendering error:', error);
+        if (ref.current) {
+          ref.current.innerHTML = `<pre class="text-red-400">Error rendering diagram</pre>`;
+        }
+      }
+    }
+  }, [chart]);
+
+  return <div ref={ref} className="my-6 flex justify-center" />;
+};
 
 interface HybridResultSectionProps {
   result: any;
@@ -76,13 +122,61 @@ export const HybridResultSection: React.FC<HybridResultSectionProps> = ({ result
         <div className="prose prose-invert prose-purple max-w-none">
           <div className="text-purple-100 leading-relaxed space-y-4">
             <ReactMarkdown 
+              remarkPlugins={[remarkGfm]}
               components={{
-                h3: ({node, ...props}) => <h3 className="text-2xl font-bold text-purple-300 mt-8 mb-4 flex items-center gap-3" {...props} />,
+                h1: ({node, ...props}) => <h1 className="text-3xl font-bold text-purple-200 mt-8 mb-4" {...props} />,
+                h2: ({node, ...props}) => <h2 className="text-2xl font-bold text-purple-300 mt-6 mb-3" {...props} />,
+                h3: ({node, ...props}) => <h3 className="text-xl font-bold text-purple-300 mt-6 mb-3" {...props} />,
                 p: ({node, ...props}) => <p className="text-purple-100 mb-4 leading-relaxed" {...props} />,
                 strong: ({node, ...props}) => <strong className="text-white font-bold" {...props} />,
-                ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-2 ml-4" {...props} />,
+                em: ({node, ...props}) => <em className="text-purple-200 italic" {...props} />,
+                ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-2 ml-4 mb-4" {...props} />,
+                ol: ({node, ...props}) => <ol className="list-decimal list-inside space-y-2 ml-4 mb-4" {...props} />,
                 li: ({node, ...props}) => <li className="text-purple-200" {...props} />,
-                code: ({node, ...props}) => <code className="bg-slate-800/70 px-2 py-1 rounded text-pink-300 font-mono text-sm" {...props} />,
+                blockquote: ({node, ...props}) => (
+                  <blockquote className="border-l-4 border-purple-500 pl-4 py-2 my-4 bg-purple-900/20 italic text-purple-200" {...props} />
+                ),
+                hr: ({node, ...props}) => <hr className="my-6 border-purple-500/30" {...props} />,
+                table: ({node, ...props}) => (
+                  <div className="overflow-x-auto my-6">
+                    <table className="min-w-full border-collapse border border-purple-500/30" {...props} />
+                  </div>
+                ),
+                thead: ({node, ...props}) => <thead className="bg-purple-900/40" {...props} />,
+                tbody: ({node, ...props}) => <tbody {...props} />,
+                tr: ({node, ...props}) => <tr className="border-b border-purple-500/20" {...props} />,
+                th: ({node, ...props}) => (
+                  <th className="px-4 py-2 text-left font-bold text-purple-300 border border-purple-500/30" {...props} />
+                ),
+                td: ({node, ...props}) => (
+                  <td className="px-4 py-2 text-purple-200 border border-purple-500/20" {...props} />
+                ),
+                code: ({node, inline, className, children, ...props}: any) => {
+                  const match = /language-(\w+)/.exec(className || '');
+                  const language = match ? match[1] : null;
+                  
+                  // Check if it's a mermaid diagram
+                  if (!inline && language === 'mermaid') {
+                    return <MermaidDiagram chart={String(children).replace(/\n$/, '')} />;
+                  }
+                  
+                  // Regular code block
+                  if (!inline) {
+                    return (
+                      <pre className="bg-slate-900/70 p-4 rounded-lg my-4 overflow-x-auto border border-purple-500/20">
+                        <code className="text-pink-300 font-mono text-sm" {...props}>
+                          {children}
+                        </code>
+                      </pre>
+                    );
+                  }
+                  
+                  // Inline code
+                  return <code className="bg-slate-800/70 px-2 py-1 rounded text-pink-300 font-mono text-sm" {...props}>{children}</code>;
+                },
+                a: ({node, ...props}) => (
+                  <a className="text-blue-400 hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer" {...props} />
+                ),
               }}
             >
               {unified_response}
@@ -144,17 +238,35 @@ export const HybridResultSection: React.FC<HybridResultSectionProps> = ({ result
                   <Database className="w-5 h-5" />
                   PostgreSQL Response
                 </h4>
-                {postgres_result.sql_queries && postgres_result.sql_queries.length > 0 && (
-                  <div className="mb-3 space-y-2">
-                    <p className="text-xs text-blue-400 font-semibold">SQL {postgres_result.sql_queries.length > 1 ? 'Queries' : 'Query'} Executed:</p>
-                    {postgres_result.sql_queries.map((query: string, idx: number) => (
-                      <div key={idx} className="p-3 bg-slate-900/50 rounded border border-blue-500/20">
-                        {postgres_result.sql_queries.length > 1 && (
-                          <p className="text-xs text-blue-300 mb-1">Query {idx + 1}:</p>
+                {postgres_result.tool_calls && postgres_result.tool_calls.length > 0 && (
+                  <div className="mb-3 space-y-3">
+                    <p className="text-xs text-blue-400 font-semibold">
+                      {postgres_result.tool_calls.length > 1 ? `${postgres_result.tool_calls.length} Tool Calls` : 'Tool Call'}:
+                    </p>
+                    {postgres_result.tool_calls.map((toolCall: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-slate-900/50 rounded border border-blue-500/20 space-y-2">
+                        {postgres_result.tool_calls.length > 1 && (
+                          <p className="text-xs text-blue-300 font-semibold mb-2">Tool Call {idx + 1}</p>
                         )}
-                        <pre className="text-xs text-blue-200 whitespace-pre-wrap font-mono overflow-x-auto">
-                          {query}
-                        </pre>
+                        {toolCall.reasoning && (
+                          <div className="mb-2">
+                            <p className="text-xs text-blue-400 mb-1">🤔 Model's Reasoning:</p>
+                            <p className="text-sm text-blue-200 italic pl-3 border-l-2 border-blue-500/40">
+                              {toolCall.reasoning}
+                            </p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-xs text-blue-400 mb-1">📝 SQL Query:</p>
+                          <pre className="text-xs text-blue-200 whitespace-pre-wrap font-mono overflow-x-auto pl-3">
+                            {toolCall.sql_query}
+                          </pre>
+                        </div>
+                        {toolCall.need_embedding && toolCall.search_text && (
+                          <div className="text-xs text-blue-300/70 mt-2">
+                            🔍 Semantic search for: "{toolCall.search_text}"
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

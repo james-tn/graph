@@ -53,6 +53,7 @@ CREATE TABLE contracts (
     id SERIAL PRIMARY KEY,
     tenant_id VARCHAR(50) DEFAULT 'default',
     contract_identifier VARCHAR(200) UNIQUE NOT NULL,
+    reference_number VARCHAR(100),  -- E.g., MSA-ABC-202401-005, SOW-ABC-202403-012
     title TEXT NOT NULL,
     contract_type VARCHAR(100),
     effective_date DATE,
@@ -66,6 +67,20 @@ CREATE TABLE contracts (
     source_markdown TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Contract relationships table (parent-child, amendments, SOWs, etc.)
+CREATE TABLE contract_relationships (
+    id SERIAL PRIMARY KEY,
+    tenant_id VARCHAR(50) DEFAULT 'default',
+    child_contract_id INTEGER NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
+    parent_contract_id INTEGER REFERENCES contracts(id) ON DELETE CASCADE,
+    parent_reference_number VARCHAR(100),  -- Parent ref captured even if not yet ingested
+    parent_identifier VARCHAR(200),        -- Parent file identifier
+    relationship_type VARCHAR(200) NOT NULL, -- 'amendment', 'sow', 'addendum', 'work_order', 'maintenance', 'related'
+    relationship_description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(child_contract_id, parent_contract_id, relationship_type)
 );
 
 CREATE TABLE parties (
@@ -199,6 +214,12 @@ CREATE INDEX idx_contracts_tenant ON contracts(tenant_id);
 CREATE INDEX idx_contracts_type ON contracts(contract_type);
 CREATE INDEX idx_contracts_dates ON contracts(effective_date, expiration_date);
 CREATE INDEX idx_contracts_risk ON contracts(risk_score_overall);
+CREATE INDEX idx_contracts_reference ON contracts(reference_number);
+
+CREATE INDEX idx_contract_relationships_child ON contract_relationships(child_contract_id);
+CREATE INDEX idx_contract_relationships_parent ON contract_relationships(parent_contract_id);
+CREATE INDEX idx_contract_relationships_type ON contract_relationships(relationship_type);
+CREATE INDEX idx_contract_relationships_parent_ref ON contract_relationships(parent_reference_number);
 
 CREATE INDEX idx_parties_tenant ON parties(tenant_id);
 CREATE INDEX idx_parties_name ON parties(name);
