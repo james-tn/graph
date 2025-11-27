@@ -16,6 +16,9 @@ debug_*.py
 debug_*.txt
 test_*.py
 *_test.py
+run_*.py
+start_*.bat
+!start_backend.bat
 contract_analysis.txt
 
 # Logs

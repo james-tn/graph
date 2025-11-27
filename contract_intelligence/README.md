@@ -39,16 +39,20 @@ PostgreSQL Agent ←→ Router Agent ←→ GraphRAG Agent
    set GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-small
    ```
 
-### Run the Pipeline
+### Run the Application
 
+**Backend:**
 ```bash
-start.bat
+start_backend.bat
 ```
 
-This will:
-1. **Ingest contracts** with LLM extraction (contracts, parties, clauses, obligations, rights, terms, monetary values)
-2. **Build graph** in Apache AGE (nodes and relationships)
-3. **Run AI agent** with SQL, vector search, and graph traversal queries
+**Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+
+Then open http://localhost:5173 for the hybrid search interface.
 
 ## Key Features
 
