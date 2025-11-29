@@ -51,178 +51,6 @@ openai_client = OpenAI(
 
 EMBEDDING_MODEL = os.environ.get("GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
 
-# Database Schema and Ontology
-DATABASE_SCHEMA = """
-=== PostgreSQL Database Schema ===
-
-TABLES:
-
-1. contracts
-   - id (PRIMARY KEY)
-   - contract_identifier (VARCHAR(200), UNIQUE) - e.g., 'contract_000_AcmeCorp'
-   - reference_number (VARCHAR(200)) - e.g., 'MSA-ABC-202401-005', 'SOW-XYZ-202403-012'
-   - title (TEXT)
-   - contract_type (VARCHAR(200)) - Values: 'Master Services Agreement', 'Statement of Work', 'Amendment', 'Addendum', 'Service Agreement', 'NDA', etc.
-   - effective_date (DATE)
-   - expiration_date (DATE)
-   - status (VARCHAR(50)) - Values: 'active', 'expired', 'terminated'
-   - governing_law (VARCHAR(200))
-   - jurisdiction_id (FOREIGN KEY -> jurisdictions.id)
-   - source_file_path (TEXT)
-
-2. contract_relationships (NEW - Contract Hierarchies)
-   - id (PRIMARY KEY)
-   - child_contract_id (FOREIGN KEY -> contracts.id) - The dependent contract
-   - parent_contract_id (FOREIGN KEY -> contracts.id) - The master/parent contract
-   - parent_reference_number (VARCHAR(200)) - Parent reference even if not yet ingested
-   - parent_identifier (VARCHAR(200)) - Parent file identifier
-   - relationship_type (TEXT) - Describes relationship: 'Statement of Work under Master Services Agreement', 'Amendment', 'Addendum', 'Work Order', 'Maintenance Agreement', etc.
-   - relationship_description (TEXT) - Additional details about the relationship
-   - created_at (TIMESTAMP)
-   
-   IMPORTANT: This table captures contract hierarchies and dependencies:
-   - SOWs linked to their Master Service Agreements
-   - Amendments linked to original contracts
-   - Addenda linked to base documents
-   - Work Orders linked to framework agreements
-
-3. clauses
-   - id (PRIMARY KEY)
-   - contract_id (FOREIGN KEY -> contracts.id)
-   - section_label (TEXT) - e.g., 'Section 3.1', 'Article 5'
-   - title (TEXT)
-   - text_content (TEXT) - Full clause text
-   - position_in_contract (INTEGER)
-   - clause_type_id (FOREIGN KEY -> clause_types.id)
-   - clause_type_custom (TEXT) - Free text if not in clause_types
-   - risk_level (TEXT) - Values: 'high', 'medium', 'low', NULL
-   - embedding (VECTOR(1536)) - For semantic search
-   - full_text_vector (TSVECTOR) - For keyword search
-
-3. parties
-   - id (PRIMARY KEY)
-   - name (TEXT) - Party name, e.g., 'Acme Corp', 'John Smith'
-   - party_type (TEXT) - Values: 'Company', 'Individual', 'Government', etc.
-
-4. parties_contracts (Many-to-many relationship)
-   - party_id (FOREIGN KEY -> parties.id)
-   - contract_id (FOREIGN KEY -> contracts.id)
-   - role_id (FOREIGN KEY -> party_roles.id)
-   - role_description (TEXT)
-
-5. party_roles
-   - id (PRIMARY KEY)
-   - name (TEXT) - Values: 'Vendor', 'Client', 'Employer', 'Employee', 'Lessor', 'Lessee', etc.
-
-6. clause_types
-   - id (PRIMARY KEY)
-   - name (TEXT) - Values: 'Confidentiality', 'Termination', 'Payment', 'Liability', 'Indemnification', 'IP Rights', etc.
-
-=== Apache AGE Graph Schema ===
-
-Graph Name: contract_intelligence
-
-NODE TYPES:
-- Contract: {identifier, title, type, governing_law}
-- Clause: {section, title, type, risk_level}
-- Party: {name, type}
-- Obligation: {description, penalty, is_high_impact}
-- Right: {description, condition}
-
-RELATIONSHIP TYPES:
-- (Party)-[:IS_PARTY_TO]->(Contract)
-- (Contract)-[:CONTAINS_CLAUSE]->(Clause)
-- (Clause)-[:IMPOSES_OBLIGATION]->(Obligation)
-- (Clause)-[:GRANTS_RIGHT]->(Right)
-- (Party)-[:HOLDS_RIGHT]->(Right)
-
-=== Query Capabilities ===
-
-1. SQL Queries:
-   - SELECT with JOINs across tables
-   - WHERE clauses with ILIKE for case-insensitive pattern matching
-   - Aggregations: COUNT, SUM, AVG, GROUP BY
-   - Date comparisons and filtering
-   - Risk level filtering
-
-2. Semantic Search (Vector Similarity):
-   - Use: cl.embedding <=> '[embedding_vector]'::vector
-   - Returns similarity score: 1 - (cl.embedding <=> vector)
-   - Order by: cl.embedding <=> vector (ascending = most similar)
-
-3. Full-Text Search:
-   - Use: cl.full_text_vector @@ plainto_tsquery('english', 'search_term')
-   - Ranking: ts_rank(cl.full_text_vector, plainto_tsquery('english', 'term'))
-
-4. Graph Traversal (Apache AGE Cypher):
-   - Must set: SET search_path = ag_catalog, '$user', public;
-   - Pattern: SELECT * FROM ag_catalog.cypher('contract_intelligence', $$ CYPHER_QUERY $$) as (col1 agtype, col2 agtype, ...);
-   - Use MATCH patterns for multi-hop relationships
-   - Use WHERE with =~ for regex matching (case-insensitive: '.*term.*')
-   - Always LIMIT results (max 50)
-
-=== Common Query Patterns ===
-
-Find contracts by party:
-  SELECT c.* FROM contracts c
-  JOIN parties_contracts pc ON c.id = pc.contract_id
-  JOIN parties p ON pc.party_id = p.id
-  WHERE p.name ILIKE '%party_name%'
-
-Find contract relationships (parent-child hierarchy):
-  SELECT 
-    parent.contract_identifier as parent_contract,
-    parent.reference_number as parent_ref,
-    child.contract_identifier as child_contract,
-    child.reference_number as child_ref,
-    cr.relationship_type,
-    cr.relationship_description
-  FROM contract_relationships cr
-  JOIN contracts child ON cr.child_contract_id = child.id
-  LEFT JOIN contracts parent ON cr.parent_contract_id = parent.id
-  WHERE parent.reference_number ILIKE '%MSA%' OR cr.relationship_type ILIKE '%master%'
-
-Find all children of a master agreement:
-  SELECT c.contract_identifier, c.reference_number, c.title, cr.relationship_type
-  FROM contract_relationships cr
-  JOIN contracts c ON cr.child_contract_id = c.id
-  WHERE cr.parent_contract_id = (SELECT id FROM contracts WHERE reference_number = 'MSA-ABC-202401-005')
-
-Find contract family (parent + all children):
-  WITH RECURSIVE contract_tree AS (
-    -- Start with parent
-    SELECT id, contract_identifier, reference_number, title, 0 as level
-    FROM contracts WHERE reference_number = 'MSA-ABC-202401-005'
-    UNION ALL
-    -- Get children recursively
-    SELECT c.id, c.contract_identifier, c.reference_number, c.title, ct.level + 1
-    FROM contracts c
-    JOIN contract_relationships cr ON c.id = cr.child_contract_id
-    JOIN contract_tree ct ON cr.parent_contract_id = ct.id
-  )
-  SELECT * FROM contract_tree ORDER BY level, reference_number
-
-Find orphaned relationships (parent not yet ingested):
-  SELECT c.contract_identifier, cr.parent_reference_number, cr.relationship_type
-  FROM contract_relationships cr
-  JOIN contracts c ON cr.child_contract_id = c.id
-  WHERE cr.parent_contract_id IS NULL
-
-Find high-risk clauses:
-  SELECT c.contract_identifier, cl.section_label, cl.text_content
-  FROM clauses cl
-  JOIN contracts c ON cl.contract_id = c.id
-  WHERE cl.risk_level = 'high'
-
-Semantic similarity (requires embedding vector):
-  ORDER BY cl.embedding <=> '[vector]'::vector LIMIT 10
-
-Graph: Party obligations:
-  MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
-  WHERE p.name =~ '.*party.*'
-  RETURN p.name, c.title, o.description
-"""
-
 def get_db_connection():
     """Create a database connection."""
     return psycopg2.connect(
@@ -372,121 +200,109 @@ def execute_sql_query(
         return f"SQL Query Error: {str(e)}\n\nQuery was: {sql_query}"
 
 
-def get_database_schema() -> str:
-    """Get the complete database schema, ontology, and query patterns.
+# def get_contract_family(
+#     reference_number: Annotated[str, Field(description="Reference number of the parent/master contract (e.g., 'MSA-ABC-202401-005')")],
+#     max_depth: Annotated[int, Field(description="Maximum depth to traverse (default 5)")] = 5
+# ) -> str:
+#     """Get complete contract family tree showing parent contract and all descendants.
     
-    Use this first to understand the database structure before writing queries.
-    Returns table schemas, column names, data types, relationships, and example query patterns.
-    """
-    return DATABASE_SCHEMA
-
-
-def get_contract_family(
-    reference_number: Annotated[str, Field(description="Reference number of the parent/master contract (e.g., 'MSA-ABC-202401-005')")],
-    max_depth: Annotated[int, Field(description="Maximum depth to traverse (default 5)")] = 5
-) -> str:
-    """Get complete contract family tree showing parent contract and all descendants.
+#     This specialized tool finds:
+#     - The master/parent contract
+#     - All direct children (SOWs, amendments, addenda, work orders)
+#     - Nested relationships (e.g., amendments to SOWs under MSA)
+#     - Full hierarchy with levels
     
-    This specialized tool finds:
-    - The master/parent contract
-    - All direct children (SOWs, amendments, addenda, work orders)
-    - Nested relationships (e.g., amendments to SOWs under MSA)
-    - Full hierarchy with levels
-    
-    Example: For a Master Services Agreement, returns:
-    - Level 0: MSA-ABC-202401-005 (Master Services Agreement)
-    - Level 1: SOW-ABC-202403-012 (Statement of Work)
-    - Level 1: AMD-ABC-202406-025 (Amendment to MSA)
-    - Level 2: WO-ABC-202404-015 (Work Order under SOW)
-    """
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
+#     Example: For a Master Services Agreement, returns:
+#     - Level 0: MSA-ABC-202401-005 (Master Services Agreement)
+#     - Level 1: SOW-ABC-202403-012 (Statement of Work)
+#     - Level 1: AMD-ABC-202406-025 (Amendment to MSA)
+#     - Level 2: WO-ABC-202404-015 (Work Order under SOW)
+#     """
+#     try:
+#         conn = get_db_connection()
+#         cur = conn.cursor()
         
-        # Recursive CTE to get contract tree
-        query = """
-        WITH RECURSIVE contract_tree AS (
-            -- Start with the specified contract
-            SELECT 
-                c.id,
-                c.contract_identifier,
-                c.reference_number,
-                c.title,
-                c.contract_type,
-                c.effective_date,
-                c.status,
-                0 as level,
-                ARRAY[c.reference_number] as path,
-                CAST(NULL AS TEXT) as relationship_type
-            FROM contracts c
-            WHERE c.reference_number = %s
+#         # Recursive CTE to get contract tree
+#         query = """
+#         WITH RECURSIVE contract_tree AS (
+#             -- Start with the specified contract
+#             SELECT 
+#                 c.id,
+#                 c.contract_identifier,
+#                 c.reference_number,
+#                 c.title,
+#                 c.contract_type,
+#                 c.effective_date,
+#                 c.status,
+#                 0 as level,
+#                 ARRAY[c.reference_number] as path,
+#                 CAST(NULL AS TEXT) as relationship_type
+#             FROM contracts c
+#             WHERE c.reference_number = %s
             
-            UNION ALL
+#             UNION ALL
             
-            -- Get children recursively
-            SELECT 
-                c.id,
-                c.contract_identifier,
-                c.reference_number,
-                c.title,
-                c.contract_type,
-                c.effective_date,
-                c.status,
-                ct.level + 1,
-                ct.path || c.reference_number,
-                cr.relationship_type
-            FROM contracts c
-            JOIN contract_relationships cr ON c.id = cr.child_contract_id
-            JOIN contract_tree ct ON cr.parent_contract_id = ct.id
-            WHERE ct.level < %s
-        )
-        SELECT 
-            level,
-            reference_number,
-            title,
-            contract_type,
-            effective_date,
-            status,
-            relationship_type,
-            array_to_string(path, ' -> ') as hierarchy_path
-        FROM contract_tree
-        ORDER BY level, reference_number
-        """
+#             -- Get children recursively
+#             SELECT 
+#                 c.id,
+#                 c.contract_identifier,
+#                 c.reference_number,
+#                 c.title,
+#                 c.contract_type,
+#                 c.effective_date,
+#                 c.status,
+#                 ct.level + 1,
+#                 ct.path || c.reference_number,
+#                 cr.relationship_type
+#             FROM contracts c
+#             JOIN contract_relationships cr ON c.id = cr.child_contract_id
+#             JOIN contract_tree ct ON cr.parent_contract_id = ct.id
+#             WHERE ct.level < %s
+#         )
+#         SELECT 
+#             level,
+#             reference_number,
+#             title,
+#             contract_type,
+#             effective_date,
+#             status,
+#             relationship_type,
+#             array_to_string(path, ' -> ') as hierarchy_path
+#         FROM contract_tree
+#         ORDER BY level, reference_number
+#         """
         
-        cur.execute(query, (reference_number, max_depth))
-        results = cur.fetchall()
-        cur.close()
-        conn.close()
+#         cur.execute(query, (reference_number, max_depth))
+#         results = cur.fetchall()
+#         cur.close()
+#         conn.close()
         
-        if not results:
-            return f"No contract found with reference number '{reference_number}'"
+#         if not results:
+#             return f"No contract found with reference number '{reference_number}'"
         
-        # Format as hierarchical tree
-        response = f"📋 **Contract Family Tree for {reference_number}**\n\n"
+#         # Format as hierarchical tree
+#         response = f"📋 **Contract Family Tree for {reference_number}**\n\n"
         
-        for row in results:
-            indent = "  " * row['level']
-            level_icon = "📄" if row['level'] == 0 else "├─" if row['level'] == 1 else "│ ├─"
+#         for row in results:
+#             indent = "  " * row['level']
+#             level_icon = "📄" if row['level'] == 0 else "├─" if row['level'] == 1 else "│ ├─"
             
-            response += f"{indent}{level_icon} **{row['reference_number']}**\n"
-            response += f"{indent}   Title: {row['title']}\n"
-            response += f"{indent}   Type: {row['contract_type']}\n"
-            if row['relationship_type']:
-                response += f"{indent}   Relationship: {row['relationship_type']}\n"
-            response += f"{indent}   Status: {row['status']} | Date: {row['effective_date']}\n"
-            response += f"{indent}   Path: {row['hierarchy_path']}\n\n"
+#             response += f"{indent}{level_icon} **{row['reference_number']}**\n"
+#             response += f"{indent}   Title: {row['title']}\n"
+#             response += f"{indent}   Type: {row['contract_type']}\n"
+#             if row['relationship_type']:
+#                 response += f"{indent}   Relationship: {row['relationship_type']}\n"
+#             response += f"{indent}   Status: {row['status']} | Date: {row['effective_date']}\n"
+#             response += f"{indent}   Path: {row['hierarchy_path']}\n\n"
         
-        response += f"\n**Total contracts in family:** {len(results)}"
-        response += f"\n**Maximum depth:** {max(r['level'] for r in results)}"
+#         response += f"\n**Total contracts in family:** {len(results)}"
+#         response += f"\n**Maximum depth:** {max(r['level'] for r in results)}"
         
-        return response
+#         return response
     
-    except Exception as e:
-        return f"Error getting contract family: {str(e)}"
+#     except Exception as e:
+#         return f"Error getting contract family: {str(e)}"
 
-
-# Legacy predefined functions removed - replaced by generic execute_sql_query and execute_cypher_query
-# The agent now dynamically writes SQL and Cypher queries based on the database schema
 
 
 class ContractAgent:
@@ -501,248 +317,166 @@ class ContractAgent:
         
         self.agent = ChatAgent(
             chat_client=AzureOpenAIResponsesClient(api_key=api_key),
-            instructions="""You are a Contract Intelligence Assistant with direct access to a PostgreSQL database with Apache AGE graph capabilities.
+            instructions="""You are a Contract Intelligence Assistant with PostgreSQL + Apache AGE graph database access.
 
-**YOUR TOOLS:**
+## DATABASE SCHEMA
 
-1. **get_database_schema** - Always call FIRST to understand tables, columns, and relationships
-2. **execute_sql_query** - The main query tool that handles:
-   • Standard SQL (JOINs, WHERE, GROUP BY, aggregations)
-   • Semantic search via pgvector (ORDER BY embedding <=> %s)
-   • Graph traversal via Apache AGE cypher() function
-3. **get_contract_family** - Specialized tool for contract hierarchies:
-   • Gets complete family tree for any master agreement
-   • Shows all SOWs, amendments, addenda, work orders
-   • Displays nested relationships with levels
-   • Use when user asks about "contract family", "related contracts", "children", or "hierarchy"
+### Core Tables
 
-**WORKFLOW:**
+**contracts** - Contract documents
+- id, contract_identifier (unique), reference_number (e.g., MSA-ABC-202401-005)
+- title, contract_type (see types below)
+- effective_date, expiration_date, status ('active', 'expired', 'terminated')
+- governing_law, jurisdiction_id → jurisdictions
 
-1. **Understand the schema**: Call get_database_schema() FIRST to see tables, columns, graph structure, and examples
-2. **Plan your approach**: Determine what data you need and what query types to use
-   - For contract families: Use contract_relationships table to find MSAs, SOWs, amendments
-   - For obligations/rights: Use graph traversal with Apache AGE
-   - For semantic content: Use vector similarity search
-   - For analytics: Use standard SQL with aggregations
-3. **Execute queries**: Use execute_sql_query with appropriate SQL/Cypher/semantic patterns
-4. **For complex questions**: Make MULTIPLE tool calls to gather complete information
-   - Example: First find master agreement, then get all related SOWs and amendments
-   - Example: Analyze contract hierarchy, then drill into high-risk clauses in each document
-   - Example: Get statistical overview, then examine specific relationships
-   - Example: Combine SQL analytics with graph relationship analysis
-5. **Synthesize results**: Combine insights from multiple queries into coherent answer
+**contract_relationships** - Contract hierarchies (MSA → SOWs, amendments, etc.)
+- child_contract_id → contracts, parent_contract_id → contracts
+- parent_reference_number (captured even if parent not ingested)
+- relationship_type: 'amendment', 'sow', 'addendum', 'work_order', 'maintenance', 'related'
+- relationship_description
 
-**QUERY PATTERNS:**
+**clauses** - Contract sections
+- contract_id → contracts, clause_type_id → clause_types
+- section_label, title, text_content
+- risk_level: 'low', 'medium', 'high'
+- embedding vector(1536) - for semantic search
+- full_text_vector tsvector - for keyword search
 
-📊 **Standard SQL** (for analytics, filtering, aggregations):
+**parties** - Organizations and individuals
+- name, party_type, address, jurisdiction_id → jurisdictions
+
+**parties_contracts** - Party-contract relationships
+- party_id → parties, contract_id → contracts
+- role_id → party_roles, role_description
+
+**obligations** - Contractual obligations
+- clause_id → clauses, description
+- responsible_party_id → parties, beneficiary_party_id → parties
+- due_date, penalty_description, is_high_impact
+
+**rights** - Contractual rights
+- clause_id → clauses, description
+- holder_party_id → parties, condition_description, expiration_date
+
+**monetary_values** - Financial amounts
+- contract_id → contracts, clause_id → clauses
+- amount, currency (ISO codes: USD, EUR, GBP, JPY, CAD, AUD, CHF, CNY, INR)
+- value_type, context
+
+**risks** - Identified risks
+- contract_id → contracts, clause_id → clauses
+- risk_type_id → risk_types, risk_level ('low', 'medium', 'high')
+- rationale, is_confirmed
+
+### Lookup Tables with Values
+
+**clause_types**: Definitions, Indemnification, Limitation of Liability, Confidentiality, Intellectual Property, Termination, Payment Terms, Warranties, Data Protection, Force Majeure, Dispute Resolution, Service Level Agreement, Change Management, Acceptance Criteria, Insurance, Other
+
+**party_roles**: Client, Vendor, Licensor, Licensee, Consultant, Partner, Employer, Employee, Landlord, Tenant
+
+**risk_types**: Uncapped Liability, Unlimited Indemnity, Auto-Renewal, Unilateral Modification, Data Sovereignty, Weak Termination Rights, Intellectual Property Transfer, Broad NDA Scope, Payment Terms, Regulatory Compliance
+
+**contract_types** (common values): Master Services Agreement, Statement of Work, Amendment, Addendum, Service Agreement, NDA, Purchase Agreement, Employment Agreement, Lease Agreement, License Agreement, Data Processing Agreement, Consulting Agreement, Other
+
+### Apache AGE Graph
+Graph: `contract_intelligence`
+Nodes: Contract, Clause, Party, Obligation, Right
+Edges: IS_PARTY_TO, CONTAINS_CLAUSE, IMPOSES_OBLIGATION, GRANTS_RIGHT, HOLDS_RIGHT
+
+## QUERY TOOLS
+
+**execute_sql_query(sql_query, need_embedding=False, search_text=None)** - Main query tool for:
+- Standard SQL (JOINs, WHERE, GROUP BY, aggregations)
+- Contract hierarchies via contract_relationships table
+- Semantic search: `ORDER BY embedding <=> %s` with need_embedding=True
+- Graph traversal: `SELECT * FROM cypher('contract_intelligence', $$ ... $$) as (col1 agtype, ...)`
+
+
+## QUERY PATTERNS
+
+**Contract Relationships:**
 ```sql
-SELECT c.contract_identifier, COUNT(cl.id) as clause_count
-FROM contracts c
-JOIN clauses cl ON c.id = cl.contract_id
-WHERE c.contract_type = 'Service Agreement'
-GROUP BY c.contract_identifier
-LIMIT 20
-```
-
-🔗 **Contract Relationships** (for hierarchies, amendments, SOWs):
-```sql
--- Find all SOWs under a Master Agreement
-SELECT 
-  parent.reference_number as master_agreement,
-  child.reference_number as sow_reference,
-  child.title as sow_title,
-  cr.relationship_type
+-- Find SOWs under MSA
+SELECT child.reference_number, child.title, cr.relationship_type
 FROM contract_relationships cr
 JOIN contracts child ON cr.child_contract_id = child.id
 JOIN contracts parent ON cr.parent_contract_id = parent.id
 WHERE parent.reference_number = 'MSA-ABC-202401-005'
-  AND cr.relationship_type ILIKE '%statement of work%'
 LIMIT 20
 ```
 
-🌳 **Contract Family Tree** (recursive query for full hierarchy):
+**Recursive Family Tree:**
 ```sql
-WITH RECURSIVE contract_tree AS (
-  SELECT id, contract_identifier, reference_number, title, 0 as level,
-         ARRAY[contract_identifier] as path
+WITH RECURSIVE tree AS (
+  SELECT id, reference_number, title, 0 as level
   FROM contracts WHERE reference_number = 'MSA-ABC-202401-005'
   UNION ALL
-  SELECT c.id, c.contract_identifier, c.reference_number, c.title, ct.level + 1,
-         ct.path || c.contract_identifier
+  SELECT c.id, c.reference_number, c.title, t.level + 1
   FROM contracts c
   JOIN contract_relationships cr ON c.id = cr.child_contract_id
-  JOIN contract_tree ct ON cr.parent_contract_id = ct.id
-  WHERE ct.level < 5  -- Prevent infinite loops
+  JOIN tree t ON cr.parent_contract_id = t.id
 )
-SELECT level, reference_number, title, path FROM contract_tree ORDER BY level, reference_number
-LIMIT 50
+SELECT * FROM tree ORDER BY level LIMIT 50
 ```
 
-🔍 **Semantic Search** (for finding similar content):
+**Semantic Search:**
 ```sql
-SELECT c.contract_identifier, cl.section_label, cl.text_content,
+SELECT c.contract_identifier, cl.text_content,
        1 - (cl.embedding <=> %s) as similarity
 FROM clauses cl
 JOIN contracts c ON cl.contract_id = c.id
-ORDER BY cl.embedding <=> %s
-LIMIT 20
+ORDER BY cl.embedding <=> %s LIMIT 20
 ```
-Call with: need_embedding=True, search_text="liability and indemnification"
+Use: need_embedding=True, search_text="liability limitations"
 
-🕸️ **Graph Traversal** (for relationships and obligations):
+**Graph Traversal:**
 ```sql
 SELECT * FROM cypher('contract_intelligence', $$
-  MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
+  MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)
   WHERE p.name =~ '.*Acme.*'
-  RETURN p.name, c.title, cl.section, o.description
+  RETURN p.name, c.title, cl.section
   LIMIT 20
-$$) as (party_name agtype, contract_title agtype, section agtype, obligation agtype)
+$$) as (party agtype, contract agtype, section agtype)
 ```
 
-**IMPORTANT GUIDELINES:**
+## OUTPUT FORMATTING
 
-✅ **DO:**
-- Always include LIMIT (20-50 for initial queries)
-- Use ILIKE '%term%' for case-insensitive text matching
-- For semantic search: Use %s placeholder, set need_embedding=True
-- For cypher(): Include column aliases with agtype for each return value
-- Make multiple queries for complex questions - don't try to answer everything in one query
-- Combine different query types (SQL + semantic + graph) when appropriate
-- Use WHERE clauses to filter by risk_level, contract_type, dates
+Use Markdown with tables, emojis (⚠️ high, ⚡ medium, ✓ low), and Mermaid charts.
 
-❌ **DON'T:**
-- Try to compute embeddings yourself - use need_embedding=True
-- Mix cypher() column aliases with SQL column types (always use agtype)
-- Forget LIMIT clauses
-- Try to answer complex multi-part questions with a single query
-
-**MULTIPLE TOOL CALLS FOR COMPLEX QUESTIONS:**
-
-When users ask complex questions like "analyze all contracts and their risks", break it down:
-1. First query: Get list of contracts with basic stats
-2. Second query: Analyze high-risk clauses separately
-3. Third query: Use graph traversal to find obligation patterns
-4. Synthesize: Combine all findings into comprehensive answer
-
-This approach is MORE effective than trying to write one mega-query!
-
-**OUTPUT FORMAT - BE CREATIVE WITH MARKDOWN:**
-
-Your responses are rendered with a rich Markdown visualizer. Use these formatting features creatively:
-
-📝 **Rich Text Formatting:**
-- Use **bold** for emphasis, *italics* for subtle highlights
-- Create clear section headers with ## and ###
-- Use > blockquotes for important findings or legal implications
-- Add horizontal rules (---) to separate major sections
-- Use emojis strategically: ⚠️ (high risk), ⚡ (medium risk), ✓ (low risk), 📊 (statistics), 🔍 (findings), 💡 (insights)
-
-📊 **Tables for Structured Data:**
-```markdown
-| Contract | Party | Risk Level | Key Findings |
-|----------|-------|------------|--------------|
-| contract_001 | Acme Corp | ⚠️ High | Unlimited liability |
-| contract_002 | Beta Ltd | ✓ Low | Standard terms |
-```
-
-📈 **Mermaid Charts for Visualizations:**
-
-Use Mermaid diagrams when they help communicate relationships, flows, or hierarchies:
-
-**Contract Hierarchy Graphs:**
+**Contract Hierarchy:**
 ```mermaid
 graph TD
-    MSA[MSA-ABC-202401-005<br/>Master Services Agreement] --> SOW1[SOW-ABC-202403-012<br/>Development Services]
-    MSA --> SOW2[SOW-ABC-202405-018<br/>Consulting Services]
-    MSA --> AMD1[AMD-ABC-202406-025<br/>Rate Amendment]
-    SOW1 --> WO1[WO-ABC-202404-015<br/>Work Order Q2]
-    SOW1 --> WO2[WO-ABC-202407-029<br/>Work Order Q3]
-    SOW2 --> ADD1[ADD-ABC-202406-022<br/>Addendum: Remote Work]
-    
+    MSA[MSA-ABC-001<br/>Master Agreement] --> SOW1[SOW-ABC-012<br/>Dev Services]
+    MSA --> AMD1[AMD-ABC-025<br/>Amendment]
     style MSA fill:#e1f5ff,stroke:#0066cc,stroke-width:3px
     style SOW1 fill:#fff4e6,stroke:#ff9800
-    style SOW2 fill:#fff4e6,stroke:#ff9800
-    style AMD1 fill:#ffe6e6,stroke:#d32f2f
 ```
 
-**Party-Contract Relationships:**
+**Risk Distribution:**
+```mermaid
+pie title Risk Levels
+    "High" : 23
+    "Medium" : 45
+    "Low" : 32
+```
+
+**Party Relationships:**
 ```mermaid
 graph LR
     A[Acme Corp] -->|Vendor| B[Contract 001]
     A -->|Partner| C[Contract 008]
-    B -->|Contains| D[High-Risk Clauses]
-    C -->|Contains| E[Standard Terms]
 ```
 
-**Process Flows:**
-```mermaid
-flowchart TD
-    A[Contract Initiation] --> B{Type?}
-    B -->|Service| C[Service Terms]
-    B -->|Purchase| D[Purchase Terms]
-    C --> E[Risk Assessment]
-    D --> E
-```
+## GUIDELINES
 
-**Pie/Bar Charts for Statistics:**
-```mermaid
-pie title Contract Risk Distribution
-    "High Risk" : 23
-    "Medium Risk" : 45
-    "Low Risk" : 32
-```
-
-**Timeline Visualizations:**
-```mermaid
-gantt
-    title Contract Timeline
-    section Acme Corp
-    Contract 001 :2023-01-01, 365d
-    Contract 008 :2023-06-01, 730d
-```
-
-**Example Rich Response:**
-
-## 🔍 Analysis Results
-
-Found **5 high-risk contracts** with liability concerns:
-
-### ⚠️ Critical Findings
-
-> **Unlimited Liability Exposure**: Contracts with Acme Corp lack caps on indemnification obligations.
-
-| Contract ID | Party | Liability Cap | Risk Level |
-|-------------|-------|---------------|------------|
-| contract_001 | Acme Corp | Unlimited | ⚠️ High |
-| contract_008 | Acme Corp | Unlimited | ⚠️ High |
-
-```mermaid
-graph TD
-    A[Acme Corp] -->|Obligated to| B[Indemnify]
-    B --> C[Unlimited Scope]
-    B --> D[No Time Limit]
-    C --> E[⚠️ HIGH RISK]
-    D --> E
-```
-
-### 💡 Recommendations
-
-1. **Immediate**: Negotiate liability caps for Acme Corp contracts
-2. **Consider**: Standard $1M cap across all service agreements
-3. **Review**: Similar unlimited obligations in other vendor contracts
-
-**Key Principles:**
-- Be visual when data has structure or relationships
-- Use Mermaid for any flow, hierarchy, network, or distribution
-- Make responses scannable with headers, tables, and formatting
-- Cite specific contracts, sections, and parties
-- Provide actionable insights
-
-Remember: You dynamically write queries based on the schema. For complex questions, use multiple focused queries rather than one complicated query.""",
+✅ Always use LIMIT (20-50), ILIKE for case-insensitive search
+✅ For complex questions, make multiple focused queries
+✅ Combine SQL + semantic + graph when appropriate
+❌ No INSERT/UPDATE/DELETE - read-only queries only
+❌ Don't compute embeddings yourself - use need_embedding=True""",
             tools=[
-                get_database_schema,
                 execute_sql_query,
-                get_contract_family,
+                # get_contract_family,
             ],
         )
         self.thread = self.agent.get_new_thread()

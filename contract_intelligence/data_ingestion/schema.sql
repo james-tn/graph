@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS term_definitions CASCADE;
 DROP TABLE IF EXISTS rights CASCADE;
 DROP TABLE IF EXISTS obligations CASCADE;
 DROP TABLE IF EXISTS clauses CASCADE;
+DROP TABLE IF EXISTS contract_relationships CASCADE;
 DROP TABLE IF EXISTS parties_contracts CASCADE;
 DROP TABLE IF EXISTS parties CASCADE;
 DROP TABLE IF EXISTS contracts CASCADE;
@@ -42,9 +43,9 @@ CREATE TABLE party_roles (
 -- Core entities
 CREATE TABLE jurisdictions (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(200) NOT NULL,
-    country VARCHAR(100),
-    state_province VARCHAR(100),
+    name VARCHAR(300) NOT NULL,  -- Increased for formal legal jurisdiction names
+    country VARCHAR(200),  -- Increased for formal country names
+    state_province VARCHAR(200),  -- Increased for formal state/province names
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(name, country, state_province)
 );
@@ -76,8 +77,7 @@ CREATE TABLE contract_relationships (
     child_contract_id INTEGER NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
     parent_contract_id INTEGER REFERENCES contracts(id) ON DELETE CASCADE,
     parent_reference_number VARCHAR(200),  -- Parent ref captured even if not yet ingested
-    parent_identifier VARCHAR(200),        -- Parent file identifier
-    relationship_type TEXT, -- Allows verbose relationship descriptions from LLM
+    relationship_type VARCHAR(50) CHECK (relationship_type IN ('amendment', 'sow', 'addendum', 'work_order', 'maintenance', 'related')),
     relationship_description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(child_contract_id, parent_contract_id, relationship_type)
@@ -87,7 +87,7 @@ CREATE TABLE parties (
     id SERIAL PRIMARY KEY,
     tenant_id VARCHAR(50) DEFAULT 'default',
     name VARCHAR(300) NOT NULL,
-    party_type VARCHAR(100),
+    party_type VARCHAR(200),  -- Increased for longer party type descriptions
     address TEXT,
     jurisdiction_id INTEGER REFERENCES jurisdictions(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -113,7 +113,7 @@ CREATE TABLE clauses (
     title TEXT,
     clause_type_id INTEGER REFERENCES clause_types(id),
     clause_type_custom VARCHAR(200),
-    risk_level VARCHAR(20),
+    risk_level VARCHAR(20) CHECK (risk_level IN ('low', 'medium', 'high')),
     is_standard BOOLEAN DEFAULT TRUE,
     text_content TEXT NOT NULL,
     embedding vector(1536),
@@ -174,7 +174,7 @@ CREATE TABLE monetary_values (
     contract_id INTEGER REFERENCES contracts(id) ON DELETE CASCADE,
     clause_id INTEGER REFERENCES clauses(id) ON DELETE SET NULL,
     amount DECIMAL(20,2) NOT NULL,
-    currency VARCHAR(100) DEFAULT 'USD',  -- Allow full currency names
+    currency VARCHAR(10) DEFAULT 'USD',  -- ISO currency codes (3 chars)
     value_type VARCHAR(200),
     context TEXT,
     multiple_of_fees DECIMAL(10,2),
@@ -188,7 +188,7 @@ CREATE TABLE risks (
     clause_id INTEGER REFERENCES clauses(id) ON DELETE CASCADE,
     risk_type_id INTEGER REFERENCES risk_types(id),
     risk_type_custom VARCHAR(200),
-    risk_level VARCHAR(20) NOT NULL,
+    risk_level VARCHAR(20) NOT NULL CHECK (risk_level IN ('low', 'medium', 'high')),
     rationale TEXT,
     detected_by VARCHAR(50),
     is_confirmed BOOLEAN DEFAULT FALSE,
@@ -272,7 +272,8 @@ INSERT INTO clause_types (name, description) VALUES
     ('Service Level Agreement', 'SLA commitments and metrics'),
     ('Change Management', 'Procedures for contract modifications'),
     ('Acceptance Criteria', 'Deliverable acceptance terms'),
-    ('Insurance', 'Insurance coverage requirements');
+    ('Insurance', 'Insurance coverage requirements'),
+    ('Other', 'Miscellaneous or uncategorized clauses');
 
 INSERT INTO risk_types (name, description, severity_default) VALUES
     ('Uncapped Liability', 'No limit on liability exposure', 'high'),

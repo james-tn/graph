@@ -7,104 +7,144 @@ interface HybridQuerySectionProps {
 }
 
 const SAMPLE_QUERIES = [
-  // Contract Relationships & Hierarchies (NEW)
+  // A. Vendor Risk and Exposure
+  {
+    text: "For each of our main vendors, how many contracts do we have with them, and how many of those include high-risk clauses? Which vendors look riskiest overall?",
+    type: "postgres",
+    desc: "Vendor risk aggregation + high-risk clause counting",
+    category: "vendor-risk"
+  },
+  {
+    text: "For vendors like Acme Corp and Phoenix Industries, how does their risk profile compare? I'd like to see: how many contracts we have with each, how many high-risk clauses they have, and which types of risk show up most often for each vendor.",
+    type: "postgres",
+    desc: "Multi-vendor risk comparison + risk type analysis",
+    category: "vendor-risk"
+  },
+  {
+    text: "Which vendors do we owe the largest number of high-impact obligations to? Please rank our vendors by how many high-impact obligations we have in their contracts.",
+    type: "postgres",
+    desc: "Vendor obligation ranking + high-impact filtering",
+    category: "vendor-risk"
+  },
+  {
+    text: "For a specific vendor, for example Atlas Ventures, show me all of our high-impact obligations to them, grouped by contract, with a short description of each obligation.",
+    type: "postgres",
+    desc: "Vendor-specific obligation analysis + contract grouping",
+    category: "vendor-risk"
+  },
+  
+  // B. Contract Families and Relationship Complexity
   {
     text: "Show the complete contract family tree for Zenith Technologies Master Services Agreement MSA-ZEN-202403-197",
     type: "postgres",
-    desc: "Master agreement → SOWs → Amendments hierarchy (3 children)",
-    icon: "graph"
+    desc: "Master agreement → SOWs → Amendments hierarchy",
+    category: "families"
   },
   {
-    text: "Find all amendments and addenda to the Data Processing Agreement DPA-SUM-202502-324",
+    text: "Among our larger vendor relationships, which contract families (for example, an MSA and its SOWs, work orders, amendments, and addenda) have the highest number of high-risk clauses overall?",
     type: "postgres",
-    desc: "Contract relationship tracking + modification history (4 children)",
-    icon: "graph"
+    desc: "Contract family risk aggregation + hierarchical analysis",
+    category: "families"
   },
   {
-    text: "List all SOWs and work orders under the Phoenix Industries Master Agreement MSA-PHO-202508-344",
+    text: "Show me the contract family trees for our biggest vendors, and for each family give me: how many related documents there are, and a simple summary of how many high-risk clauses appear in that family.",
     type: "postgres",
-    desc: "Relationship hierarchy + SOW tracking (3 SOWs)",
-    icon: "graph"
+    desc: "Multi-family analysis + risk concentration",
+    category: "families"
+  },
+  {
+    text: "Which Master Services Agreements have an unusually large number of related documents (SOWs, work orders, amendments, addenda)? I want to see where the relationship has become complex and potentially harder to manage.",
+    type: "postgres",
+    desc: "Relationship complexity detection + document counting",
+    category: "families"
   },
   
-  // Vendor-Specific Analysis
+  // C. Clause-Level Risk Patterns
   {
-    text: "What are all obligations and penalties for Acme Corp across their contracts?",
+    text: "Across our entire contract portfolio, which types of clauses are most often marked as high risk? For example, is it more often limitation of liability, termination, payment terms, or service levels?",
     type: "postgres",
-    desc: "Multi-hop graph: Party → Contract → Clause → Obligations (55 contracts)",
-    icon: "graph"
+    desc: "Portfolio-wide clause type risk distribution",
+    category: "clause-risk"
   },
   {
-    text: "Find all high-risk liability limitation clauses in Phoenix Industries contracts",
+    text: "Which vendors have the highest number of high-risk 'Data Protection' or 'Confidentiality' clauses in their contracts?",
     type: "postgres",
-    desc: "Semantic search + vendor filtering + risk analysis (41 contracts)",
-    icon: "semantic"
+    desc: "Vendor risk ranking by specific clause types",
+    category: "clause-risk"
   },
   {
-    text: "Show the contract hierarchy for Pinnacle Services Data Processing Agreement DPA-PIN-202411-069",
+    text: "For our top 10 vendors, summarize for me: how many high-risk termination clauses they have, how many high-risk payment terms, and how many high-risk service level clauses.",
     type: "postgres",
-    desc: "Relationship traversal + hierarchy visualization (4 children)",
-    icon: "graph"
+    desc: "Multi-vendor clause-specific risk breakdown",
+    category: "clause-risk"
   },
   
-  // Semantic Search & Contract-Specific Queries
+  // D. Monetary Exposure vs Risk
   {
-    text: "Find confidentiality and data processing clauses similar to Epsilon Group contracts",
+    text: "Which individual contracts combine a large contract value with high-risk clauses? Show me the top set by contract value, along with the vendor and a brief risk summary for each.",
     type: "postgres",
-    desc: "Vector search + similarity ranking (32 contracts)",
-    icon: "semantic"
+    desc: "Financial exposure + risk correlation analysis",
+    category: "monetary"
   },
   {
-    text: "Search for force majeure clauses mentioning pandemic or natural disasters in Gamma Inc service agreements",
+    text: "By vendor, how much total contract value is tied to contracts that contain at least one high-risk clause? I'd like a ranking of vendors by 'high-risk contract value'.",
     type: "postgres",
-    desc: "Vector similarity + vendor filtering + text matching (29 contracts)",
-    icon: "semantic"
+    desc: "Vendor financial risk exposure aggregation",
+    category: "monetary"
   },
   {
-    text: "Identify unusual warranty disclaimers in Atlas Ventures and Nexus Corporation software license agreements",
+    text: "Which vendors have a lot of contract value with us, but only low- or medium-risk clauses? I'd like to see where our commercial exposure is high but the legal risk looks relatively low.",
     type: "postgres",
-    desc: "Multi-vendor semantic search + deviation detection (34+31 contracts)",
-    icon: "semantic"
+    desc: "High-value low-risk vendor identification",
+    category: "monetary"
   },
   
-  // Cross-Document Intelligence (Microsoft GraphRAG)
+  // E. Obligations and Rights
   {
-    text: "Compare payment terms across all Delta LLC contracts and identify outliers",
-    type: "graphrag",
-    desc: "Cross-document comparison + benchmarking (33 contracts)",
-    icon: "knowledge"
+    text: "Which vendors are associated with the largest number of high-impact obligations across all of their contracts with us?",
+    type: "postgres",
+    desc: "Vendor obligation burden analysis",
+    category: "obligations"
   },
   {
-    text: "Summarize all GDPR and data privacy obligations across Epsilon Group agreements",
-    type: "graphrag",
-    desc: "Multi-document synthesis + compliance analysis (32 contracts)",
-    icon: "knowledge"
-  },
-  {
-    text: "What are common dispute resolution patterns in our Master Service Agreements?",
-    type: "graphrag",
-    desc: "Global knowledge graph reasoning + pattern detection",
-    icon: "knowledge"
+    text: "Which contracts grant us important rights that are due to expire in the next six months, and which vendors are those contracts with?",
+    type: "postgres",
+    desc: "Rights expiration tracking + vendor identification",
+    category: "obligations"
   },
   
-  // Hybrid Intelligence (PostgreSQL + GraphRAG)
+  // F. Governing Law and Regional Risk
   {
-    text: "Full risk assessment for Cascade Enterprises: high-risk clauses + cross-contract inconsistencies + missing protections",
-    type: "hybrid",
-    desc: "SQL risk filter + GraphRAG pattern detection (39 contracts)",
-    icon: "hybrid"
+    text: "How does our overall risk profile differ by governing law? For example, compare contracts governed by England and Wales, Delaware, and California in terms of how many high-, medium-, and low-risk clauses they contain.",
+    type: "postgres",
+    desc: "Jurisdictional risk comparison + distribution analysis",
+    category: "regional"
   },
   {
-    text: "Analyze Delta LLC contract network: show MSA dependencies, SOW relationships, and amendment impacts",
-    type: "hybrid",
-    desc: "Graph structure + semantic conflict detection (33 contracts)",
-    icon: "hybrid"
+    text: "For contracts governed by England and Wales, which vendors do we have the most high-risk clauses with?",
+    type: "postgres",
+    desc: "Jurisdiction-specific vendor risk ranking",
+    category: "regional"
+  },
+  
+  // G. Portfolio-Level Summaries
+  {
+    text: "Across our whole portfolio, which counterparties (customers or vendors) have the most contracts with us, and what does the risk breakdown look like for each (high, medium, low)?",
+    type: "postgres",
+    desc: "Portfolio-wide party analysis + risk distribution",
+    category: "portfolio"
   },
   {
-    text: "Generate negotiation leverage report for Pinnacle Services: compare our terms vs. their proposed changes",
-    type: "hybrid",
-    desc: "Historical analysis + power dynamics + benchmarking",
-    icon: "hybrid"
+    text: "Which contracts have the highest concentration of high-risk clauses—for example, more than three high-risk clauses in a single contract? Show these with the party name and contract type.",
+    type: "postgres",
+    desc: "High-risk concentration detection + contract identification",
+    category: "portfolio"
+  },
+  {
+    text: "For our largest service or consulting contracts, summarize for each: total contract value, number of high-risk clauses, and number of high-impact obligations, so we can see where the biggest risks are.",
+    type: "postgres",
+    desc: "Comprehensive risk + financial + obligation analysis",
+    category: "portfolio"
   }
 ];
 
@@ -229,104 +269,210 @@ export const HybridQuerySection: React.FC<HybridQuerySectionProps> = ({ onResult
           <Sparkles className="w-5 h-5 text-purple-400" />
           <h3 className="text-lg font-bold text-purple-300">Real-World Legal Intelligence Queries</h3>
           <span className="text-xs text-purple-400 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-400/30">
-            {SAMPLE_QUERIES.length} sophisticated examples
+            {SAMPLE_QUERIES.length} queries across 7 categories
           </span>
         </div>
         
         {/* Query Categories */}
         <div className="space-y-6">
-          {/* Graph Traversal & Semantic Search Section */}
+          {/* A. Vendor Risk and Exposure */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-3">
+              <Database className="w-4 h-4 text-red-400" />
+              <h4 className="text-sm font-bold text-red-300 uppercase tracking-wider">A. Vendor Risk and Exposure</h4>
+              <div className="flex-1 h-px bg-gradient-to-r from-red-500/30 to-transparent"></div>
+            </div>
+            {SAMPLE_QUERIES.filter(q => q.category === 'vendor-risk').map((sample, idx) => (
+              <button
+                key={`vendor-risk-${idx}`}
+                onClick={() => handleSearch(sample.text, sample.type)}
+                disabled={loading}
+                className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-red-900/30 hover:to-slate-800/50 rounded-xl border border-red-500/20 hover:border-red-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-red-500/20"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <p className="text-red-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
+                      {sample.text}
+                    </p>
+                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-red-500/20 text-red-300 border border-red-400/30">
+                      {sample.desc}
+                    </span>
+                  </div>
+                  <Search className="w-5 h-5 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                </div>
+              </button>
+            ))}
+          </div>
+          
+          {/* B. Contract Families */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 mb-3">
               <GitBranch className="w-4 h-4 text-blue-400" />
-              <h4 className="text-sm font-bold text-blue-300 uppercase tracking-wider">Graph Traversal & Semantic Search</h4>
+              <h4 className="text-sm font-bold text-blue-300 uppercase tracking-wider">B. Contract Families and Relationship Complexity</h4>
               <div className="flex-1 h-px bg-gradient-to-r from-blue-500/30 to-transparent"></div>
             </div>
-            <p className="text-xs text-blue-300/70 mb-3 italic">Real-world vendor and contract-specific queries combining graph relationships and vector search</p>
-            {SAMPLE_QUERIES.slice(0, 9).map((sample, idx) => (
+            {SAMPLE_QUERIES.filter(q => q.category === 'families').map((sample, idx) => (
               <button
-                key={idx}
-                onClick={() => handleSearch(sample.text, 'auto')}
+                key={`families-${idx}`}
+                onClick={() => handleSearch(sample.text, sample.type)}
                 disabled={loading}
                 className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-blue-900/30 hover:to-slate-800/50 rounded-xl border border-blue-500/20 hover:border-blue-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-blue-500/20"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
-                    <p className="text-blue-100 group-hover:text-white transition-colors font-medium mb-2">
+                    <p className="text-blue-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
                       {sample.text}
                     </p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs px-3 py-1 rounded-full font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30">
-                        {sample.desc}
-                      </span>
-                      <span className="text-xs text-blue-400/60">PostgreSQL + Apache AGE + Vectors</span>
-                    </div>
+                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                      {sample.desc}
+                    </span>
                   </div>
-                  <Search className="w-5 h-5 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <Search className="w-5 h-5 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                 </div>
               </button>
             ))}
           </div>
           
-          {/* Cross-Document Intelligence Section */}
+          {/* C. Clause-Level Risk */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 mb-3">
-              <Brain className="w-4 h-4 text-green-400" />
-              <h4 className="text-sm font-bold text-green-300 uppercase tracking-wider">Cross-Document Intelligence</h4>
+              <Database className="w-4 h-4 text-orange-400" />
+              <h4 className="text-sm font-bold text-orange-300 uppercase tracking-wider">C. Clause-Level Risk Patterns</h4>
+              <div className="flex-1 h-px bg-gradient-to-r from-orange-500/30 to-transparent"></div>
+            </div>
+            {SAMPLE_QUERIES.filter(q => q.category === 'clause-risk').map((sample, idx) => (
+              <button
+                key={`clause-risk-${idx}`}
+                onClick={() => handleSearch(sample.text, sample.type)}
+                disabled={loading}
+                className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-orange-900/30 hover:to-slate-800/50 rounded-xl border border-orange-500/20 hover:border-orange-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-orange-500/20"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <p className="text-orange-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
+                      {sample.text}
+                    </p>
+                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-orange-500/20 text-orange-300 border border-orange-400/30">
+                      {sample.desc}
+                    </span>
+                  </div>
+                  <Search className="w-5 h-5 text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                </div>
+              </button>
+            ))}
+          </div>
+          
+          {/* D. Monetary Exposure */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-3">
+              <Database className="w-4 h-4 text-yellow-400" />
+              <h4 className="text-sm font-bold text-yellow-300 uppercase tracking-wider">D. Monetary Exposure vs Risk</h4>
+              <div className="flex-1 h-px bg-gradient-to-r from-yellow-500/30 to-transparent"></div>
+            </div>
+            {SAMPLE_QUERIES.filter(q => q.category === 'monetary').map((sample, idx) => (
+              <button
+                key={`monetary-${idx}`}
+                onClick={() => handleSearch(sample.text, sample.type)}
+                disabled={loading}
+                className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-yellow-900/30 hover:to-slate-800/50 rounded-xl border border-yellow-500/20 hover:border-yellow-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-yellow-500/20"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <p className="text-yellow-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
+                      {sample.text}
+                    </p>
+                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-yellow-500/20 text-yellow-300 border border-yellow-400/30">
+                      {sample.desc}
+                    </span>
+                  </div>
+                  <Search className="w-5 h-5 text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                </div>
+              </button>
+            ))}
+          </div>
+          
+          {/* E. Obligations and Rights */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-3">
+              <Database className="w-4 h-4 text-green-400" />
+              <h4 className="text-sm font-bold text-green-300 uppercase tracking-wider">E. Obligations and Rights</h4>
               <div className="flex-1 h-px bg-gradient-to-r from-green-500/30 to-transparent"></div>
             </div>
-            {SAMPLE_QUERIES.slice(9, 12).map((sample, idx) => (
+            {SAMPLE_QUERIES.filter(q => q.category === 'obligations').map((sample, idx) => (
               <button
-                key={idx + 9}
-                onClick={() => handleSearch(sample.text, 'auto')}
+                key={`obligations-${idx}`}
+                onClick={() => handleSearch(sample.text, sample.type)}
                 disabled={loading}
                 className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-green-900/30 hover:to-slate-800/50 rounded-xl border border-green-500/20 hover:border-green-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-green-500/20"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
-                    <p className="text-green-100 group-hover:text-white transition-colors font-medium mb-2">
+                    <p className="text-green-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
                       {sample.text}
                     </p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs px-3 py-1 rounded-full font-semibold bg-green-500/20 text-green-300 border border-green-400/30">
-                        {sample.desc}
-                      </span>
-                      <span className="text-xs text-green-400/60">Microsoft GraphRAG</span>
-                    </div>
+                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-green-500/20 text-green-300 border border-green-400/30">
+                      {sample.desc}
+                    </span>
                   </div>
-                  <Search className="w-5 h-5 text-green-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <Search className="w-5 h-5 text-green-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                 </div>
               </button>
             ))}
           </div>
           
-          {/* Hybrid Intelligence Section */}
+          {/* F. Regional Risk */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-3">
+              <Database className="w-4 h-4 text-cyan-400" />
+              <h4 className="text-sm font-bold text-cyan-300 uppercase tracking-wider">F. Governing Law and Regional Risk</h4>
+              <div className="flex-1 h-px bg-gradient-to-r from-cyan-500/30 to-transparent"></div>
+            </div>
+            {SAMPLE_QUERIES.filter(q => q.category === 'regional').map((sample, idx) => (
+              <button
+                key={`regional-${idx}`}
+                onClick={() => handleSearch(sample.text, sample.type)}
+                disabled={loading}
+                className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-cyan-900/30 hover:to-slate-800/50 rounded-xl border border-cyan-500/20 hover:border-cyan-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-cyan-500/20"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <p className="text-cyan-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
+                      {sample.text}
+                    </p>
+                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                      {sample.desc}
+                    </span>
+                  </div>
+                  <Search className="w-5 h-5 text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                </div>
+              </button>
+            ))}
+          </div>
+          
+          {/* G. Portfolio Summaries */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="w-4 h-4 text-purple-400" />
-              <h4 className="text-sm font-bold text-purple-300 uppercase tracking-wider">Hybrid Intelligence</h4>
+              <h4 className="text-sm font-bold text-purple-300 uppercase tracking-wider">G. Portfolio-Level Summaries</h4>
               <div className="flex-1 h-px bg-gradient-to-r from-purple-500/30 to-transparent"></div>
             </div>
-            {SAMPLE_QUERIES.slice(12, 15).map((sample, idx) => (
+            {SAMPLE_QUERIES.filter(q => q.category === 'portfolio').map((sample, idx) => (
               <button
-                key={idx + 12}
-                onClick={() => handleSearch(sample.text, 'auto')}
+                key={`portfolio-${idx}`}
+                onClick={() => handleSearch(sample.text, sample.type)}
                 disabled={loading}
                 className="w-full text-left p-4 bg-gradient-to-r from-purple-900/30 to-pink-900/30 hover:from-purple-900/50 hover:to-pink-900/50 rounded-xl border border-purple-500/30 hover:border-purple-400/60 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-purple-500/30"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
-                    <p className="text-purple-100 group-hover:text-white transition-colors font-medium mb-2">
+                    <p className="text-purple-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
                       {sample.text}
                     </p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs px-3 py-1 rounded-full font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30">
-                        {sample.desc}
-                      </span>
-                      <span className="text-xs bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent font-bold">PostgreSQL + GraphRAG</span>
-                    </div>
+                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30">
+                      {sample.desc}
+                    </span>
                   </div>
-                  <Sparkles className="w-5 h-5 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <Sparkles className="w-5 h-5 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                 </div>
               </button>
             ))}

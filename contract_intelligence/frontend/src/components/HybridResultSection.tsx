@@ -8,18 +8,26 @@ import mermaid from 'mermaid';
 if (typeof window !== 'undefined') {
   mermaid.initialize({ 
     startOnLoad: true, 
-    theme: 'dark',
+    theme: 'base',
     themeVariables: {
-      primaryColor: '#a855f7',
-      primaryTextColor: '#fff',
-      primaryBorderColor: '#9333ea',
-      lineColor: '#c084fc',
-      secondaryColor: '#ec4899',
-      tertiaryColor: '#3b82f6',
+      primaryColor: '#dbeafe',
+      primaryTextColor: '#1e3a8a',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#60a5fa',
+      secondaryColor: '#fef3c7',
+      secondaryTextColor: '#78350f',
+      tertiaryColor: '#d1fae5',
+      tertiaryTextColor: '#065f46',
       background: '#1e293b',
-      mainBkg: '#1e293b',
-      textColor: '#e2e8f0',
-      fontSize: '14px'
+      mainBkg: '#e0e7ff',
+      textColor: '#1e293b',
+      nodeTextColor: '#1e293b',
+      labelTextColor: '#1e293b',
+      edgeLabelBackground: '#ffffff',
+      clusterBkg: '#f1f5f9',
+      clusterBorder: '#cbd5e1',
+      fontSize: '14px',
+      fontFamily: 'ui-sans-serif, system-ui, sans-serif'
     }
   });
 }
@@ -31,9 +39,16 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
   useEffect(() => {
     if (ref.current && chart) {
       try {
-        mermaid.render(`mermaid-${Math.random()}`, chart).then(({ svg }) => {
+        // Generate a valid DOM ID (must start with letter, no dots)
+        const id = `mermaid-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        mermaid.render(id, chart).then(({ svg }) => {
           if (ref.current) {
             ref.current.innerHTML = svg;
+          }
+        }).catch(error => {
+          console.error('Mermaid rendering error:', error);
+          if (ref.current) {
+            ref.current.innerHTML = `<pre class="text-red-400">Error rendering diagram: ${error.message}</pre>`;
           }
         });
       } catch (error) {

@@ -10,7 +10,7 @@ Uses OpenAI structured outputs with Pydantic models for robust parsing.
 
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -38,18 +38,80 @@ openai_client = OpenAI(
 LLM_MODEL = os.environ.get("GRAPHRAG_LLM_DEPLOYMENT_NAME", "gpt-4.1")
 EMBEDDING_MODEL = os.environ.get("GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
 
+# Standardized enumerations matching database schema
+CLAUSE_TYPES = [
+    "Definitions",
+    "Indemnification",
+    "Limitation of Liability",
+    "Confidentiality",
+    "Intellectual Property",
+    "Termination",
+    "Payment Terms",
+    "Warranties",
+    "Data Protection",
+    "Force Majeure",
+    "Dispute Resolution",
+    "Service Level Agreement",
+    "Change Management",
+    "Acceptance Criteria",
+    "Insurance",
+    "Other"
+]
+
+RISK_LEVELS = ["low", "medium", "high"]
+
+RELATIONSHIP_TYPES = [
+    "amendment",
+    "sow",
+    "addendum",
+    "work_order",
+    "maintenance",
+    "related"
+]
+
+CONTRACT_TYPES = [
+    "Master Services Agreement",
+    "Statement of Work",
+    "Data Processing Agreement",
+    "Service Level Agreement",
+    "Non-Disclosure Agreement",
+    "Amendment",
+    "Addendum",
+    "Work Order",
+    "Consulting Agreement",
+    "License Agreement",
+    "Maintenance Agreement",
+    "Purchase Order",
+    "Other"
+]
+
+PARTY_ROLES = [
+    "Client",
+    "Vendor",
+    "Licensor",
+    "Licensee",
+    "Consultant",
+    "Partner",
+    "Employer",
+    "Employee",
+    "Landlord",
+    "Tenant"
+]
+
+CURRENCIES = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR"]
+
 
 # Pydantic models for structured outputs
 class Party(BaseModel):
     name: str
-    role: str
+    role: Literal["Client", "Vendor", "Licensor", "Licensee", "Consultant", "Partner", "Employer", "Employee", "Landlord", "Tenant"]
     address: Optional[str] = None
     jurisdiction: Optional[str] = None
 
 
 class TotalValue(BaseModel):
     amount: Optional[float] = None
-    currency: Optional[str] = None
+    currency: Optional[Literal["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR"]] = "USD"
     description: Optional[str] = None
 
 
@@ -65,7 +127,12 @@ class DefinedTerm(BaseModel):
 
 class ContractMetadata(BaseModel):
     title: str
-    contract_type: str
+    contract_type: Literal[
+        "Master Services Agreement", "Statement of Work", "Data Processing Agreement",
+        "Service Level Agreement", "Non-Disclosure Agreement", "Amendment", "Addendum",
+        "Work Order", "Consulting Agreement", "License Agreement", "Maintenance Agreement",
+        "Purchase Order", "Other"
+    ]
     reference_number: Optional[str] = None  # E.g., MSA-ABC-202401-005
     effective_date: Optional[str] = None
     expiration_date: Optional[str] = None
@@ -76,8 +143,7 @@ class ContractMetadata(BaseModel):
     defined_terms: list[DefinedTerm] = Field(default_factory=list)
     # Relationship information
     parent_contract_reference: Optional[str] = None  # E.g., MSA-ABC-202401-005
-    parent_contract_identifier: Optional[str] = None  # E.g., contract_042_master_services_agreement
-    relationship_type: Optional[str] = None  # amendment, sow, addendum, work_order, maintenance
+    relationship_type: Optional[Literal["amendment", "sow", "addendum", "work_order", "maintenance", "related"]] = None
     relationship_description: Optional[str] = None
 
 
@@ -110,7 +176,7 @@ class Right(BaseModel):
 
 class MonetaryValue(BaseModel):
     amount: Optional[float] = None
-    currency: Optional[str] = None
+    currency: Literal["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR"] = "USD"
     value_type: str
     context: str
     multiple_of_fees: Optional[float] = None
@@ -122,8 +188,13 @@ class Condition(BaseModel):
 
 
 class ClauseAnalysis(BaseModel):
-    clause_type: str = Field(description="One of: Definitions, Indemnification, Limitation of Liability, Confidentiality, Intellectual Property, Termination, Payment Terms, Warranties, Data Protection, Force Majeure, Dispute Resolution, Service Level Agreement, Change Management, Acceptance Criteria, Insurance, Other")
-    risk_level: str = Field(description="low, medium, or high")
+    clause_type: Literal[
+        "Definitions", "Indemnification", "Limitation of Liability", "Confidentiality",
+        "Intellectual Property", "Termination", "Payment Terms", "Warranties",
+        "Data Protection", "Force Majeure", "Dispute Resolution", "Service Level Agreement",
+        "Change Management", "Acceptance Criteria", "Insurance", "Other"
+    ] = Field(description="Clause classification - must exactly match one of the predefined types")
+    risk_level: Literal["low", "medium", "high"] = Field(description="Risk level classification")
     is_standard: bool
     risk_rationale: Optional[str] = None
     obligations: list[Obligation] = Field(default_factory=list)
@@ -144,12 +215,22 @@ def get_embedding(text: str) -> list[float]:
 def extract_contract_metadata(markdown_content: str, filename: str) -> dict[str, Any]:
     """Extract comprehensive contract metadata using LLM with structured outputs."""
     
-    system_prompt = """You are a legal contract analyzer specialized in extracting structured metadata.
+    system_prompt = f"""You are a legal contract analyzer specialized in extracting structured metadata.
 Extract information accurately from the contract provided. Pay special attention to:
 - Contract reference numbers (e.g., MSA-ABC-202401-005, SOW-XYZ-202403-012)
-- References to parent/master agreements with their reference numbers and identifiers
-- Relationship types: amendment, statement of work (SOW), addendum, work order, maintenance agreement
+- References to parent/master agreements with their reference numbers
+- Use ONLY these standardized contract types: {', '.join(CONTRACT_TYPES)}
+- Use ONLY these relationship types: {', '.join(RELATIONSHIP_TYPES)}
+- Use ONLY these party roles: {', '.join(PARTY_ROLES)}
+- Use ISO currency codes: {', '.join(CURRENCIES)}
 - Language like "executed pursuant to", "amends", "supplements", "issued under"
+
+IMPORTANT FORMATTING RULES:
+- Governing law: Use SHORT forms like "California", "New York", "Delaware", "England and Wales" (max 100 chars)
+- Party jurisdictions: Use SHORT forms like "Delaware", "California", "UK" (max 100 chars)  
+- Party names: Use official business names without excessive legal suffixes (max 200 chars)
+- DO NOT include full legal descriptions like "State of California, United States of America"
+- DO NOT include address information in jurisdiction fields
 """
 
     user_prompt = f"""Analyze this contract and extract all metadata including title, type, dates, parties, values, defined terms, and any relationships to parent contracts.
@@ -157,13 +238,28 @@ Extract information accurately from the contract provided. Pay special attention
 Look for:
 - This contract's own reference number (usually at the top)
 - References to parent contracts by reference number (e.g., "pursuant to MSA-ABC-202401-005")
-- References to parent contracts by identifier (e.g., "contract_042_master_services_agreement")
 - Relationship language indicating if this is an amendment, SOW, addendum, work order, or maintenance agreement
+
+PARTY EXTRACTION REQUIREMENTS:
+- Extract party names from the preamble (e.g., "Contoso Enterprises, Inc.", "Summit Tech, LLC")
+- Extract jurisdiction from party descriptions like:
+  * "a Delaware corporation" → jurisdiction: "Delaware"
+  * "a Washington corporation" → jurisdiction: "Washington"  
+  * "a Delaware limited liability company" → jurisdiction: "Delaware"
+  * "a company incorporated in England and Wales" → jurisdiction: "England and Wales"
+- Extract roles from context (Client, Vendor, Licensor, Licensee, etc.)
+- Extract full addresses if provided
+
+FORMATTING REQUIREMENTS:
+- Governing law: Extract ONLY the jurisdiction name (e.g., "California", "New York", "Delaware", "England and Wales")
+- Party jurisdictions: Use SHORT forms (e.g., "Delaware", "California", "Texas", "UK", "Singapore")
+- DO NOT use verbose forms like "State of California, United States of America"
+- Keep all text fields concise and focused
 
 Contract (first 6000 characters):
 {markdown_content[:6000]}
 
-Extract all available information accurately, especially relationship references."""
+Extract all available information accurately, especially party jurisdictions and relationship references."""
 
     try:
         response = openai_client.chat.completions.parse(
@@ -194,11 +290,6 @@ Extract all available information accurately, especially relationship references
         parent_ref_match = re.search(parent_ref_pattern, markdown_content[:3000], re.IGNORECASE)
         parent_reference = parent_ref_match.group(1) if parent_ref_match else None
         
-        # Try to extract parent identifier
-        parent_id_pattern = r'contract_\d{3}_[\w_]+'
-        parent_id_match = re.search(parent_id_pattern, markdown_content[:3000])
-        parent_identifier = parent_id_match.group(0) if parent_id_match else None
-        
         parts = filename.replace(".md", "").split("_")
         return {
             "title": " ".join(parts[2:]) if len(parts) > 2 else filename,
@@ -212,25 +303,11 @@ Extract all available information accurately, especially relationship references
             "key_dates": [],
             "defined_terms": [],
             "parent_contract_reference": parent_reference,
-            "parent_contract_identifier": parent_identifier,
             "relationship_type": None,
             "relationship_description": None
         }
 
 
-def segment_clauses(markdown_content: str) -> list[dict[str, Any]]:
-    """Segment contract into logical clauses using intelligent two-tier approach."""
-    
-    # First try basic markdown segmentation (fast path)
-    basic_clauses = _segment_clauses_basic(markdown_content)
-    
-    # If basic segmentation found reasonable sections, use it
-    if len(basic_clauses) >= 5:
-        return basic_clauses
-    
-    # Otherwise, use LLM for intelligent segmentation (robust path)
-    print("  🤖 Using LLM for intelligent clause segmentation...")
-    return _segment_clauses_llm(markdown_content)
 
 
 def _segment_clauses_basic(markdown_content: str) -> list[dict[str, Any]]:
@@ -282,15 +359,15 @@ def _segment_clauses_basic(markdown_content: str) -> list[dict[str, Any]]:
     return clauses
 
 
-def _segment_clauses_llm(markdown_content: str) -> list[dict[str, Any]]:
-    """Robust path: Use LLM to intelligently segment contract into logical clauses."""
-    
+def segment_clauses(markdown_content: str) -> list[dict[str, Any]]:
+    """Segment contract into logical clauses using intelligent two-tier approach."""
+        
     system_prompt = """You are a legal document analyzer. Segment the contract into logical clauses/sections.
 Identify major sections like Preamble, Definitions, Payment Terms, Termination, Liability, etc.
 Each clause should be a meaningful, self-contained section."""
 
     # Truncate if too long
-    content = markdown_content[:15000] if len(markdown_content) > 15000 else markdown_content
+    content = markdown_content[:25000] if len(markdown_content) > 25000 else markdown_content
     
     user_prompt = f"""Segment this contract into logical clauses. Identify section labels (Article I, Section 1, etc.), titles, and full text content.
 
@@ -321,7 +398,12 @@ Segment into major clauses/sections."""
 def classify_and_analyze_clause(clause_text: str, clause_title: str) -> dict[str, Any]:
     """Comprehensive clause analysis using LLM with structured outputs."""
     
-    system_prompt = """You are a legal contract analyzer. Classify clauses accurately and identify risks, obligations, rights, and monetary values."""
+    system_prompt = f"""You are a legal contract analyzer. Classify clauses accurately and identify risks, obligations, rights, and monetary values.
+
+IMPORTANT: Use ONLY these exact clause types: {', '.join(CLAUSE_TYPES)}
+Use ONLY these risk levels: {', '.join(RISK_LEVELS)}
+Use ONLY these currency codes: {', '.join(CURRENCIES)}
+"""
 
     user_prompt = f"""Analyze this contract clause and extract all obligations, rights, monetary values, conditions, and assess risk level.
 

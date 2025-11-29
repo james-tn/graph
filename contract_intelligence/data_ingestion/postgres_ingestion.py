@@ -8,6 +8,7 @@ Handles contract extraction and storage in PostgreSQL database.
 """
 
 import os
+import sys
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -55,6 +56,7 @@ def initialize_schema(schema_file_path: Path = None) -> bool:
         schema_file_path = SCHEMA_FILE
     
     print("\n[*] Initializing PostgreSQL schema...")
+    print(f"    This will DROP all existing tables and recreate them!")
     
     if not schema_file_path.exists():
         print(f"[!] Schema file not found: {schema_file_path}")
@@ -63,16 +65,24 @@ def initialize_schema(schema_file_path: Path = None) -> bool:
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+        
+        # Read and display schema info
         with open(schema_file_path, 'r') as f:
             schema_sql = f.read()
+        
+        # Check for VARCHAR limits in schema
+        import re
+        varchar_limits = re.findall(r'VARCHAR\((\d+)\)', schema_sql)
+        print(f"    VARCHAR limits in schema: {set(varchar_limits)}")
+        
         cur.execute(schema_sql)
         conn.commit()
         cur.close()
         conn.close()
-        print("[OK] Schema initialized")
+        print("[OK] Schema initialized with updated VARCHAR limits")
         return True
     except Exception as e:
-        print(f"[!] Schema initialization warning: {e}")
+        print(f"[!] Schema initialization error: {e}")
         return False
 
 
@@ -111,6 +121,25 @@ def ingest_contract_comprehensive(filepath: Path):
         print("  🔍 Extracting metadata...")
         metadata = extract_contract_metadata(markdown_content, filepath.name)
         
+        # Truncate long values with logging
+        def truncate_field(value: str, max_length: int, field_name: str) -> str:
+            if value and len(value) > max_length:
+                print(f"  ⚠️  Truncating {field_name}: '{value}' ({len(value)} chars) -> {max_length} chars")
+                return value[:max_length]
+            return value
+        
+        # Debug: Log all metadata fields
+        print(f"  DEBUG: governing_law = {metadata.get('governing_law')} ({len(metadata.get('governing_law', '')) if metadata.get('governing_law') else 0} chars)")
+        print(f"  DEBUG: contract_type = {metadata.get('contract_type')} ({len(metadata.get('contract_type', '')) if metadata.get('contract_type') else 0} chars)")
+        print(f"  DEBUG: parties count = {len(metadata.get('parties', []))}")
+        for i, party in enumerate(metadata.get('parties', [])):
+            print(f"  DEBUG: party[{i}].name = {party.get('name')} ({len(party.get('name', '')) if party.get('name') else 0} chars)")
+            print(f"  DEBUG: party[{i}].role = {party.get('role')} ({len(party.get('role', '')) if party.get('role') else 0} chars)")
+            print(f"  DEBUG: party[{i}].jurisdiction = {party.get('jurisdiction')} ({len(party.get('jurisdiction', '')) if party.get('jurisdiction') else 0} chars)")
+        
+        # Truncate governing_law if too long
+        governing_law = truncate_field(metadata.get("governing_law"), 200, "governing_law")
+        
         # Create contract identifier
         contract_id_parts = filepath.stem.split('_')
         contract_identifier = f"{contract_id_parts[0]}_{contract_id_parts[1]}" if len(contract_id_parts) >= 2 else filepath.stem
@@ -130,7 +159,7 @@ def ingest_contract_comprehensive(filepath: Path):
             metadata.get("contract_type"),
             metadata.get("effective_date"),
             metadata.get("expiration_date"),
-            metadata.get("governing_law"),
+            governing_law,
             str(filepath),
             markdown_content
         ))
@@ -141,14 +170,15 @@ def ingest_contract_comprehensive(filepath: Path):
         
         # Insert jurisdiction if governing_law specified
         jurisdiction_id = None
-        if metadata.get("governing_law"):
+        if governing_law:
+            jurisdiction_name = truncate_field(governing_law, 300, "jurisdiction.name")
             cur.execute("""
                 INSERT INTO jurisdictions (name, country, state_province)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (name, country, state_province) DO UPDATE 
                 SET name = EXCLUDED.name
                 RETURNING id
-            """, (metadata["governing_law"], None, None))
+            """, (jurisdiction_name, None, None))
             jurisdiction_id = cur.fetchone()['id']
             
             cur.execute("""
@@ -165,16 +195,23 @@ def ingest_contract_comprehensive(filepath: Path):
             if not party_name:
                 continue
             
+            # Truncate party name if needed
+            party_name = truncate_field(party_name, 300, f"party.name")
+            
             party_jurisdiction_id = None
             if party_info.get("jurisdiction"):
+                party_jurisdiction = truncate_field(party_info["jurisdiction"], 300, "party.jurisdiction")
                 cur.execute("""
                     INSERT INTO jurisdictions (name, country, state_province)
                     VALUES (%s, %s, %s)
                     ON CONFLICT (name, country, state_province) DO UPDATE 
                     SET name = EXCLUDED.name
                     RETURNING id
-                """, (party_info["jurisdiction"], None, None))
+                """, (party_jurisdiction, None, None))
                 party_jurisdiction_id = cur.fetchone()['id']
+            
+            # Truncate address if needed
+            party_address = truncate_field(party_info.get("address"), 1000, "party.address")
             
             cur.execute("""
                 INSERT INTO parties (name, party_type, address, jurisdiction_id)
@@ -182,13 +219,15 @@ def ingest_contract_comprehensive(filepath: Path):
                 ON CONFLICT (tenant_id, name) DO UPDATE 
                 SET address = EXCLUDED.address, updated_at = CURRENT_TIMESTAMP
                 RETURNING id
-            """, (party_name, "Corporation", party_info.get("address"), party_jurisdiction_id))
+            """, (party_name, "Corporation", party_address, party_jurisdiction_id))
             
             party_id = cur.fetchone()['id']
             party_map[party_name] = party_id
             
             # Link party to contract
             party_role = party_info.get("role", "Unknown")
+            # Truncate role name to fit lookup table (50 chars)
+            party_role = truncate_field(party_role, 50, "party.role")
             cur.execute("SELECT id FROM party_roles WHERE name = %s", (party_role,))
             role_row = cur.fetchone()
             role_id = role_row['id'] if role_row else None
@@ -214,26 +253,18 @@ def ingest_contract_comprehensive(filepath: Path):
         
         # Insert contract relationship if this is a related contract
         parent_ref = metadata.get("parent_contract_reference")
-        parent_id_str = metadata.get("parent_contract_identifier")
         relationship_type = metadata.get("relationship_type")
         relationship_desc = metadata.get("relationship_description")
         
-        if parent_ref or parent_id_str:
-            print(f"  🔗 Detected relationship to parent: {parent_ref or parent_id_str}")
+        if parent_ref:
+            print(f"  🔗 Detected relationship to parent: {parent_ref}")
             
-            # Try to find parent contract in database
+            # Find parent contract in database by reference number
             parent_contract_id = None
-            if parent_ref:
-                cur.execute("SELECT id FROM contracts WHERE reference_number = %s", (parent_ref,))
-                parent_row = cur.fetchone()
-                if parent_row:
-                    parent_contract_id = parent_row['id']
-            
-            if not parent_contract_id and parent_id_str:
-                cur.execute("SELECT id FROM contracts WHERE contract_identifier = %s", (parent_id_str,))
-                parent_row = cur.fetchone()
-                if parent_row:
-                    parent_contract_id = parent_row['id']
+            cur.execute("SELECT id FROM contracts WHERE reference_number = %s", (parent_ref,))
+            parent_row = cur.fetchone()
+            if parent_row:
+                parent_contract_id = parent_row['id']
             
             # Determine relationship type from contract type if not explicitly set
             if not relationship_type:
@@ -254,15 +285,14 @@ def ingest_contract_comprehensive(filepath: Path):
             # Insert relationship record (even if parent not found yet)
             cur.execute("""
                 INSERT INTO contract_relationships (child_contract_id, parent_contract_id, 
-                                                  parent_reference_number, parent_identifier,
+                                                  parent_reference_number,
                                                   relationship_type, relationship_description)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (child_contract_id, parent_contract_id, relationship_type) DO NOTHING
             """, (
                 contract_id,
                 parent_contract_id,  # May be NULL if parent not ingested yet
                 parent_ref,
-                parent_id_str,
                 relationship_type,
                 relationship_desc
             ))
@@ -369,6 +399,10 @@ def ingest_contract_comprehensive(filepath: Path):
             # Insert monetary values
             for monetary in analysis.get("monetary_values", []):
                 if monetary.get("amount"):
+                    # Truncate fields that might exceed old schema limits
+                    value_type = truncate_field(monetary.get("value_type"), 200, "monetary.value_type")
+                    context = truncate_field(monetary.get("context"), 1000, "monetary.context")
+                    
                     cur.execute("""
                         INSERT INTO monetary_values (contract_id, clause_id, amount, currency, 
                                                 value_type, context, multiple_of_fees)
@@ -378,8 +412,8 @@ def ingest_contract_comprehensive(filepath: Path):
                         clause_id,
                         monetary["amount"],
                         monetary.get("currency", "USD"),
-                        monetary.get("value_type"),
-                        monetary.get("context"),
+                        value_type,
+                        context,
                         monetary.get("multiple_of_fees")
                     ))
             
@@ -443,7 +477,20 @@ def process_single_contract(filepath: Path) -> tuple[str, bool, str]:
         ingest_contract_comprehensive(filepath)
         return (filepath.name, True, "Success")
     except Exception as e:
-        return (filepath.name, False, str(e))
+        # Provide more detailed error information
+        import traceback
+        error_msg = str(e)
+        full_trace = traceback.format_exc()
+        
+        # Try to extract the specific column causing the issue
+        if "value too long" in error_msg.lower():
+            # Parse psycopg2 error to find column name
+            print(f"\n  ❌ ERROR DETAILS for {filepath.name}:")
+            print(f"     Error: {error_msg}")
+            print(f"     Full trace:\n{full_trace}")
+            error_msg = f"VARCHAR limit exceeded: {error_msg}"
+        
+        return (filepath.name, False, error_msg)
 
 
 def resolve_orphaned_relationships() -> int:
@@ -456,12 +503,12 @@ def resolve_orphaned_relationships() -> int:
     cur = conn.cursor()
     
     try:
-        # Find relationships with NULL parent_contract_id but non-NULL parent reference/identifier
+        # Find relationships with NULL parent_contract_id but non-NULL parent reference
         cur.execute("""
-            SELECT id, parent_reference_number, parent_identifier
+            SELECT id, parent_reference_number
             FROM contract_relationships
             WHERE parent_contract_id IS NULL
-            AND (parent_reference_number IS NOT NULL OR parent_identifier IS NOT NULL)
+            AND parent_reference_number IS NOT NULL
         """)
         
         orphaned = cur.fetchall()
@@ -470,31 +517,21 @@ def resolve_orphaned_relationships() -> int:
         for row in orphaned:
             relationship_id = row['id']
             parent_ref = row['parent_reference_number']
-            parent_id_str = row['parent_identifier']
             
-            # Try to find parent by reference number first
-            parent_contract_id = None
+            # Try to find parent by reference number
             if parent_ref:
                 cur.execute("SELECT id FROM contracts WHERE reference_number = %s", (parent_ref,))
                 parent_row = cur.fetchone()
                 if parent_row:
                     parent_contract_id = parent_row['id']
-            
-            # Try by identifier if reference didn't work
-            if not parent_contract_id and parent_id_str:
-                cur.execute("SELECT id FROM contracts WHERE contract_identifier = %s", (parent_id_str,))
-                parent_row = cur.fetchone()
-                if parent_row:
-                    parent_contract_id = parent_row['id']
-            
-            # Update if found
-            if parent_contract_id:
-                cur.execute("""
-                    UPDATE contract_relationships
-                    SET parent_contract_id = %s
-                    WHERE id = %s
-                """, (parent_contract_id, relationship_id))
-                resolved_count += 1
+                    
+                    # Update the relationship
+                    cur.execute("""
+                        UPDATE contract_relationships
+                        SET parent_contract_id = %s
+                        WHERE id = %s
+                    """, (parent_contract_id, relationship_id))
+                    resolved_count += 1
         
         conn.commit()
         return resolved_count
@@ -672,6 +709,27 @@ def run_postgres_ingestion(
     print(f"PostgreSQL Ingestion Complete: {successful}/{total} successful")
     print("=" * 70)
     
+    # Run data exploration if ingestion was successful
+    if successful > 0:
+        print("\n" + "=" * 70)
+        print("Running Data Exploration & Report Generation")
+        print("=" * 70)
+        try:
+            import subprocess
+            explore_script = Path(__file__).parent / 'explore_data.py'
+            result = subprocess.run(
+                [sys.executable, str(explore_script)],
+                capture_output=False,
+                text=True
+            )
+            if result.returncode == 0:
+                print("\n✅ Data exploration report generated successfully!")
+            else:
+                print("\n⚠️ Data exploration completed with warnings")
+        except Exception as e:
+            print(f"\n⚠️ Could not run data exploration: {e}")
+            print("You can run it manually: python data_ingestion/explore_data.py")
+    
     # Resolve orphaned relationships (child contracts ingested before parents)
     if successful > 0:
         print("\n[*] Resolving orphaned contract relationships...")
@@ -708,16 +766,19 @@ if __name__ == "__main__":
     print("\n[?] How many contracts to process?")
     print("    1 = Quick test (1 contract)")
     print("    5 = Moderate test (5 contracts)")
+    print("    20 = Medium batch (20 contracts)")
     print("    a = Full ingestion (all contracts)")
     
-    choice = input("\nChoice [1/5/a]: ").strip().lower()
+    choice = input("\nChoice [1/5/20/a]: ").strip().lower()
     
     if choice == '1':
         num, workers = 1, 1
     elif choice == '5':
         num, workers = 5, 2
+    elif choice == '20':
+        num, workers = 20, 10
     else:
-        num, workers = None, 5
+        num, workers = None, 20
     
     success = run_postgres_ingestion(num_contracts=num, n_parallel=workers)
     print("\n" + ("✓ Success!" if success else "✗ Failed"))
