@@ -1,0 +1,102 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Azure and deployment
+.azure/
+azure.yaml
+infra/
+DEPLOYMENT.md
+DEPLOYMENT_QUICKSTART.md
+*.bicep
+*.bicepparam
+
+# Python virtual environments and caches
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Python development
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+
+# Node modules (frontend is built in separate stage)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.turbo/
+
+# Environment files (secrets should not be in image)
+.env
+.env.*
+!.env.example
+!.env.azure.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Cache directories
+cache/
+.cache/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Documentation (not needed at runtime)
+README.md
+*.md
+!backend/**/*.md
+docs/
+
+# Scripts (not needed at runtime)
+scripts/
+start_backend.bat
+*.ps1
+*.sh
+
+# Testing
+tests/
+test/
+*.test.py
+*.spec.py
+
+# Data ingestion (not needed at runtime, data/output is copied separately)
+data_ingestion/
+
+# Lock files (dependencies are already installed)
+uv.lock
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp

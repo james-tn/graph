@@ -52,15 +52,27 @@ openai_client = OpenAI(
 EMBEDDING_MODEL = os.environ.get("GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
 
 def get_db_connection():
-    """Create a database connection."""
-    return psycopg2.connect(
-        host=DB_HOST,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        sslmode='require',
-        cursor_factory=RealDictCursor
-    )
+    """Create a database connection with timeout settings."""
+    try:
+        return psycopg2.connect(
+            host=DB_HOST,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            sslmode='require',
+            cursor_factory=RealDictCursor,
+            connect_timeout=30,  # 30 second connection timeout
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=5
+        )
+    except psycopg2.OperationalError as e:
+        print(f"[ERROR] PostgreSQL connection failed: {e}")
+        raise Exception(f"Database connection timeout or unavailable: {str(e)}")
+    except Exception as e:
+        print(f"[ERROR] Unexpected database error: {e}")
+        raise
 
 
 def get_embedding(text: str) -> list[float]:
@@ -168,6 +180,7 @@ def execute_sql_query(
             cur.execute(sql_query)
         
         results = cur.fetchall()
+        
         cur.close()
         conn.close()
         
@@ -196,8 +209,15 @@ def execute_sql_query(
         
         return "Query executed successfully."
     
+    except psycopg2.OperationalError as e:
+        error_msg = str(e)
+        if "timeout" in error_msg.lower():
+            return f"Database Connection Timeout: The query took too long to execute or the database is unavailable.\n\nError: {error_msg}\n\nQuery was: {sql_query[:200]}..."
+        return f"Database Connection Error: {error_msg}\n\nQuery was: {sql_query[:200]}..."
+    except psycopg2.Error as e:
+        return f"PostgreSQL Error: {str(e)}\n\nQuery was: {sql_query[:200]}..."
     except Exception as e:
-        return f"SQL Query Error: {str(e)}\n\nQuery was: {sql_query}"
+        return f"Unexpected Error: {str(e)}\n\nQuery was: {sql_query[:200]}..."
 
 
 # def get_contract_family(
@@ -383,97 +403,260 @@ Graph: `contract_intelligence`
 Nodes: Contract, Clause, Party, Obligation, Right
 Edges: IS_PARTY_TO, CONTAINS_CLAUSE, IMPOSES_OBLIGATION, GRANTS_RIGHT, HOLDS_RIGHT
 
-## QUERY TOOLS
+## WHEN TO USE WHICH CAPABILITY
 
-**execute_sql_query(sql_query, need_embedding=False, search_text=None)** - Main query tool for:
-- Standard SQL (JOINs, WHERE, GROUP BY, aggregations)
-- Contract hierarchies via contract_relationships table
-- Semantic search: `ORDER BY embedding <=> %s` with need_embedding=True
-- Graph traversal: `SELECT * FROM cypher('contract_intelligence', $$ ... $$) as (col1 agtype, ...)`
+**Use plain SQL for:**
+- Simple filters and aggregations on contracts, clauses, risks, parties, monetary_values tables
+- Straightforward JOINs (e.g., contracts ↔ parties_contracts ↔ parties)
+- Counting, summing, grouping by fields
+- Example: "How many active contracts do we have?" or "List all high-risk clauses"
+
+**Use Cypher via Apache AGE for:**
+- Multi-hop patterns spanning several entity types (Party → Contract → Clause → Risk/Obligation/Right)
+- Questions clearly about "paths" or "connections" across the graph
+- Complex relationship queries like "Which parties are connected to high-risk obligations through multiple contracts?"
+- Example: "Show me all paths from Acme Corp through contracts to high-risk clauses"
+
+**Use semantic search (embedding) when:**
+- User asks about "clauses similar to..." or "find language that talks about..."
+- Question is conceptual, not about named clause types
+- Need to match meaning/intent, not exact keywords
+- Example: "Find clauses about data breach notification" (matches various phrasings)
+
+## QUERY TOOL
+
+**execute_sql_query(sql_query, need_embedding=False, search_text=None)**
+- For standard SQLand Cypher queries
+- Set need_embedding=True and search_text="..." for semantic search
+- Returns query results
+
 
 
 ## QUERY PATTERNS
 
-**Contract Relationships:**
+### 1. Standard SQL - Simple Filters & Aggregations
+
 ```sql
--- Find SOWs under MSA
-SELECT child.reference_number, child.title, cr.relationship_type
+-- Count contracts by type
+SELECT contract_type, COUNT(*) as count
+FROM contracts
+WHERE status = 'active'
+GROUP BY contract_type
+ORDER BY count DESC LIMIT 20
+```
+
+```sql
+-- High-risk clauses with contract info
+SELECT c.reference_number, c.title, cl.clause_type_id, cl.title as clause_title
+FROM clauses cl
+JOIN contracts c ON cl.contract_id = c.id
+WHERE cl.risk_level = 'high'
+LIMIT 20
+```
+
+### 2. Contract Relationships - Standard Joins
+
+```sql
+-- Find SOWs under a specific MSA (include relationship_type!)
+SELECT 
+  child.reference_number, 
+  child.title, 
+  child.contract_type,
+  cr.relationship_type,
+  cr.relationship_description
 FROM contract_relationships cr
 JOIN contracts child ON cr.child_contract_id = child.id
 JOIN contracts parent ON cr.parent_contract_id = parent.id
 WHERE parent.reference_number = 'MSA-ABC-202401-005'
+  AND cr.relationship_type = 'sow'
 LIMIT 20
 ```
 
-**Recursive Family Tree:**
+### 3. Recursive SQL - Contract Families
+
 ```sql
+-- Complete contract family tree
 WITH RECURSIVE tree AS (
-  SELECT id, reference_number, title, 0 as level
-  FROM contracts WHERE reference_number = 'MSA-ABC-202401-005'
+  SELECT 
+    id, 
+    reference_number, 
+    title, 
+    contract_type,
+    0 as level,
+    ARRAY[reference_number] as path
+  FROM contracts 
+  WHERE reference_number = 'MSA-ABC-202401-005'
+  
   UNION ALL
-  SELECT c.id, c.reference_number, c.title, t.level + 1
+  
+  SELECT 
+    c.id, 
+    c.reference_number, 
+    c.title,
+    c.contract_type,
+    t.level + 1,
+    t.path || c.reference_number
   FROM contracts c
   JOIN contract_relationships cr ON c.id = cr.child_contract_id
   JOIN tree t ON cr.parent_contract_id = t.id
+  WHERE t.level < 5
 )
-SELECT * FROM tree ORDER BY level LIMIT 50
+SELECT 
+  level,
+  reference_number, 
+  title,
+  contract_type,
+  array_to_string(path, ' → ') as hierarchy
+FROM tree 
+ORDER BY level, reference_number 
+LIMIT 50
 ```
 
-**Semantic Search:**
+### 4. Semantic Search - Conceptual Matching
+
 ```sql
-SELECT c.contract_identifier, cl.text_content,
-       1 - (cl.embedding <=> %s) as similarity
+-- Find clauses similar to a concept
+SELECT 
+  c.reference_number,
+  cl.section_label,
+  cl.title,
+  cl.text_content,
+  1 - (cl.embedding <=> %s) as similarity
 FROM clauses cl
 JOIN contracts c ON cl.contract_id = c.id
-ORDER BY cl.embedding <=> %s LIMIT 20
+ORDER BY cl.embedding <=> %s
+LIMIT 20
 ```
-Use: need_embedding=True, search_text="liability limitations"
+**IMPORTANT:** Set need_embedding=True and search_text="liability cap exceptions"
 
-**Graph Traversal:**
+### 5. Apache AGE Cypher - Multi-Hop Graph Patterns
+
+**CRITICAL Cypher Format:**
 ```sql
+-- Set search path for AGE
+SET search_path = ag_catalog, '$user', public;
+
+-- Query format: SELECT * FROM cypher('graph_name', $$ CYPHER_QUERY $$) AS (col1 agtype, col2 agtype, ...)
 SELECT * FROM cypher('contract_intelligence', $$
-  MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)
+  MATCH (p:Party)-[r1:IS_PARTY_TO]->(c:Contract)-[r2:CONTAINS_CLAUSE]->(cl:Clause)
   WHERE p.name =~ '.*Acme.*'
-  RETURN p.name, c.title, cl.section
+  RETURN p.name, c.reference_number, c.title, cl.section_label, cl.risk_level
   LIMIT 20
-$$) as (party agtype, contract agtype, section agtype)
+$$) as (party_name agtype, contract_ref agtype, contract_title agtype, clause_section agtype, risk_level agtype)
+```
+
+**MUST wrap Cypher in cypher() function and declare ALL return columns with agtype!**
+
+```sql
+-- Multi-hop: Party → Contract → Clause → Obligation
+SET search_path = ag_catalog, '$user', public;
+
+SELECT * FROM cypher('contract_intelligence', $$
+  MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
+  WHERE cl.risk_level = 'high'
+  RETURN p.name, c.reference_number, cl.section_label, o.description
+  LIMIT 20
+$$) as (party agtype, contract agtype, clause agtype, obligation agtype)
+```
+
+```sql
+-- Find paths between parties through contracts
+SET search_path = ag_catalog, '$user', public;
+
+SELECT * FROM cypher('contract_intelligence', $$
+  MATCH path = (p1:Party)-[:IS_PARTY_TO]->(:Contract)<-[:IS_PARTY_TO]-(p2:Party)
+  WHERE p1.name =~ '.*Acme.*' AND p2.name =~ '.*TechCorp.*'
+  RETURN p1.name, p2.name, length(path) as hops
+  LIMIT 10
+$$) as (party1 agtype, party2 agtype, hops agtype)
 ```
 
 ## OUTPUT FORMATTING
 
-Use Markdown with tables, emojis (⚠️ high, ⚡ medium, ✓ low), and Mermaid charts.
+**CRITICAL: Visualize data whenever possible using Mermaid charts! Users prefer graphics over text.**
 
-**Contract Hierarchy:**
+**Keep responses CONCISE:**
+- Use brief bullet points instead of paragraphs
+- Let visualizations tell the story
+- Include only essential details
+
+**Mermaid Chart Types to Use:**
+
+1. **Contract Hierarchies** - Use `graph TD` for family trees:
 ```mermaid
 graph TD
-    MSA[MSA-ABC-001<br/>Master Agreement] --> SOW1[SOW-ABC-012<br/>Dev Services]
-    MSA --> AMD1[AMD-ABC-025<br/>Amendment]
+    MSA[MSA-ABC-001<br/>Master Agreement<br/>📋 Active] --> SOW1[SOW-ABC-012<br/>Development Services<br/>📄 Active]
+    MSA --> SOW2[SOW-ABC-018<br/>Maintenance<br/>📄 Active]
+    MSA --> AMD1[AMD-ABC-025<br/>Amendment 1<br/>📝 Active]
+    SOW1 --> WO1[WO-ABC-045<br/>Phase 1 Work Order<br/>📌 Completed]
     style MSA fill:#e1f5ff,stroke:#0066cc,stroke-width:3px
     style SOW1 fill:#fff4e6,stroke:#ff9800
+    style SOW2 fill:#fff4e6,stroke:#ff9800
+    style AMD1 fill:#f3e5f5,stroke:#9c27b0
+    style WO1 fill:#e8f5e9,stroke:#4caf50
 ```
 
-**Risk Distribution:**
+2. **Distributions & Proportions** - Use `pie` charts:
 ```mermaid
-pie title Risk Levels
-    "High" : 23
-    "Medium" : 45
-    "Low" : 32
+pie title Risk Level Distribution
+    "High ⚠️" : 23
+    "Medium ⚡" : 45
+    "Low ✓" : 32
 ```
 
-**Party Relationships:**
+3. **Party Relationships** - Use `graph LR` for networks:
 ```mermaid
 graph LR
-    A[Acme Corp] -->|Vendor| B[Contract 001]
-    A -->|Partner| C[Contract 008]
+    Acme[Acme Corp<br/>Client] -->|MSA-001| B[TechVendor<br/>Vendor]
+    Acme -->|NDA-012| C[DataCorp<br/>Partner]
+    B -->|SOW-045| D[CloudHost<br/>Subcontractor]
+    style Acme fill:#e1f5ff,stroke:#0066cc,stroke-width:3px
+    style B fill:#fff4e6,stroke:#ff9800
+    style C fill:#f3e5f5,stroke:#9c27b0
+    style D fill:#e8f5e9,stroke:#4caf50
 ```
 
-## GUIDELINES
+4. **Timelines** - Use `gantt` for date ranges:
+```mermaid
+gantt
+    title Contract Timeline
+    dateFormat YYYY-MM-DD
+    section Active
+    MSA-001 :2024-01-15, 2026-01-15
+    SOW-012 :2024-03-01, 2025-03-01
+```
 
-✅ Always use LIMIT (20-50), ILIKE for case-insensitive search
-✅ For complex questions, make multiple focused queries
-✅ Combine SQL + semantic + graph when appropriate
-❌ No INSERT/UPDATE/DELETE - read-only queries only
-❌ Don't compute embeddings yourself - use need_embedding=True""",
+5. **Vendor Comparisons** - Use `bar` charts for metrics:
+```mermaid
+%%{init: {'theme':'dark'}}%%
+xychart-beta
+    title "Contracts by Vendor"
+    x-axis [Acme, TechCorp, DataVendor, CloudProvider]
+    y-axis "Contract Count" 0 --> 15
+    bar [12, 8, 5, 3]
+```
+
+**Text Formatting:**
+- Emojis: ⚠️ high, ⚡ medium, ✓ low, 📋 MSA, 📄 SOW, 📝 amendment, 💰 money
+- Tables: Use markdown tables ONLY when charts don't work
+- Bold key numbers: **$1.2M**, **23 contracts**, **8 high-risk**
+
+## BEST PRACTICES
+
+✅ **VISUALIZE FIRST:** Always ask "Can I show this as a chart?" before writing text
+✅ **BE CONCISE:** 2-3 sentences max, then show a chart
+✅ **ALWAYS use LIMIT** (20-50 rows) to prevent overwhelming responses
+✅ **Use ILIKE** for case-insensitive string matching (e.g., `WHERE name ILIKE '%acme%'`)
+✅ **Include relationship_type** when querying contract_relationships
+✅ **For Cypher:** SET search_path first, wrap in cypher(), declare ALL columns with agtype
+✅ **Complex questions:** Break into multiple focused queries, combine results
+✅ **Choose the right tool:** SQL for simple queries, recursive SQL for hierarchies, Cypher for multi-hop patterns
+
+❌ **READ-ONLY:** No INSERT/UPDATE/DELETE queries allowed
+❌ **Don't compute embeddings:** Use need_embedding=True parameter instead
+❌ **Don't forget LIMIT:** Always constrain result size
+❌ **Cypher formatting:** Must use exact format shown in examples above
+❌ **No long paragraphs:** Use bullets + charts instead""",
             tools=[
                 execute_sql_query,
                 # get_contract_family,
@@ -487,30 +670,48 @@ graph LR
         
         # Extract SQL queries and their reasoning from tool calls in the conversation
         tool_calls = []
+        
         for message in result.messages:
+            
             # Extract reasoning (text content) that comes before tool calls
             reasoning = ""
             current_tool_calls = []
             
             for content in message.contents:
-                if hasattr(content, 'text') and hasattr(content, 'type') and content.type == 'text':
+                # Handle text content
+                if hasattr(content, 'text'):
                     reasoning += content.text
                 
                 # Check if this is a function call to execute_sql_query
-                elif hasattr(content, 'name') and content.name == 'execute_sql_query':
-                    # Parse the arguments to get the SQL query
+                if hasattr(content, 'name') and content.name == 'execute_sql_query':
+                    args = None
+                    # Try parse_arguments method
                     if hasattr(content, 'parse_arguments'):
-                        args = content.parse_arguments()
-                        if args and 'sql_query' in args:
-                            current_tool_calls.append({
-                                'sql_query': args['sql_query'],
-                                'reasoning': reasoning.strip() if reasoning else None,
-                                'need_embedding': args.get('need_embedding', False),
-                                'search_text': args.get('search_text', None),
-                            })
+                        try:
+                            args = content.parse_arguments()
+                        except:
+                            pass
+                    # Try arguments attribute
+                    if not args and hasattr(content, 'arguments'):
+                        try:
+                            import json
+                            args = json.loads(content.arguments) if isinstance(content.arguments, str) else content.arguments
+                        except:
+                            pass
+                    
+                    if args and 'sql_query' in args:
+                        current_tool_calls.append({
+                            'sql_query': args['sql_query'],
+                            'reasoning': reasoning.strip() if reasoning else None,
+                            'need_embedding': args.get('need_embedding', False),
+                            'search_text': args.get('search_text', None),
+                        })
+                        reasoning = ""  # Reset reasoning after capturing
             
             # Add tool calls from this message
             tool_calls.extend(current_tool_calls)
+        
+        print(f"[DEBUG] Total tool calls extracted: {len(tool_calls)}")
         
         return {
             "query": query_text,

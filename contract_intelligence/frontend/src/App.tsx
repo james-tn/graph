@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { UploadSection } from './components/UploadSection'
 import { HybridQuerySection } from './components/HybridQuerySection'
 import { HybridResultSection } from './components/HybridResultSection'
-import { Sparkles, Zap, Shield, Brain, Search, Upload, Database, GitBranch } from 'lucide-react'
+import { Brain, Search, Upload, Database, GitBranch } from 'lucide-react'
 
 function App() {
   const [result, setResult] = useState(null);

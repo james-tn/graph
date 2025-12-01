@@ -274,7 +274,7 @@ class GraphRAGAgent:
                 entities=self._entities,
                 relationships=self._relationships,
                 covariates={"claims": self._covariates},
-                response_type="multiple paragraphs",
+                response_type="concise with visualizations",  # Changed from "multiple paragraphs"
                 description_embedding_store=self._description_embedding_store,
             )
             
@@ -402,84 +402,135 @@ class GraphRAGAgent:
             context = "\n\n".join(relevant_reports)
             
             # Use LLM to answer based on context
-            prompt = f"""Based on the following contract analysis reports, answer this question:
+            prompt = f"""Based on the following contract analysis reports, answer this question concisely with rich visualizations.
 
 Question: {query}
 
 Reports:
 {context}
 
-**IMPORTANT - FORMAT YOUR RESPONSE WITH RICH MARKDOWN:**
+**CRITICAL INSTRUCTIONS - CONCISE & VISUAL:**
 
-Your response will be rendered with a Markdown visualizer. Use these formatting features creatively:
+🎯 **BE BRIEF:** 
+- Maximum 3-4 sentences of text explanation
+- Let charts and diagrams do the talking
+- Use bullet points, not paragraphs
 
-📝 **Rich Formatting:**
-- Use **bold** for key findings, *italics* for emphasis
-- Create clear sections with ## and ### headers
-- Use > blockquotes for critical insights
-- Add --- horizontal rules between major sections
-- Strategic emojis: 📊 (data), 🔍 (findings), 💡 (insights), ⚠️ (risks), ✓ (positive)
+📊 **VISUALIZE EVERYTHING:**
+Ask yourself: "Can I show this as a chart instead of text?" If yes, DO IT.
 
-📊 **Tables for Comparisons:**
-```markdown
-| Category | Finding | Impact |
-|----------|---------|--------|
-| Payment Terms | 30-60 days | Standard |
-```
+**Mermaid Chart Types:**
 
-📈 **Mermaid Charts for Patterns:**
-
-Use Mermaid diagrams to visualize patterns, trends, or distributions:
-
+1. **Pie Charts** - For distributions, proportions, breakdowns:
 ```mermaid
-pie title Contract Distribution
-    "High Risk" : 25
-    "Medium Risk" : 45
-    "Low Risk" : 30
+pie title Risk Distribution
+    "High ⚠️" : 23
+    "Medium ⚡" : 45
+    "Low ✓" : 32
 ```
 
+2. **Flow/Relationship Graphs** - For patterns, connections, hierarchies:
 ```mermaid
 graph LR
-    A[Common Pattern] --> B[Variant 1]
-    A --> C[Variant 2]
-    A --> D[Outlier]
+    A[Pattern Type A] -->|leads to| B[Outcome 1]
+    A -->|may cause| C[Outcome 2]
+    D[Pattern Type B] -->|results in| B
+    style A fill:#e1f5ff,stroke:#0066cc
+    style B fill:#fff4e6,stroke:#ff9800
 ```
 
-Provide a comprehensive, well-formatted answer based on the reports above."""
+3. **Timelines** - For temporal patterns:
+```mermaid
+gantt
+    title Contract Renewal Patterns
+    dateFormat YYYY-MM
+    section Q1
+    Pattern A :2024-01, 2024-03
+    section Q2
+    Pattern B :2024-04, 2024-06
+```
+
+4. **Bar Charts** - For comparisons:
+```mermaid
+%%{{init: {{'theme':'dark'}}}}%%
+xychart-beta
+    title "Clause Type Frequency"
+    x-axis [Liability, IP, Termination, Payment]
+    y-axis "Count" 0 --> 50
+    bar [45, 32, 28, 15]
+```
+
+5. **Mind Maps** - For thematic relationships:
+```mermaid
+mindmap
+  root((Risk Themes))
+    Financial
+      Payment delays
+      Penalty clauses
+    Legal
+      Liability caps
+      Indemnification
+    Operational
+      Termination rights
+      Service levels
+```
+
+**Formatting:**
+- Use emojis: 📊 data, 🔍 finding, 💡 insight, ⚠️ risk, ✓ good, ❌ bad, 🎯 key point
+- **Bold key numbers**: **85%**, **23 contracts**, **$1.2M**
+- Tables ONLY if charts won't work
+- 2-3 bullet points max before showing a chart
+
+Provide a CONCISE, VISUAL answer with multiple charts."""
             
-            # Simple completion call
-            from openai import OpenAI
-            client = OpenAI(
-                api_key=self.api_key,
-                base_url=self.api_base,
-            )
-            
-            print(f"  Calling LLM with {len(prompt)} chars of prompt...")
-            
-            response = client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model=self.llm_deployment,
-                max_completion_tokens=8000  # Increased for reasoning models
-            )
-            
-            answer = response.choices[0].message.content
-            print(f"  LLM returned: {len(answer) if answer else 0} chars")
-            
-            if not answer:
-                print(f"  WARNING: Empty response from LLM!")
-                print(f"  Response object: {response}")
-                answer = "No response generated from the LLM."
-            
-            return {
-                "query": query,
-                "search_type": "global",
-                "response": answer,
-                "context_data": {"num_reports": len(relevant_reports)},
-                "context_text": context[:1000] + "..." if len(context) > 1000 else context,
-                "completion_time": 0,
-                "llm_calls": 1,
-                "map_responses": [],
-            }
+            try:
+                # Simple completion call using Azure OpenAI
+                from openai import OpenAI
+                client = OpenAI(
+                    api_key=self.api_key,
+                    base_url=self.api_base,
+                )
+                
+                print(f"  Calling LLM with {len(prompt)} chars of prompt...")
+                
+                response = client.chat.completions.create(
+                    messages=[{"role": "user", "content": prompt}],
+                    model=self.llm_deployment,
+                    max_completion_tokens=8000  
+                )
+                
+                answer = response.choices[0].message.content
+                print(f"  LLM returned: {len(answer) if answer else 0} chars")
+                
+                if not answer:
+                    print(f"  WARNING: Empty response from LLM!")
+                    print(f"  Response object: {response}")
+                    answer = "No response generated from the LLM."
+                
+                return {
+                    "query": query,
+                    "search_type": "global",
+                    "response": answer,
+                    "context_data": {"num_reports": len(relevant_reports)},
+                    "context_text": context[:1000] + "..." if len(context) > 1000 else context,
+                    "completion_time": 0,
+                    "llm_calls": 1,
+                    "map_responses": [],
+                }
+            except Exception as e:
+                print(f"  ❌ ERROR calling LLM: {type(e).__name__}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                return {
+                    "query": query,
+                    "search_type": "global",
+                    "response": f"Error generating response: {str(e)}",
+                    "context_data": {"error": str(e), "error_type": type(e).__name__},
+                    "context_text": "",
+                    "completion_time": 0,
+                    "llm_calls": 0,
+                    "map_responses": [],
+                }
         
         result = await self._global_search_engine.asearch(query)
         

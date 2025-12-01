@@ -34,22 +34,25 @@ class RouterAgent:
         "specific contract", "contract identifier", "contract id",
         "party name", "party obligations", "party rights",
         "exact clause", "clause text", "keyword search",
-        "monetary value", "payment", "fee", "price",
+        "monetary value", "payment", "fee", "price", "amount", "cost",
         "date", "deadline", "effective date", "expiration",
         "high risk", "risk level", "compliance",
-        "list", "count", "statistics", "how many",
-        "which contracts", "find contract",
+        "list", "count", "statistics", "how many", "total", "sum",
+        "which contracts", "find contract", "filter",
+        "aggregate", "group by", "average", "maximum", "minimum",
+        "top", "largest", "smallest", "most", "least",
+        "quantitative", "metric", "measure", "calculation",
     ]
     
     GRAPHRAG_PATTERNS = [
-        "all contracts", "across contracts", "cross-contract",
-        "pattern", "trend", "common", "typical", "generally",
-        "compare", "comparison", "similar", "difference",
-        "overview", "summary", "summarize", "aggregate",
-        "industry", "best practice", "standard",
+        "pattern", "trend", "common themes", "typical language", "generally",
+        "compare narratively", "qualitative comparison", "thematic difference",
+        "thematic overview", "narrative summary", "abstractive summary",
+        "industry practice", "best practice", "standard language",
         "relationship between", "connection", "related to",
-        "theme", "category", "type of",
-        "why", "how", "explain", "understand",
+        "theme", "conceptual category",
+        "why", "how", "explain", "understand", "rationale",
+        "insight", "implication", "strategic",
     ]
     
     def __init__(self):
@@ -105,19 +108,23 @@ class RouterAgent:
 
 You have access to two specialized search engines:
 
-1. **PostgreSQL Agent** (Structured Database):
+1. **PostgreSQL Agent** (Structured Database) - DEFAULT:
    - Precise lookups by contract ID, party name, or specific terms
-   - SQL queries for exact filtering and counting
+   - SQL queries for exact filtering, counting, and aggregations
+   - Quantitative analysis: totals, averages, counts, grouping
    - Vector similarity search on clause embeddings
    - Graph traversal using Apache AGE (party->contract->clause relationships)
-   - Best for: specific contracts, exact matches, numerical queries, structured data
+   - Best for: specific contracts, exact matches, numerical queries, structured data, quantitative summaries, aggregations
 
-2. **GraphRAG Agent** (Knowledge Graph):
+2. **GraphRAG Agent** (Knowledge Graph) - SPECIALIZED:
    - Entity extraction with community detection
-   - Cross-document pattern analysis
-   - Global summaries and comparative insights
+   - Cross-document thematic pattern analysis
+   - Abstractive/qualitative summaries (narrative insights, not numbers)
    - Local search for entity-centric context
-   - Best for: trends, comparisons, summaries, "why/how" questions, thematic analysis
+   - Best for: "why/how" questions, thematic analysis, qualitative comparisons, narrative insights, strategic implications
+   - NOT for: counting, totals, averages, or any quantitative aggregation (use PostgreSQL instead)
+
+**IMPORTANT**: Use PostgreSQL for ANY quantitative/numerical queries including counts, totals, averages, grouping. Only use GraphRAG for abstractive/qualitative/narrative analysis.
 
 Analyze the query and decide which approach is best. Return JSON only:
 {

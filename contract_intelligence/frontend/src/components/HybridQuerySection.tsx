@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Loader2, Sparkles, GitBranch, Database, Brain } from 'lucide-react';
+import { Search, Loader2, Sparkles, GitBranch, Database, Brain, ChevronDown, ChevronUp, Grid3x3, List } from 'lucide-react';
 import { runHybridQuery } from '../api';
 
 interface HybridQuerySectionProps {
@@ -127,23 +127,53 @@ const SAMPLE_QUERIES = [
     category: "regional"
   },
   
-  // G. Portfolio-Level Summaries
+  // G. Strategic Insights & Thematic Analysis (GraphRAG - Abstractive/Qualitative)
   {
-    text: "Across our whole portfolio, which counterparties (customers or vendors) have the most contracts with us, and what does the risk breakdown look like for each (high, medium, low)?",
-    type: "postgres",
-    desc: "Portfolio-wide party analysis + risk distribution",
+    text: "What are the most common themes and patterns in our high-risk clauses across all contracts?",
+    type: "graphrag",
+    desc: "Thematic pattern discovery across portfolio",
     category: "portfolio"
   },
   {
-    text: "Which contracts have the highest concentration of high-risk clauses—for example, more than three high-risk clauses in a single contract? Show these with the party name and contract type.",
-    type: "postgres",
-    desc: "High-risk concentration detection + contract identification",
+    text: "How do our vendor contracts typically structure liability and indemnification language? What patterns emerge?",
+    type: "graphrag",
+    desc: "Qualitative language pattern analysis",
     category: "portfolio"
   },
   {
-    text: "For our largest service or consulting contracts, summarize for each: total contract value, number of high-risk clauses, and number of high-impact obligations, so we can see where the biggest risks are.",
-    type: "postgres",
-    desc: "Comprehensive risk + financial + obligation analysis",
+    text: "What are the strategic implications of our data protection and confidentiality obligations across different vendor relationships?",
+    type: "graphrag",
+    desc: "Strategic narrative synthesis",
+    category: "portfolio"
+  },
+  {
+    text: "Explain the relationship between contract types and risk profiles - what patterns do you see in how different agreement types handle risk?",
+    type: "graphrag",
+    desc: "Cross-contract thematic comparison",
+    category: "portfolio"
+  },
+  {
+    text: "What common themes appear in our termination and renewal clauses? How do these differ conceptually across vendors?",
+    type: "graphrag",
+    desc: "Conceptual theme extraction",
+    category: "portfolio"
+  },
+  {
+    text: "Provide a narrative overview of how intellectual property rights are typically addressed across our technology vendor contracts.",
+    type: "graphrag",
+    desc: "Abstractive IP strategy summary",
+    category: "portfolio"
+  },
+  {
+    text: "What insights can you provide about the relationships between parties, obligations, and risk levels in our contract network?",
+    type: "graphrag",
+    desc: "Graph relationship insights",
+    category: "portfolio"
+  },
+  {
+    text: "How do our contracts balance rights and obligations? What patterns suggest areas where we might be over-exposed or under-protected?",
+    type: "graphrag",
+    desc: "Qualitative risk-benefit analysis",
     category: "portfolio"
   }
 ];
@@ -151,7 +181,55 @@ const SAMPLE_QUERIES = [
 export const HybridQuerySection: React.FC<HybridQuerySectionProps> = ({ onResult }) => {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [strategy, setStrategy] = useState<'auto' | 'postgres' | 'graphrag' | 'hybrid'>('auto');
+  const [strategy, setStrategy] = useState<'auto' | 'postgres' | 'graphrag' | 'hybrid'>('postgres');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'compact' | 'full'>('compact');
+
+  const toggleCategory = (category: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(category)) {
+      newExpanded.delete(category);
+    } else {
+      newExpanded.add(category);
+    }
+    setExpandedCategories(newExpanded);
+  };
+
+  const categories = [
+    { id: 'vendor-risk', name: 'A. Vendor Risk and Exposure', icon: Database, color: 'red', count: SAMPLE_QUERIES.filter(q => q.category === 'vendor-risk').length },
+    { id: 'families', name: 'B. Contract Families and Relationship Complexity', icon: GitBranch, color: 'blue', count: SAMPLE_QUERIES.filter(q => q.category === 'families').length },
+    { id: 'clause-risk', name: 'C. Clause-Level Risk Patterns', icon: Database, color: 'orange', count: SAMPLE_QUERIES.filter(q => q.category === 'clause-risk').length },
+    { id: 'monetary', name: 'D. Monetary Exposure vs Risk', icon: Database, color: 'yellow', count: SAMPLE_QUERIES.filter(q => q.category === 'monetary').length },
+    { id: 'obligations', name: 'E. Obligations and Rights', icon: Database, color: 'green', count: SAMPLE_QUERIES.filter(q => q.category === 'obligations').length },
+    { id: 'regional', name: 'F. Governing Law and Regional Risk', icon: Database, color: 'cyan', count: SAMPLE_QUERIES.filter(q => q.category === 'regional').length },
+    { id: 'portfolio', name: 'G. Strategic Insights & Thematic Analysis', icon: Sparkles, color: 'purple', count: SAMPLE_QUERIES.filter(q => q.category === 'portfolio').length }
+  ];
+
+  // Filter queries based on selected strategy
+  const getFilteredQueries = (categoryId: string) => {
+    const allQueries = SAMPLE_QUERIES.filter(q => q.category === categoryId);
+    
+    if (strategy === 'postgres') {
+      // PostgreSQL: Show A-F (exclude G which is graphrag-focused)
+      return categoryId === 'portfolio' ? [] : allQueries;
+    } else if (strategy === 'graphrag') {
+      // GraphRAG: Show only G (portfolio/strategic insights)
+      return categoryId === 'portfolio' ? allQueries : [];
+    } else {
+      // Auto/Hybrid: Show all categories
+      return allQueries;
+    }
+  };
+
+  const getVisibleCategories = () => {
+    if (strategy === 'postgres') {
+      return categories.filter(cat => cat.id !== 'portfolio');
+    } else if (strategy === 'graphrag') {
+      return categories.filter(cat => cat.id === 'portfolio');
+    } else {
+      return categories;
+    }
+  };
 
   const handleSearch = async (q: string, forceStrategy?: string) => {
     setQuery(q);
@@ -265,217 +343,127 @@ export const HybridQuerySection: React.FC<HybridQuerySectionProps> = ({ onResult
 
       {/* Sample Queries */}
       <div>
-        <div className="flex items-center gap-3 mb-4">
-          <Sparkles className="w-5 h-5 text-purple-400" />
-          <h3 className="text-lg font-bold text-purple-300">Real-World Legal Intelligence Queries</h3>
-          <span className="text-xs text-purple-400 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-400/30">
-            {SAMPLE_QUERIES.length} queries across 7 categories
-          </span>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Sparkles className="w-5 h-5 text-purple-400" />
+            <h3 className="text-lg font-bold text-purple-300">Sample Queries</h3>
+            <span className="text-xs text-purple-400 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-400/30">
+              {getVisibleCategories().reduce((sum, cat) => sum + getFilteredQueries(cat.id).length, 0)} queries • {getVisibleCategories().length} categories
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setViewMode('compact')}
+              className={`p-2 rounded-lg transition-all ${viewMode === 'compact' ? 'bg-purple-600 text-white' : 'bg-slate-800/50 text-purple-300 hover:bg-slate-700/50'}`}
+              title="Compact View"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('full')}
+              className={`p-2 rounded-lg transition-all ${viewMode === 'full' ? 'bg-purple-600 text-white' : 'bg-slate-800/50 text-purple-300 hover:bg-slate-700/50'}`}
+              title="Full View"
+            >
+              <Grid3x3 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         
-        {/* Query Categories */}
-        <div className="space-y-6">
-          {/* A. Vendor Risk and Exposure */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-3">
-              <Database className="w-4 h-4 text-red-400" />
-              <h4 className="text-sm font-bold text-red-300 uppercase tracking-wider">A. Vendor Risk and Exposure</h4>
-              <div className="flex-1 h-px bg-gradient-to-r from-red-500/30 to-transparent"></div>
-            </div>
-            {SAMPLE_QUERIES.filter(q => q.category === 'vendor-risk').map((sample, idx) => (
-              <button
-                key={`vendor-risk-${idx}`}
-                onClick={() => handleSearch(sample.text, sample.type)}
-                disabled={loading}
-                className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-red-900/30 hover:to-slate-800/50 rounded-xl border border-red-500/20 hover:border-red-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-red-500/20"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-red-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
-                      {sample.text}
-                    </p>
-                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-red-500/20 text-red-300 border border-red-400/30">
-                      {sample.desc}
+        {/* Collapsible Categories */}
+        <div className="space-y-2">
+          {getVisibleCategories().map((cat) => {
+            const Icon = cat.icon;
+            const isExpanded = expandedCategories.has(cat.id);
+            const queries = getFilteredQueries(cat.id);
+            
+            // Skip if no queries for this category in current mode
+            if (queries.length === 0) return null;
+            
+            return (
+              <div key={cat.id} className="border border-slate-700/50 rounded-xl overflow-hidden bg-slate-800/30">
+                {/* Category Header */}
+                <button
+                  onClick={() => toggleCategory(cat.id)}
+                  className={`w-full p-4 flex items-center justify-between hover:bg-slate-700/30 transition-all ${
+                    isExpanded ? `bg-${cat.color}-900/20` : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className={`w-5 h-5 text-${cat.color}-400`} />
+                    <h4 className={`text-sm font-bold text-${cat.color}-300 uppercase tracking-wider`}>
+                      {cat.name}
+                    </h4>
+                    <span className={`text-xs px-2 py-1 rounded-full bg-${cat.color}-500/20 text-${cat.color}-300 border border-${cat.color}-400/30`}>
+                      {cat.count}
                     </span>
                   </div>
-                  <Search className="w-5 h-5 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                </div>
-              </button>
-            ))}
-          </div>
+                  {isExpanded ? (
+                    <ChevronUp className={`w-5 h-5 text-${cat.color}-400`} />
+                  ) : (
+                    <ChevronDown className={`w-5 h-5 text-${cat.color}-400`} />
+                  )}
+                </button>
+                
+                {/* Category Content */}
+                {isExpanded && (
+                  <div className="p-2 space-y-2 bg-slate-900/30">
+                    {viewMode === 'compact' ? (
+                      // Compact View - Just query text
+                      queries.map((sample, idx) => (
+                        <button
+                          key={`${cat.id}-${idx}`}
+                          onClick={() => handleSearch(sample.text, sample.type)}
+                          disabled={loading}
+                          className={`w-full text-left px-4 py-2 rounded-lg hover:bg-${cat.color}-900/20 border border-${cat.color}-500/10 hover:border-${cat.color}-400/30 transition-all group disabled:opacity-50`}
+                        >
+                          <p className={`text-sm text-${cat.color}-100 group-hover:text-white transition-colors line-clamp-2`}>
+                            {sample.text}
+                          </p>
+                        </button>
+                      ))
+                    ) : (
+                      // Full View - Query with description
+                      queries.map((sample, idx) => (
+                        <button
+                          key={`${cat.id}-${idx}`}
+                          onClick={() => handleSearch(sample.text, sample.type)}
+                          disabled={loading}
+                          className={`w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-${cat.color}-900/30 hover:to-slate-800/50 rounded-xl border border-${cat.color}-500/20 hover:border-${cat.color}-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-${cat.color}-500/20`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <p className={`text-${cat.color}-100 group-hover:text-white transition-colors font-medium mb-2 text-sm`}>
+                                {sample.text}
+                              </p>
+                              <span className={`text-xs px-3 py-1 rounded-full font-semibold bg-${cat.color}-500/20 text-${cat.color}-300 border border-${cat.color}-400/30`}>
+                                {sample.desc}
+                              </span>
+                            </div>
+                            <Search className={`w-5 h-5 text-${cat.color}-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0`} />
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           
-          {/* B. Contract Families */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-3">
-              <GitBranch className="w-4 h-4 text-blue-400" />
-              <h4 className="text-sm font-bold text-blue-300 uppercase tracking-wider">B. Contract Families and Relationship Complexity</h4>
-              <div className="flex-1 h-px bg-gradient-to-r from-blue-500/30 to-transparent"></div>
-            </div>
-            {SAMPLE_QUERIES.filter(q => q.category === 'families').map((sample, idx) => (
-              <button
-                key={`families-${idx}`}
-                onClick={() => handleSearch(sample.text, sample.type)}
-                disabled={loading}
-                className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-blue-900/30 hover:to-slate-800/50 rounded-xl border border-blue-500/20 hover:border-blue-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-blue-500/20"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-blue-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
-                      {sample.text}
-                    </p>
-                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30">
-                      {sample.desc}
-                    </span>
-                  </div>
-                  <Search className="w-5 h-5 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                </div>
-              </button>
-            ))}
-          </div>
-          
-          {/* C. Clause-Level Risk */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-3">
-              <Database className="w-4 h-4 text-orange-400" />
-              <h4 className="text-sm font-bold text-orange-300 uppercase tracking-wider">C. Clause-Level Risk Patterns</h4>
-              <div className="flex-1 h-px bg-gradient-to-r from-orange-500/30 to-transparent"></div>
-            </div>
-            {SAMPLE_QUERIES.filter(q => q.category === 'clause-risk').map((sample, idx) => (
-              <button
-                key={`clause-risk-${idx}`}
-                onClick={() => handleSearch(sample.text, sample.type)}
-                disabled={loading}
-                className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-orange-900/30 hover:to-slate-800/50 rounded-xl border border-orange-500/20 hover:border-orange-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-orange-500/20"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-orange-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
-                      {sample.text}
-                    </p>
-                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-orange-500/20 text-orange-300 border border-orange-400/30">
-                      {sample.desc}
-                    </span>
-                  </div>
-                  <Search className="w-5 h-5 text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                </div>
-              </button>
-            ))}
-          </div>
-          
-          {/* D. Monetary Exposure */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-3">
-              <Database className="w-4 h-4 text-yellow-400" />
-              <h4 className="text-sm font-bold text-yellow-300 uppercase tracking-wider">D. Monetary Exposure vs Risk</h4>
-              <div className="flex-1 h-px bg-gradient-to-r from-yellow-500/30 to-transparent"></div>
-            </div>
-            {SAMPLE_QUERIES.filter(q => q.category === 'monetary').map((sample, idx) => (
-              <button
-                key={`monetary-${idx}`}
-                onClick={() => handleSearch(sample.text, sample.type)}
-                disabled={loading}
-                className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-yellow-900/30 hover:to-slate-800/50 rounded-xl border border-yellow-500/20 hover:border-yellow-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-yellow-500/20"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-yellow-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
-                      {sample.text}
-                    </p>
-                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-yellow-500/20 text-yellow-300 border border-yellow-400/30">
-                      {sample.desc}
-                    </span>
-                  </div>
-                  <Search className="w-5 h-5 text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                </div>
-              </button>
-            ))}
-          </div>
-          
-          {/* E. Obligations and Rights */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-3">
-              <Database className="w-4 h-4 text-green-400" />
-              <h4 className="text-sm font-bold text-green-300 uppercase tracking-wider">E. Obligations and Rights</h4>
-              <div className="flex-1 h-px bg-gradient-to-r from-green-500/30 to-transparent"></div>
-            </div>
-            {SAMPLE_QUERIES.filter(q => q.category === 'obligations').map((sample, idx) => (
-              <button
-                key={`obligations-${idx}`}
-                onClick={() => handleSearch(sample.text, sample.type)}
-                disabled={loading}
-                className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-green-900/30 hover:to-slate-800/50 rounded-xl border border-green-500/20 hover:border-green-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-green-500/20"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-green-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
-                      {sample.text}
-                    </p>
-                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-green-500/20 text-green-300 border border-green-400/30">
-                      {sample.desc}
-                    </span>
-                  </div>
-                  <Search className="w-5 h-5 text-green-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                </div>
-              </button>
-            ))}
-          </div>
-          
-          {/* F. Regional Risk */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-3">
-              <Database className="w-4 h-4 text-cyan-400" />
-              <h4 className="text-sm font-bold text-cyan-300 uppercase tracking-wider">F. Governing Law and Regional Risk</h4>
-              <div className="flex-1 h-px bg-gradient-to-r from-cyan-500/30 to-transparent"></div>
-            </div>
-            {SAMPLE_QUERIES.filter(q => q.category === 'regional').map((sample, idx) => (
-              <button
-                key={`regional-${idx}`}
-                onClick={() => handleSearch(sample.text, sample.type)}
-                disabled={loading}
-                className="w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-cyan-900/30 hover:to-slate-800/50 rounded-xl border border-cyan-500/20 hover:border-cyan-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-cyan-500/20"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-cyan-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
-                      {sample.text}
-                    </p>
-                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
-                      {sample.desc}
-                    </span>
-                  </div>
-                  <Search className="w-5 h-5 text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                </div>
-              </button>
-            ))}
-          </div>
-          
-          {/* G. Portfolio Summaries */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="w-4 h-4 text-purple-400" />
-              <h4 className="text-sm font-bold text-purple-300 uppercase tracking-wider">G. Portfolio-Level Summaries</h4>
-              <div className="flex-1 h-px bg-gradient-to-r from-purple-500/30 to-transparent"></div>
-            </div>
-            {SAMPLE_QUERIES.filter(q => q.category === 'portfolio').map((sample, idx) => (
-              <button
-                key={`portfolio-${idx}`}
-                onClick={() => handleSearch(sample.text, sample.type)}
-                disabled={loading}
-                className="w-full text-left p-4 bg-gradient-to-r from-purple-900/30 to-pink-900/30 hover:from-purple-900/50 hover:to-pink-900/50 rounded-xl border border-purple-500/30 hover:border-purple-400/60 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-purple-500/30"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-purple-100 group-hover:text-white transition-colors font-medium mb-2 text-sm">
-                      {sample.text}
-                    </p>
-                    <span className="text-xs px-3 py-1 rounded-full font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30">
-                      {sample.desc}
-                    </span>
-                  </div>
-                  <Sparkles className="w-5 h-5 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                </div>
-              </button>
-            ))}
+          {/* Expand/Collapse All */}
+          <div className="flex gap-2 justify-center pt-2">
+            <button
+              onClick={() => setExpandedCategories(new Set(categories.map(c => c.id)))}
+              className="text-xs px-4 py-2 bg-slate-800/50 hover:bg-slate-700/50 text-purple-300 rounded-lg border border-purple-500/20 hover:border-purple-400/40 transition-all"
+            >
+              Expand All
+            </button>
+            <button
+              onClick={() => setExpandedCategories(new Set())}
+              className="text-xs px-4 py-2 bg-slate-800/50 hover:bg-slate-700/50 text-purple-300 rounded-lg border border-purple-500/20 hover:border-purple-400/40 transition-all"
+            >
+              Collapse All
+            </button>
           </div>
         </div>
       </div>

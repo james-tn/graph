@@ -1,40 +1,30 @@
+# Azure Developer CLI (azd) configuration for Contract Intelligence
 name: contract-intelligence
 metadata:
-  template: contract-intelligence
+  template: contract-intelligence@0.0.1
+
+# Infrastructure configuration
 infra:
   provider: bicep
   path: infra
-  parameters:
-    baseName:
-      value: contract-intel
-    environmentName:
-      value: ${AZD_ENV_NAME}
-    tags:
-      value:
-        project: contract-intelligence
-        environment: ${AZD_ENV_NAME}
-    serverName:
-      value: ${AZD_ENV_NAME}-pgflex
-    administratorLogin:
-      value: pgadmin
-    administratorPassword:
-      value: ${POSTGRES_ADMIN_PASSWORD}
-    availabilityZone:
-      value: ${POSTGRES_AVAILABILITY_ZONE}
-    enableHighAvailability:
-      value: false
-    enablePublicAccess:
-      value: true
-    storageSizeGB:
-      value: 256
-    backupRetentionDays:
-      value: 14
-    databaseName:
-      value: cipgraph
-    extensions:
-      value:
-        - vector
-        - pg_trgm
-        - hstore
-        - citext
-        - age
+  module: main.azd
+
+# Services to deploy
+services:
+  backend:
+    project: .
+    language: python
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      context: .
+
+# Deployment hooks
+hooks:
+  preprovision:
+    posix:
+      run: pwsh -File ./infra/scripts/preprovision.ps1
+    windows:
+      run: pwsh -File ./infra/scripts/preprovision.ps1
+
+# Environment configuration - Set these in .azure/<env-name>/.env to reuse existing resources
