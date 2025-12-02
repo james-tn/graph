@@ -36,12 +36,14 @@ htmlcov/
 .ruff_cache/
 .pytype/
 
-# Node modules (frontend is built in separate stage)
+# Frontend (exclude heavy dev files, but keep source for build)
 frontend/node_modules/
 frontend/dist/
-backend/utils/node_modules/
 frontend/.vite/
 frontend/.turbo/
+
+# Node modules
+backend/utils/node_modules/
 
 # Environment files (secrets should not be in image)
 .env
@@ -87,10 +89,11 @@ test/
 *.test.py
 *.spec.py
 
-# Data ingestion (not needed at runtime, data/output is copied separately)
+# Data directories (exclude large files not needed in container)
+data/*
+!data/output/
 data_ingestion/
-
-# Lock files (dependencies are already installed)
+graphrag_config/# Lock files (dependencies are already installed)
 uv.lock
 package-lock.json
 yarn.lock

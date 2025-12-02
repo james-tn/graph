@@ -35,21 +35,21 @@ DB_PASSWORD = os.environ.get("POSTGRES_ADMIN_PASSWORD")
 GRAPH_NAME = "contract_intelligence"
 
 # Validate required environment variables
-GRAPHRAG_API_KEY = os.environ.get("GRAPHRAG_API_KEY")
-GRAPHRAG_API_BASE = os.environ.get("GRAPHRAG_API_BASE")
+AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY")
+AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT")
 
-if not GRAPHRAG_API_KEY:
-    raise ValueError("GRAPHRAG_API_KEY environment variable is required")
-if not GRAPHRAG_API_BASE:
-    raise ValueError("GRAPHRAG_API_BASE environment variable is required")
+if not AZURE_OPENAI_API_KEY:
+    raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
+if not AZURE_OPENAI_ENDPOINT:
+    raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
 
 # OpenAI client for embeddings
 openai_client = OpenAI(
-    api_key=GRAPHRAG_API_KEY,
-    base_url=GRAPHRAG_API_BASE + "/openai/v1/" if not GRAPHRAG_API_BASE.endswith("/") else GRAPHRAG_API_BASE + "openai/v1/"
+    api_key=AZURE_OPENAI_API_KEY,
+    base_url=AZURE_OPENAI_ENDPOINT 
 )
 
-EMBEDDING_MODEL = os.environ.get("GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
 
 def get_db_connection():
     """Create a database connection with timeout settings."""
@@ -89,12 +89,13 @@ def execute_sql_query(
     - Standard SQL (SELECT, JOIN, WHERE, GROUP BY, aggregations)
     - CTEs with WITH and WITH RECURSIVE for hierarchical queries
     - Apache AGE graph queries using cypher() function
-    - Semantic search using pgvector distance operators (<->, <=>)
+    - Semantic search using pgvector distance operators
     
     For semantic search with embeddings:
-    - Use %s placeholder in ORDER BY clause: ORDER BY cl.embedding <=> %s LIMIT 20
+    - Use <=> operator (cosine distance) for similarity: ORDER BY embedding <=> %s::vector
+    - IMPORTANT: Must cast %s placeholder to ::vector type
     - Set need_embedding=True and provide search_text
-    - The embedding vector will be automatically bound to %s
+    - The embedding will be passed as string '[x,y,z,...]' and bound to %s placeholder
     
     For graph traversal with Apache AGE:
     - Use: SELECT * FROM cypher('contract_intelligence', $$ MATCH ... RETURN ... $$) as (col1 agtype, col2 agtype, ...)
@@ -119,10 +120,10 @@ def execute_sql_query(
     SEMANTIC SEARCH EXAMPLE:
     ```sql
     SELECT c.contract_identifier, cl.section_label, cl.text_content,
-           1 - (cl.embedding <=> %s) as similarity
+           1 - (cl.embedding <=> %s::vector) as similarity
     FROM clauses cl
     JOIN contracts c ON cl.contract_id = c.id
-    ORDER BY cl.embedding <=> %s
+    ORDER BY cl.embedding <=> %s::vector
     LIMIT 20
     ```
     Call with: need_embedding=True, search_text="liability limitations"
@@ -169,9 +170,11 @@ def execute_sql_query(
             if not search_text:
                 return "Error: search_text required when need_embedding=True"
             embedding_vector = get_embedding(search_text)
+            # Convert to string format for pgvector: '[x,y,z,...]'
+            embedding_str = '[' + ','.join(map(str, embedding_vector)) + ']'
             # Count %s placeholders in query
             param_count = sql_query.count('%s')
-            params = tuple([embedding_vector] * param_count) if param_count > 0 else None
+            params = tuple([embedding_str] * param_count) if param_count > 0 else None
         
         # Execute query
         if params:
@@ -227,9 +230,9 @@ class ContractAgent:
     def __init__(self):
         """Initialize the contract agent."""
         # Get API key from environment
-        api_key = os.getenv("GRAPHRAG_API_KEY")
+        api_key = os.getenv("AZURE_OPENAI_API_KEY")
         if not api_key:
-            raise ValueError("GRAPHRAG_API_KEY environment variable is required")
+            raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
         
         self.agent = ChatAgent(
             chat_client=AzureOpenAIResponsesClient(api_key=api_key),
@@ -411,19 +414,21 @@ LIMIT 50
 ### 4. Semantic Search - Conceptual Matching
 
 ```sql
--- Find clauses similar to a concept
+-- Find clauses semantically similar to a concept (using cosine distance)
 SELECT 
   c.reference_number,
   cl.section_label,
   cl.title,
   cl.text_content,
-  1 - (cl.embedding <=> %s) as similarity
+  1 - (cl.embedding <=> %s::vector) as similarity_score
 FROM clauses cl
 JOIN contracts c ON cl.contract_id = c.id
-ORDER BY cl.embedding <=> %s
+ORDER BY cl.embedding <=> %s::vector
 LIMIT 20
 ```
-**IMPORTANT:** Set need_embedding=True and search_text="liability cap exceptions"
+**IMPORTANT:** 
+- Set need_embedding=True and search_text="liability cap exceptions"
+- MUST cast %s to ::vector type (cosine distance: 0 = identical, 2 = opposite)
 
 ### 5. Apache AGE Cypher - Multi-Hop Graph Patterns
 

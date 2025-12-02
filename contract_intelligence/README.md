@@ -33,10 +33,10 @@ PostgreSQL Agent ←→ Router Agent ←→ GraphRAG Agent
 3. **Environment Variables**:
    ```bash
    set POSTGRES_ADMIN_PASSWORD=<your-password>
-   set GRAPHRAG_API_KEY=<your-azure-openai-key>
-   set GRAPHRAG_API_BASE=https://<your-instance>.openai.azure.com
-   set GRAPHRAG_LLM_DEPLOYMENT_NAME=gpt-4.1
-   set GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-small
+   set AZURE_OPENAI_API_KEY=<your-azure-openai-key>
+   set AZURE_OPENAI_ENDPOINT=https://<your-instance>.openai.azure.com
+   set AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4.1
+   set EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-small
    ```
 
 ### Run the Application

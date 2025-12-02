@@ -3,7 +3,7 @@ skip_workflows: []
 
 models:
   default_chat_model:
-    api_key: ${GRAPHRAG_API_KEY}
+    api_key: ${AZURE_OPENAI_API_KEY}
     type: chat
     model_provider: azure
     model: gpt-4o
@@ -13,13 +13,13 @@ models:
     api_version: 2024-12-01-preview
     deployment_name: gpt-5.1
   default_embedding_model:
-    api_key: ${GRAPHRAG_API_KEY}
+    api_key: ${AZURE_OPENAI_API_KEY}
     type: embedding
     model_provider: azure
     model: text-embedding-3-small
     api_base: https://eastus2oai.openai.azure.com
     api_version: 2024-12-01-preview
-    deployment_name: ${GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME}
+    deployment_name: ${EMBEDDING_DEPLOYMENT_NAME}
 
 parallelization:
   stagger: 0.5

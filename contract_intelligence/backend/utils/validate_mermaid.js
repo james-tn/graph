@@ -49,7 +49,7 @@ process.stdin.on('end', async () => {
         ];
         
         const child = spawn('node', args, { 
-            timeout: 10000
+            timeout: 30000  // 30 seconds for Puppeteer/Chromium startup
         });
 
         let stderr = '';

@@ -68,8 +68,8 @@ def main() -> None:
             "https://cognitiveservices.azure.com/.default"
         )
         token = token_provider()
-        os.environ["GRAPHRAG_API_KEY"] = token
-        LOGGER.info("Successfully acquired token and set GRAPHRAG_API_KEY")
+        os.environ["AZURE_OPENAI_API_KEY"] = token
+        LOGGER.info("Successfully acquired token and set AZURE_OPENAI_API_KEY")
     except Exception as e:
         LOGGER.warning("Failed to acquire Azure token: %s. Falling back to existing env var.", e)
 

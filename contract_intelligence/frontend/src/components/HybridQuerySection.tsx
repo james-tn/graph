@@ -245,6 +245,97 @@ export const HybridQuerySection: React.FC<HybridQuerySectionProps> = ({ onResult
     }
   };
 
+  // Helper to get color classes based on category
+  const getColorClasses = (color: string) => {
+    const colorMap = {
+      red: {
+        icon: 'text-red-400',
+        title: 'text-red-300',
+        badge: 'bg-red-500/20 text-red-300 border-red-400/30',
+        bg: 'bg-red-900/20',
+        border: 'border-red-500/10 hover:border-red-400/30',
+        hover: 'hover:bg-red-900/20',
+        fullBg: 'hover:from-red-900/30',
+        fullBorder: 'border-red-500/20 hover:border-red-400/50',
+        shadow: 'hover:shadow-red-500/20',
+        text: 'text-red-100',
+        textHover: 'group-hover:text-white',
+        desc: 'bg-red-500/20 text-red-300 border-red-400/30'
+      },
+      blue: {
+        icon: 'text-blue-400',
+        title: 'text-blue-300',
+        badge: 'bg-blue-500/20 text-blue-300 border-blue-400/30',
+        bg: 'bg-blue-900/20',
+        border: 'border-blue-500/10 hover:border-blue-400/30',
+        hover: 'hover:bg-blue-900/20',
+        fullBg: 'hover:from-blue-900/30',
+        fullBorder: 'border-blue-500/20 hover:border-blue-400/50',
+        shadow: 'hover:shadow-blue-500/20',
+        text: 'text-blue-100',
+        textHover: 'group-hover:text-white',
+        desc: 'bg-blue-500/20 text-blue-300 border-blue-400/30'
+      },
+      green: {
+        icon: 'text-green-400',
+        title: 'text-green-300',
+        badge: 'bg-green-500/20 text-green-300 border-green-400/30',
+        bg: 'bg-green-900/20',
+        border: 'border-green-500/10 hover:border-green-400/30',
+        hover: 'hover:bg-green-900/20',
+        fullBg: 'hover:from-green-900/30',
+        fullBorder: 'border-green-500/20 hover:border-green-400/50',
+        shadow: 'hover:shadow-green-500/20',
+        text: 'text-green-100',
+        textHover: 'group-hover:text-white',
+        desc: 'bg-green-500/20 text-green-300 border-green-400/30'
+      },
+      yellow: {
+        icon: 'text-yellow-400',
+        title: 'text-yellow-300',
+        badge: 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30',
+        bg: 'bg-yellow-900/20',
+        border: 'border-yellow-500/10 hover:border-yellow-400/30',
+        hover: 'hover:bg-yellow-900/20',
+        fullBg: 'hover:from-yellow-900/30',
+        fullBorder: 'border-yellow-500/20 hover:border-yellow-400/50',
+        shadow: 'hover:shadow-yellow-500/20',
+        text: 'text-yellow-100',
+        textHover: 'group-hover:text-white',
+        desc: 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30'
+      },
+      purple: {
+        icon: 'text-purple-400',
+        title: 'text-purple-300',
+        badge: 'bg-purple-500/20 text-purple-300 border-purple-400/30',
+        bg: 'bg-purple-900/20',
+        border: 'border-purple-500/10 hover:border-purple-400/30',
+        hover: 'hover:bg-purple-900/20',
+        fullBg: 'hover:from-purple-900/30',
+        fullBorder: 'border-purple-500/20 hover:border-purple-400/50',
+        shadow: 'hover:shadow-purple-500/20',
+        text: 'text-purple-100',
+        textHover: 'group-hover:text-white',
+        desc: 'bg-purple-500/20 text-purple-300 border-purple-400/30'
+      },
+      orange: {
+        icon: 'text-orange-400',
+        title: 'text-orange-300',
+        badge: 'bg-orange-500/20 text-orange-300 border-orange-400/30',
+        bg: 'bg-orange-900/20',
+        border: 'border-orange-500/10 hover:border-orange-400/30',
+        hover: 'hover:bg-orange-900/20',
+        fullBg: 'hover:from-orange-900/30',
+        fullBorder: 'border-orange-500/20 hover:border-orange-400/50',
+        shadow: 'hover:shadow-orange-500/20',
+        text: 'text-orange-100',
+        textHover: 'group-hover:text-white',
+        desc: 'bg-orange-500/20 text-orange-300 border-orange-400/30'
+      }
+    };
+    return colorMap[color as keyof typeof colorMap] || colorMap.blue;
+  };
+
   return (
     <div className="glass-dark p-8 rounded-3xl shadow-2xl border border-purple-500/20 backdrop-blur-xl hover:border-purple-500/40 transition-all duration-300">
       <div className="flex items-center justify-between mb-6">
@@ -375,35 +466,36 @@ export const HybridQuerySection: React.FC<HybridQuerySectionProps> = ({ onResult
             const Icon = cat.icon;
             const isExpanded = expandedCategories.has(cat.id);
             const queries = getFilteredQueries(cat.id);
-            
+            const colors = getColorClasses(cat.color);
+
             // Skip if no queries for this category in current mode
             if (queries.length === 0) return null;
-            
+
             return (
               <div key={cat.id} className="border border-slate-700/50 rounded-xl overflow-hidden bg-slate-800/30">
                 {/* Category Header */}
                 <button
                   onClick={() => toggleCategory(cat.id)}
                   className={`w-full p-4 flex items-center justify-between hover:bg-slate-700/30 transition-all ${
-                    isExpanded ? `bg-${cat.color}-900/20` : ''
+                    isExpanded ? colors.bg : ''
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className={`w-5 h-5 text-${cat.color}-400`} />
-                    <h4 className={`text-sm font-bold text-${cat.color}-300 uppercase tracking-wider`}>
+                    <Icon className={`w-5 h-5 ${colors.icon}`} />
+                    <h4 className={`text-sm font-bold ${colors.title} uppercase tracking-wider`}>
                       {cat.name}
                     </h4>
-                    <span className={`text-xs px-2 py-1 rounded-full bg-${cat.color}-500/20 text-${cat.color}-300 border border-${cat.color}-400/30`}>
+                    <span className={`text-xs px-2 py-1 rounded-full ${colors.badge}`}>
                       {cat.count}
                     </span>
                   </div>
                   {isExpanded ? (
-                    <ChevronUp className={`w-5 h-5 text-${cat.color}-400`} />
+                    <ChevronUp className={`w-5 h-5 ${colors.icon}`} />
                   ) : (
-                    <ChevronDown className={`w-5 h-5 text-${cat.color}-400`} />
+                    <ChevronDown className={`w-5 h-5 ${colors.icon}`} />
                   )}
                 </button>
-                
+
                 {/* Category Content */}
                 {isExpanded && (
                   <div className="p-2 space-y-2 bg-slate-900/30">
@@ -414,9 +506,9 @@ export const HybridQuerySection: React.FC<HybridQuerySectionProps> = ({ onResult
                           key={`${cat.id}-${idx}`}
                           onClick={() => handleSearch(sample.text, sample.type)}
                           disabled={loading}
-                          className={`w-full text-left px-4 py-2 rounded-lg hover:bg-${cat.color}-900/20 border border-${cat.color}-500/10 hover:border-${cat.color}-400/30 transition-all group disabled:opacity-50`}
+                          className={`w-full text-left px-4 py-2 rounded-lg ${colors.hover} ${colors.border} transition-all group disabled:opacity-50`}
                         >
-                          <p className={`text-sm text-${cat.color}-100 group-hover:text-white transition-colors line-clamp-2`}>
+                          <p className={`text-sm ${colors.text} ${colors.textHover} transition-colors line-clamp-2`}>
                             {sample.text}
                           </p>
                         </button>
@@ -428,18 +520,18 @@ export const HybridQuerySection: React.FC<HybridQuerySectionProps> = ({ onResult
                           key={`${cat.id}-${idx}`}
                           onClick={() => handleSearch(sample.text, sample.type)}
                           disabled={loading}
-                          className={`w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r hover:from-${cat.color}-900/30 hover:to-slate-800/50 rounded-xl border border-${cat.color}-500/20 hover:border-${cat.color}-400/50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-${cat.color}-500/20`}
+                          className={`w-full text-left p-4 bg-slate-800/50 hover:bg-gradient-to-r ${colors.fullBg} hover:to-slate-800/50 rounded-xl ${colors.fullBorder} transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg ${colors.shadow}`}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1">
-                              <p className={`text-${cat.color}-100 group-hover:text-white transition-colors font-medium mb-2 text-sm`}>
+                              <p className={`${colors.text} ${colors.textHover} transition-colors font-medium mb-2 text-sm`}>
                                 {sample.text}
                               </p>
-                              <span className={`text-xs px-3 py-1 rounded-full font-semibold bg-${cat.color}-500/20 text-${cat.color}-300 border border-${cat.color}-400/30`}>
+                              <span className={`text-xs px-3 py-1 rounded-full font-semibold ${colors.desc}`}>
                                 {sample.desc}
                               </span>
                             </div>
-                            <Search className={`w-5 h-5 text-${cat.color}-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0`} />
+                            <Search className={`w-5 h-5 ${colors.icon} opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0`} />
                           </div>
                         </button>
                       ))

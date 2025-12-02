@@ -69,23 +69,23 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           env: [
             // Azure OpenAI
             {
-              name: 'GRAPHRAG_API_KEY'
+              name: 'AZURE_OPENAI_API_KEY'
               value: '' // Will use managed identity
             }
             {
-              name: 'GRAPHRAG_API_BASE'
+              name: 'AZURE_OPENAI_ENDPOINT'
               value: openaiEndpoint
             }
             {
-              name: 'GRAPHRAG_API_VERSION'
+              name: 'AZURE_OPENAI_API_VERSION'
               value: '2024-02-15-preview'
             }
             {
-              name: 'GRAPHRAG_LLM_DEPLOYMENT_NAME'
+              name: 'AZURE_OPENAI_DEPLOYMENT_NAME'
               value: openaiDeploymentName
             }
             {
-              name: 'GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME'
+              name: 'EMBEDDING_DEPLOYMENT_NAME'
               value: openaiEmbeddingDeploymentName
             }
             // PostgreSQL

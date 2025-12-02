@@ -1116,23 +1116,23 @@
                       "image": "[if(not(empty(parameters('containerImageName'))), parameters('containerImageName'), 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest')]",
                       "env": [
                         {
-                          "name": "GRAPHRAG_API_KEY",
+                          "name": "AZURE_OPENAI_API_KEY",
                           "value": ""
                         },
                         {
-                          "name": "GRAPHRAG_API_BASE",
+                          "name": "AZURE_OPENAI_ENDPOINT",
                           "value": "[parameters('openaiEndpoint')]"
                         },
                         {
-                          "name": "GRAPHRAG_API_VERSION",
+                          "name": "AZURE_OPENAI_API_VERSION",
                           "value": "2024-02-15-preview"
                         },
                         {
-                          "name": "GRAPHRAG_LLM_DEPLOYMENT_NAME",
+                          "name": "AZURE_OPENAI_DEPLOYMENT_NAME",
                           "value": "[parameters('openaiDeploymentName')]"
                         },
                         {
-                          "name": "GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME",
+                          "name": "EMBEDDING_DEPLOYMENT_NAME",
                           "value": "[parameters('openaiEmbeddingDeploymentName')]"
                         },
                         {

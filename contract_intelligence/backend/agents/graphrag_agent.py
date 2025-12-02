@@ -53,18 +53,18 @@ class GraphRAGAgent:
         self.root_dir = root_dir
         
         # Environment configuration
-        self.api_key = os.environ.get("GRAPHRAG_API_KEY")
-        self.api_base = os.environ.get("GRAPHRAG_API_BASE")
+        self.api_key = os.environ.get("AZURE_OPENAI_API_KEY")
+        self.api_base = os.environ.get("AZURE_OPENAI_ENDPOINT")
         
         # Validate required environment variables
         if not self.api_key:
-            raise ValueError("GRAPHRAG_API_KEY environment variable is required")
+            raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
         if not self.api_base:
-            raise ValueError("GRAPHRAG_API_BASE environment variable is required")
+            raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
         
-        self.api_version = os.environ.get("GRAPHRAG_API_VERSION", "2024-02-15-preview")
-        self.llm_deployment = os.environ.get("GRAPHRAG_LLM_DEPLOYMENT_NAME", "gpt-4o")
-        self.embedding_deployment = os.environ.get("GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
+        self.api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-15-preview")
+        self.llm_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
+        self.embedding_deployment = os.environ.get("EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
         
         # Paths to GraphRAG output (matches GraphRAG config: data/output)
         self.output_dir = root_dir / "data" / "output"

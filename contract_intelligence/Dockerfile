@@ -67,7 +67,9 @@ COPY backend/ ./backend/
 # The puppeteer-config.json provides --no-sandbox args for Docker
 RUN if [ -f backend/utils/package.json ]; then \
     cd backend/utils && npm install --production && npm cache clean --force; \
-fi# Copy GraphRAG configuration
+fi
+
+# Copy GraphRAG configuration
 COPY graphrag_config/ ./graphrag_config/
 
 # Copy GraphRAG indexed data/output (CRITICAL: This contains the 12,750 entities, 2,909 reports)
@@ -81,7 +83,7 @@ COPY data/output/lancedb/ ./data/output/lancedb/
 COPY --from=frontend-builder /frontend-build/dist ./frontend/dist
 
 # Copy any additional data files needed
-COPY data/input/ ./data/input/
+# COPY data/input/ ./data/input/  # Not needed - data/output has processed data
 
 # Set environment variables
 ENV PYTHONPATH=/app

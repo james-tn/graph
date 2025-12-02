@@ -92,11 +92,11 @@ foreach ($line in $rawEnv) {
 }
 
 $requiredKeys = @(
-    'GRAPHRAG_API_KEY',
-    'GRAPHRAG_API_BASE',
-    'GRAPHRAG_API_VERSION',
-    'GRAPHRAG_LLM_DEPLOYMENT_NAME',
-    'GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME',
+    'AZURE_OPENAI_API_KEY',
+    'AZURE_OPENAI_ENDPOINT',
+    'AZURE_OPENAI_API_VERSION',
+    'AZURE_OPENAI_DEPLOYMENT_NAME',
+    'EMBEDDING_DEPLOYMENT_NAME',
     'POSTGRES_HOST',
     'POSTGRES_DATABASE',
     'POSTGRES_USER',
@@ -159,24 +159,22 @@ $acrUserName = $acrCredentials.username
 $acrPassword = $acrCredentials.passwords[0].value
 
 $secretArgs = @(
-    "openai-key=$($envMap['GRAPHRAG_API_KEY'])",
+    "openai-key=$($envMap['AZURE_OPENAI_API_KEY'])",
     "postgres-password=$($envMap['POSTGRES_ADMIN_PASSWORD'])"
 )
 
 $envVarArgs = @(
-    "GRAPHRAG_API_KEY=secretref:openai-key",
-    "GRAPHRAG_API_BASE=$($envMap['GRAPHRAG_API_BASE'])",
-    "GRAPHRAG_API_VERSION=$($envMap['GRAPHRAG_API_VERSION'])",
-    "GRAPHRAG_LLM_DEPLOYMENT_NAME=$($envMap['GRAPHRAG_LLM_DEPLOYMENT_NAME'])",
-    "GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME=$($envMap['GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME'])",
+    "AZURE_OPENAI_API_KEY=secretref:openai-key",
+    "AZURE_OPENAI_ENDPOINT=$($envMap['AZURE_OPENAI_ENDPOINT'])",
+    "AZURE_OPENAI_API_VERSION=$($envMap['AZURE_OPENAI_API_VERSION'])",
+    "AZURE_OPENAI_DEPLOYMENT_NAME=$($envMap['AZURE_OPENAI_DEPLOYMENT_NAME'])",
+    "EMBEDDING_DEPLOYMENT_NAME=$($envMap['EMBEDDING_DEPLOYMENT_NAME'])",
     "POSTGRES_HOST=$($envMap['POSTGRES_HOST'])",
     "POSTGRES_DATABASE=$($envMap['POSTGRES_DATABASE'])",
     "POSTGRES_USER=$($envMap['POSTGRES_USER'])",
     "POSTGRES_ADMIN_PASSWORD=secretref:postgres-password"
 )
 
-if ($envMap.ContainsKey('AZURE_OPENAI_ENDPOINT')) { $envVarArgs += "AZURE_OPENAI_ENDPOINT=$($envMap['AZURE_OPENAI_ENDPOINT'])" }
-if ($envMap.ContainsKey('AZURE_OPENAI_DEPLOYMENT_NAME')) { $envVarArgs += "AZURE_OPENAI_DEPLOYMENT_NAME=$($envMap['AZURE_OPENAI_DEPLOYMENT_NAME'])" }
 if ($envMap.ContainsKey('AZURE_OPENAI_RESPONSES_DEPLOYMENT_NAME')) { $envVarArgs += "AZURE_OPENAI_RESPONSES_DEPLOYMENT_NAME=$($envMap['AZURE_OPENAI_RESPONSES_DEPLOYMENT_NAME'])" }
 
 function Set-ContainerApp {

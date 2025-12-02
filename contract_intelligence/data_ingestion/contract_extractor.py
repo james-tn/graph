@@ -20,23 +20,23 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 # Configuration
-GRAPHRAG_API_KEY = os.environ.get("GRAPHRAG_API_KEY")
-GRAPHRAG_API_BASE = os.environ.get("GRAPHRAG_API_BASE")
-if not GRAPHRAG_API_KEY:
-    raise ValueError("GRAPHRAG_API_KEY environment variable is required")
-print(GRAPHRAG_API_BASE.endswith("/"))
-if not GRAPHRAG_API_BASE:
-    raise ValueError("GRAPHRAG_API_BASE environment variable is required")
-base_url=GRAPHRAG_API_BASE + "/openai/v1/" if not GRAPHRAG_API_BASE.endswith("v1/") else GRAPHRAG_API_BASE 
+AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY")
+AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT")
+if not AZURE_OPENAI_API_KEY:
+    raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
+print(AZURE_OPENAI_ENDPOINT.endswith("/"))
+if not AZURE_OPENAI_ENDPOINT:
+    raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
+base_url=AZURE_OPENAI_ENDPOINT + "/openai/v1/" if not AZURE_OPENAI_ENDPOINT.endswith("v1/") else AZURE_OPENAI_ENDPOINT 
 print("base_url ", base_url)
 # OpenAI client
 openai_client = OpenAI(
-    api_key=GRAPHRAG_API_KEY,
+    api_key=AZURE_OPENAI_API_KEY,
     base_url=base_url
 )
 
-LLM_MODEL = os.environ.get("GRAPHRAG_LLM_DEPLOYMENT_NAME", "gpt-4.1")
-EMBEDDING_MODEL = os.environ.get("GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
+LLM_MODEL = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4.1")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
 
 # Standardized enumerations matching database schema
 CLAUSE_TYPES = [

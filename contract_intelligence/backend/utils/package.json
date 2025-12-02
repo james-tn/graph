@@ -4,7 +4,8 @@
   "description": "Mermaid diagram syntax validator for Python backend",
   "private": true,
   "dependencies": {
-    "@mermaid-js/mermaid-cli": "^11.4.0"
+    "@mermaid-js/mermaid-cli": "^11.4.0",
+    "puppeteer": "^23.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

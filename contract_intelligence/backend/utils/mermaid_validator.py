@@ -39,6 +39,13 @@ class MermaidValidator:
         self.validator_script = Path(__file__).parent / "validate_mermaid.js"
         if not self.validator_script.exists():
             raise FileNotFoundError(f"Mermaid validator script not found: {self.validator_script}")
+        
+        # Persistent validation service process (kept alive for pooling)
+        self._service_process = None
+    
+    def __del__(self):
+        """Cleanup: stop the service when validator is destroyed."""
+        self._stop_service()
     
     def extract_mermaid_blocks(self, markdown_text: str) -> List[Tuple[str, str]]:
         """
@@ -55,9 +62,80 @@ class MermaidValidator:
         matches = re.findall(pattern, markdown_text, re.DOTALL | re.IGNORECASE)
         return matches
     
+    def _start_service(self):
+        """Start the persistent Mermaid validation service."""
+        if self._service_process is None or self._service_process.poll() is not None:
+            service_script = Path(__file__).parent / "mermaid_service.js"
+            self._service_process = subprocess.Popen(
+                ["node", str(service_script)],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+                encoding='utf-8'
+            )
+    
+    def _stop_service(self):
+        """Stop the persistent validation service."""
+        if self._service_process:
+            try:
+                self._service_process.terminate()
+                self._service_process.wait(timeout=5)
+            except:
+                self._service_process.kill()
+            self._service_process = None
+    
     def validate_mermaid_syntax(self, mermaid_code: str) -> Tuple[bool, Optional[str]]:
         """
-        Validate Mermaid diagram syntax using the actual Mermaid library via Node.js.
+        Validate Mermaid diagram syntax using persistent service (pooled browser instance).
+        Falls back to subprocess call if service fails.
+        
+        Args:
+            mermaid_code: The Mermaid diagram code to validate
+            
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        import sys
+        import select
+        
+        # On Windows, select.select() doesn't work with pipes, so use subprocess
+        # On Linux, use persistent service for better performance
+        if sys.platform == 'win32':
+            return self._validate_with_subprocess(mermaid_code)
+        
+        try:
+            # Try using persistent service first (faster on Linux)
+            self._start_service()
+            
+            if self._service_process and self._service_process.poll() is None:
+                # Send diagram to service with end marker
+                self._service_process.stdin.write(mermaid_code + "\n<<<END>>>\n")
+                self._service_process.stdin.flush()
+                
+                # Read response with timeout (Linux only - select works on pipes)
+                ready, _, _ = select.select([self._service_process.stdout], [], [], 30)
+                if ready:
+                    response = self._service_process.stdout.readline().strip()
+                    if response == "OK":
+                        return True, None
+                    else:
+                        error = self._service_process.stderr.readline().strip()
+                        return False, error or "Unknown syntax error"
+            
+            # Fallback to subprocess if service unavailable
+            return self._validate_with_subprocess(mermaid_code)
+                
+        except Exception as e:
+            print(f"Service validation error, falling back to subprocess: {e}")
+            # Restart service on next call
+            self._stop_service()
+            return self._validate_with_subprocess(mermaid_code)
+    
+    def _validate_with_subprocess(self, mermaid_code: str) -> Tuple[bool, Optional[str]]:
+        """
+        Fallback validation using subprocess (original method).
         
         Args:
             mermaid_code: The Mermaid diagram code to validate
@@ -71,7 +149,7 @@ class MermaidValidator:
                 input=mermaid_code,
                 text=True,
                 capture_output=True,
-                timeout=10,  # Increased to 10 seconds for complex diagrams
+                timeout=30,  # Increased to 30 seconds for Puppeteer/Chromium startup
                 encoding='utf-8',  # Explicitly use UTF-8 encoding for Unicode characters
                 errors='replace'   # Replace unencodable characters instead of failing
             )
@@ -238,8 +316,8 @@ Return only the corrected Mermaid code without any explanation, comments, or mar
             
             return full_block, result
         
-        # Process blocks in parallel (max 5 concurrent)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(blocks), 5)) as executor:
+        # Process blocks in parallel (max 3 concurrent to avoid overwhelming Puppeteer)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(blocks), 3)) as executor:
             processed = list(executor.map(process_block, blocks))
         
         # Apply replacements to markdown
