@@ -105,8 +105,7 @@ POSTGRES_ADMIN_PASSWORD=YourPassword123!
 # Azure OpenAI Configuration
 AZURE_OPENAI_API_KEY=your-api-key
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-AZURE_OPENAI_API_VERSION=2024-02-15-preview
-AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-5.1
 EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-small
 ```
 

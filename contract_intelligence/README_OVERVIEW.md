@@ -47,7 +47,6 @@ While built for Contract Intelligence, this architecture is industry-agnostic an
     ```env
     AZURE_OPENAI_API_KEY=your_azure_openai_key
     AZURE_OPENAI_ENDPOINT=your_azure_openai_endpoint
-    AZURE_OPENAI_API_VERSION=2024-02-15-preview
     AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o
     EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-small
     POSTGRES_CONNECTION_STRING=postgresql://user:password@host:port/dbname

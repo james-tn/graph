@@ -1,16 +1,10 @@
 {
-  "name": "mermaid-validator",
+  "name": "mermaid-corrector",
   "version": "1.0.0",
-  "description": "Mermaid diagram syntax validator for Python backend",
+  "description": "Mermaid diagram correction service (validation handled by frontend)",
   "private": true,
-  "dependencies": {
-    "@mermaid-js/mermaid-cli": "^11.4.0",
-    "puppeteer": "^23.0.0"
-  },
+  "dependencies": {},
   "engines": {
     "node": ">=18.0.0"
-  },
-  "config": {
-    "puppeteer_skip_chromium_download": false
   }
 }

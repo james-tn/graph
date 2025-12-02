@@ -31,25 +31,6 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     postgresql-client \
     curl \
-    nodejs \
-    npm \
-    # Dependencies for Puppeteer/Chromium (mermaid-cli) \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libdbus-1-3 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libpango-1.0-0 \
-    libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip and install compatible setuptools for Python 3.12
@@ -62,12 +43,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend application code
 COPY backend/ ./backend/
 
-# Install Node.js dependencies for Mermaid validator
-# This includes @mermaid-js/mermaid-cli which bundles Puppeteer/Chromium
-# The puppeteer-config.json provides --no-sandbox args for Docker
-RUN if [ -f backend/utils/package.json ]; then \
-    cd backend/utils && npm install --production && npm cache clean --force; \
-fi
 
 # Copy GraphRAG configuration
 COPY graphrag_config/ ./graphrag_config/

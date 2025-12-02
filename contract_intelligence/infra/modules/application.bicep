@@ -77,10 +77,6 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               value: openaiEndpoint
             }
             {
-              name: 'AZURE_OPENAI_API_VERSION'
-              value: '2024-02-15-preview'
-            }
-            {
               name: 'AZURE_OPENAI_DEPLOYMENT_NAME'
               value: openaiDeploymentName
             }

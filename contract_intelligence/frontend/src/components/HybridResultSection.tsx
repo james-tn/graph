@@ -25,33 +25,96 @@ style.textContent = `
     border-radius: 12px;
   }
 `;
-document.head.appendChild(style);// Mermaid component for rendering diagrams
+document.head.appendChild(style);// Mermaid component for rendering diagrams with auto-correction
 const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
   const ref = useRef<HTMLDivElement>(null);
+  const [correctedChart, setCorrectedChart] = React.useState<string>(chart);
+  const [isFixing, setIsFixing] = React.useState(false);
+  const [fixAttempts, setFixAttempts] = React.useState(0);
+  const maxAttempts = 3;
+
+  const fixMermaidDiagram = async (code: string, errorMsg: string) => {
+    if (fixAttempts >= maxAttempts) {
+      console.error('Max correction attempts reached');
+      return null;
+    }
+
+    setIsFixing(true);
+    setFixAttempts(prev => prev + 1);
+
+    try {
+      const response = await fetch('/api/mermaid/fix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mermaid_code: code,
+          error_message: errorMsg
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fix diagram');
+      }
+
+      const data = await response.json();
+      setIsFixing(false);
+      return data.corrected_code;
+    } catch (error) {
+      console.error('Error fixing diagram:', error);
+      setIsFixing(false);
+      return null;
+    }
+  };
 
   useEffect(() => {
-    if (ref.current && chart) {
+    const renderDiagram = async (diagramCode: string) => {
+      if (!ref.current) return;
+
       try {
         // Generate a valid DOM ID (must start with letter, no dots)
         const id = `mermaid-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-        mermaid.render(id, chart).then(({ svg }) => {
-          if (ref.current) {
-            ref.current.innerHTML = svg;
-          }
-        }).catch(error => {
-          console.error('Mermaid rendering error:', error);
-          if (ref.current) {
-            ref.current.innerHTML = `<pre class="text-red-400">Error rendering diagram: ${error.message}</pre>`;
-          }
-        });
-      } catch (error) {
-        console.error('Mermaid rendering error:', error);
+        
+        const { svg } = await mermaid.render(id, diagramCode);
+        
         if (ref.current) {
-          ref.current.innerHTML = `<pre class="text-red-400">Error rendering diagram</pre>`;
+          ref.current.innerHTML = svg;
+        }
+      } catch (error: any) {
+        console.error('Mermaid rendering error:', error);
+        
+        // Try to fix the diagram automatically
+        const errorMessage = error?.message || error?.toString() || 'Unknown rendering error';
+        const fixed = await fixMermaidDiagram(diagramCode, errorMessage);
+        
+        if (fixed) {
+          // Try rendering the fixed version
+          setCorrectedChart(fixed);
+        } else if (ref.current) {
+          // Show error if fix failed or max attempts reached
+          ref.current.innerHTML = `
+            <div class="p-4 bg-red-500/10 border border-red-400/30 rounded-lg">
+              <p class="text-red-400 font-semibold mb-2">⚠️ Diagram Rendering Failed</p>
+              <p class="text-red-300 text-sm">${errorMessage}</p>
+              ${fixAttempts >= maxAttempts ? '<p class="text-red-300 text-xs mt-2">Max auto-correction attempts reached</p>' : ''}
+            </div>
+          `;
         }
       }
+    };
+
+    if (ref.current && correctedChart) {
+      if (isFixing) {
+        ref.current.innerHTML = `
+          <div class="p-4 bg-yellow-500/10 border border-yellow-400/30 rounded-lg">
+            <p class="text-yellow-400 font-semibold">🔧 Auto-correcting diagram...</p>
+            <p class="text-yellow-300 text-sm mt-1">Attempt ${fixAttempts} of ${maxAttempts}</p>
+          </div>
+        `;
+      } else {
+        renderDiagram(correctedChart);
+      }
     }
-  }, [chart]);
+  }, [correctedChart, isFixing]);
 
   return <div ref={ref} className="my-6 flex justify-center" />;
 };

@@ -15,7 +15,6 @@ def check_environment():
     required_vars = [
         "AZURE_OPENAI_API_KEY",
         "AZURE_OPENAI_ENDPOINT",
-        "AZURE_OPENAI_API_VERSION",
         "AZURE_OPENAI_DEPLOYMENT_NAME",
         "EMBEDDING_DEPLOYMENT_NAME"
     ]

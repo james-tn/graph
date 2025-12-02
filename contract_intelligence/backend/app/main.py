@@ -7,6 +7,7 @@ from typing import Optional, Literal
 import asyncio
 import os
 import sys
+import traceback
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import Depends
@@ -20,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from backend.agents.router_agent import RouterAgent
 from backend.app.core.auth import get_current_user, get_user_email
 from backend.app.core.auth import get_current_user, get_user_email
+from backend.utils.mermaid_corrector import correct_mermaid_diagram
 
 app = FastAPI(
     title="Contract Intelligence API - Hybrid Search",
@@ -60,6 +62,14 @@ class IngestResponse(BaseModel):
     status: str
     message: str
     task_id: Optional[str] = None
+
+class MermaidCorrectionRequest(BaseModel):
+    mermaid_code: str
+    error_message: str
+
+class MermaidCorrectionResponse(BaseModel):
+    corrected_code: str
+    success: bool
 
 
 # Health check
@@ -103,6 +113,11 @@ async def query_contracts(
         return QueryResponse(**result)
     
     except Exception as e:
+        # Log full traceback for debugging
+        print("=" * 70)
+        print("ERROR in /api/query endpoint:")
+        print(traceback.format_exc())
+        print("=" * 70)
         raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
 
 
@@ -157,6 +172,34 @@ async def analyze_query(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+# Mermaid diagram correction endpoint
+@app.post("/api/mermaid/fix", response_model=MermaidCorrectionResponse)
+async def fix_mermaid_diagram(
+    request: MermaidCorrectionRequest,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Fix invalid Mermaid diagram syntax using LLM.
+    
+    Frontend sends diagrams that failed to render for automatic correction.
+    
+    - **mermaid_code**: The invalid Mermaid diagram code
+    - **error_message**: Error message from frontend rendering attempt
+    """
+    try:
+        corrected = correct_mermaid_diagram(
+            request.mermaid_code,
+            request.error_message
+        )
+        
+        return MermaidCorrectionResponse(
+            corrected_code=corrected,
+            success=True
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Correction failed: {str(e)}")
 
 
 # Statistics endpoint
