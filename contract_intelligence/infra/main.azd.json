@@ -1,0 +1,1323 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.38.33.27573",
+      "templateHash": "12190382241789893557"
+    }
+  },
+  "parameters": {
+    "environmentName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "metadata": {
+        "description": "Name of the environment (used for resource naming)"
+      }
+    },
+    "location": {
+      "type": "string",
+      "minLength": 1,
+      "metadata": {
+        "description": "Primary location for all resources"
+      }
+    },
+    "baseName": {
+      "type": "string",
+      "defaultValue": "ci",
+      "metadata": {
+        "description": "Base name for all resources"
+      }
+    },
+    "principalId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Id of the user or app to assign application roles"
+      }
+    },
+    "principalType": {
+      "type": "string",
+      "defaultValue": "User",
+      "metadata": {
+        "description": "Principal type: User or ServicePrincipal"
+      }
+    },
+    "existingOpenAiEndpoint": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Existing Azure OpenAI endpoint (if reusing)"
+      }
+    },
+    "existingOpenAiDeploymentName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Existing Azure OpenAI chat deployment name"
+      }
+    },
+    "existingOpenAiEmbeddingDeploymentName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Existing Azure OpenAI embedding deployment name"
+      }
+    },
+    "existingPostgresHost": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Existing PostgreSQL host (if reusing)"
+      }
+    },
+    "existingPostgresDatabase": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Existing PostgreSQL database name"
+      }
+    },
+    "existingPostgresUser": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Existing PostgreSQL username"
+      }
+    },
+    "existingPostgresPassword": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Existing PostgreSQL password"
+      }
+    },
+    "postgresAdminPassword": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "PostgreSQL admin password (required if NOT using existing)"
+      }
+    },
+    "postgresDatabaseName": {
+      "type": "string",
+      "defaultValue": "cipgraph",
+      "metadata": {
+        "description": "PostgreSQL database name"
+      }
+    },
+    "aadFrontendClientId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure AD Frontend Client ID"
+      }
+    },
+    "aadFrontendTenantId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure AD Frontend Tenant ID"
+      }
+    },
+    "aadApiTenantId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure AD API Tenant ID"
+      }
+    },
+    "aadApiAppId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure AD API App ID"
+      }
+    },
+    "aadApiAudience": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure AD API Audience"
+      }
+    },
+    "disableAuth": {
+      "type": "string",
+      "defaultValue": "false",
+      "metadata": {
+        "description": "Disable authentication"
+      }
+    },
+    "backendImageName": {
+      "type": "string",
+      "defaultValue": ""
+    }
+  },
+  "variables": {
+    "tags": {
+      "azd-env-name": "[parameters('environmentName')]",
+      "Application": "Contract-Intelligence"
+    },
+    "resourceToken": "[toLower(uniqueString(subscription().id, parameters('environmentName'), parameters('location')))]",
+    "prefix": "[format('{0}-{1}', parameters('baseName'), variables('resourceToken'))]",
+    "useExistingOpenAI": "[not(empty(parameters('existingOpenAiEndpoint')))]",
+    "useExistingPostgres": "[not(empty(parameters('existingPostgresHost')))]"
+  },
+  "resources": {
+    "rg": {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2021-04-01",
+      "name": "[format('{0}-rg', variables('prefix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]"
+    },
+    "managedIdentity": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "managed-identity",
+      "resourceGroup": "[format('{0}-rg', variables('prefix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "baseName": {
+            "value": "[variables('prefix')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.38.33.27573",
+              "templateHash": "6854598642492885877"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "baseName": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+              "apiVersion": "2023-01-31",
+              "name": "[format('{0}-identity', parameters('baseName'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]"
+            }
+          ],
+          "outputs": {
+            "resourceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}-identity', parameters('baseName')))]"
+            },
+            "clientId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}-identity', parameters('baseName'))), '2023-01-31').clientId]"
+            },
+            "principalId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}-identity', parameters('baseName'))), '2023-01-31').principalId]"
+            },
+            "name": {
+              "type": "string",
+              "value": "[format('{0}-identity', parameters('baseName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "rg"
+      ]
+    },
+    "openai": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "openai",
+      "resourceGroup": "[format('{0}-rg', variables('prefix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "baseName": {
+            "value": "[variables('prefix')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "useExistingOpenAI": {
+            "value": "[variables('useExistingOpenAI')]"
+          },
+          "existingOpenAiEndpoint": {
+            "value": "[parameters('existingOpenAiEndpoint')]"
+          },
+          "existingOpenAiDeploymentName": {
+            "value": "[parameters('existingOpenAiDeploymentName')]"
+          },
+          "existingOpenAiEmbeddingDeploymentName": {
+            "value": "[parameters('existingOpenAiEmbeddingDeploymentName')]"
+          },
+          "principalId": {
+            "value": "[reference('managedIdentity').outputs.principalId.value]"
+          },
+          "principalType": {
+            "value": "ServicePrincipal"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.38.33.27573",
+              "templateHash": "18029917059145177431"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "baseName": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "useExistingOpenAI": {
+              "type": "bool"
+            },
+            "existingOpenAiEndpoint": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "existingOpenAiDeploymentName": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "existingOpenAiEmbeddingDeploymentName": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "principalId": {
+              "type": "string"
+            },
+            "principalType": {
+              "type": "string",
+              "defaultValue": "ServicePrincipal"
+            }
+          },
+          "variables": {
+            "defaultChatDeploymentName": "gpt-4o",
+            "defaultEmbeddingDeploymentName": "text-embedding-3-small",
+            "existingResourceName": "[if(parameters('useExistingOpenAI'), split(split(parameters('existingOpenAiEndpoint'), '//')[1], '.')[0], '')]",
+            "cognitiveServicesOpenAIUserRoleId": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
+          },
+          "resources": [
+            {
+              "condition": "[not(parameters('useExistingOpenAI'))]",
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}-openai', parameters('baseName'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "OpenAI",
+              "sku": {
+                "name": "S0"
+              },
+              "properties": {
+                "customSubDomainName": "[format('{0}-openai', parameters('baseName'))]",
+                "publicNetworkAccess": "Enabled"
+              }
+            },
+            {
+              "condition": "[not(parameters('useExistingOpenAI'))]",
+              "type": "Microsoft.CognitiveServices/accounts/deployments",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/{1}', format('{0}-openai', parameters('baseName')), variables('defaultChatDeploymentName'))]",
+              "properties": {
+                "model": {
+                  "format": "OpenAI",
+                  "name": "gpt-4o",
+                  "version": "2024-08-06"
+                }
+              },
+              "sku": {
+                "name": "Standard",
+                "capacity": 50
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.CognitiveServices/accounts', format('{0}-openai', parameters('baseName')))]"
+              ]
+            },
+            {
+              "condition": "[not(parameters('useExistingOpenAI'))]",
+              "type": "Microsoft.CognitiveServices/accounts/deployments",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/{1}', format('{0}-openai', parameters('baseName')), variables('defaultEmbeddingDeploymentName'))]",
+              "properties": {
+                "model": {
+                  "format": "OpenAI",
+                  "name": "text-embedding-3-small",
+                  "version": "1"
+                }
+              },
+              "sku": {
+                "name": "Standard",
+                "capacity": 100
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.CognitiveServices/accounts/deployments', format('{0}-openai', parameters('baseName')), variables('defaultChatDeploymentName'))]",
+                "[resourceId('Microsoft.CognitiveServices/accounts', format('{0}-openai', parameters('baseName')))]"
+              ]
+            },
+            {
+              "condition": "[not(parameters('useExistingOpenAI'))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', format('{0}-openai', parameters('baseName')))]",
+              "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-openai', parameters('baseName'))), parameters('principalId'), variables('cognitiveServicesOpenAIUserRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('cognitiveServicesOpenAIUserRoleId'))]",
+                "principalId": "[parameters('principalId')]",
+                "principalType": "[parameters('principalType')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.CognitiveServices/accounts', format('{0}-openai', parameters('baseName')))]"
+              ]
+            },
+            {
+              "condition": "[parameters('useExistingOpenAI')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', variables('existingResourceName'))]",
+              "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', variables('existingResourceName')), parameters('principalId'), variables('cognitiveServicesOpenAIUserRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('cognitiveServicesOpenAIUserRoleId'))]",
+                "principalId": "[parameters('principalId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            }
+          ],
+          "outputs": {
+            "endpoint": {
+              "type": "string",
+              "value": "[if(parameters('useExistingOpenAI'), parameters('existingOpenAiEndpoint'), reference(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-openai', parameters('baseName'))), '2023-05-01').endpoint)]"
+            },
+            "chatDeploymentName": {
+              "type": "string",
+              "value": "[if(parameters('useExistingOpenAI'), parameters('existingOpenAiDeploymentName'), variables('defaultChatDeploymentName'))]"
+            },
+            "embeddingDeploymentName": {
+              "type": "string",
+              "value": "[if(parameters('useExistingOpenAI'), parameters('existingOpenAiEmbeddingDeploymentName'), variables('defaultEmbeddingDeploymentName'))]"
+            },
+            "accountName": {
+              "type": "string",
+              "value": "[if(parameters('useExistingOpenAI'), variables('existingResourceName'), format('{0}-openai', parameters('baseName')))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "managedIdentity",
+        "rg"
+      ]
+    },
+    "postgres": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "postgres",
+      "resourceGroup": "[format('{0}-rg', variables('prefix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "baseName": {
+            "value": "[variables('prefix')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "useExistingPostgres": {
+            "value": "[variables('useExistingPostgres')]"
+          },
+          "existingPostgresHost": {
+            "value": "[parameters('existingPostgresHost')]"
+          },
+          "existingPostgresDatabase": {
+            "value": "[parameters('existingPostgresDatabase')]"
+          },
+          "existingPostgresUser": {
+            "value": "[parameters('existingPostgresUser')]"
+          },
+          "existingPostgresPassword": {
+            "value": "[parameters('existingPostgresPassword')]"
+          },
+          "postgresAdminPassword": {
+            "value": "[parameters('postgresAdminPassword')]"
+          },
+          "databaseName": {
+            "value": "[parameters('postgresDatabaseName')]"
+          },
+          "principalId": {
+            "value": "[reference('managedIdentity').outputs.principalId.value]"
+          },
+          "principalType": {
+            "value": "ServicePrincipal"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.38.33.27573",
+              "templateHash": "17728771002138184059"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "baseName": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "useExistingPostgres": {
+              "type": "bool"
+            },
+            "existingPostgresHost": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "existingPostgresDatabase": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "existingPostgresUser": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "existingPostgresPassword": {
+              "type": "securestring",
+              "defaultValue": ""
+            },
+            "postgresAdminPassword": {
+              "type": "securestring",
+              "defaultValue": ""
+            },
+            "databaseName": {
+              "type": "string",
+              "defaultValue": "cipgraph"
+            },
+            "principalId": {
+              "type": "string"
+            },
+            "principalType": {
+              "type": "string",
+              "defaultValue": "ServicePrincipal"
+            }
+          },
+          "variables": {
+            "defaultAdminUsername": "pgadmin"
+          },
+          "resources": {
+            "postgresServer": {
+              "condition": "[not(parameters('useExistingPostgres'))]",
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+              "apiVersion": "2023-03-01-preview",
+              "name": "[format('{0}-pgflex', parameters('baseName'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "Standard_D2ds_v4",
+                "tier": "GeneralPurpose"
+              },
+              "properties": {
+                "administratorLogin": "[variables('defaultAdminUsername')]",
+                "administratorLoginPassword": "[parameters('postgresAdminPassword')]",
+                "version": "15",
+                "storage": {
+                  "storageSizeGB": 256,
+                  "autoGrow": "Enabled"
+                },
+                "backup": {
+                  "backupRetentionDays": 14,
+                  "geoRedundantBackup": "Disabled"
+                },
+                "highAvailability": {
+                  "mode": "Disabled"
+                },
+                "network": {
+                  "publicNetworkAccess": "Enabled"
+                }
+              }
+            },
+            "postgresExtensions": {
+              "condition": "[not(parameters('useExistingPostgres'))]",
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/configurations",
+              "apiVersion": "2023-03-01-preview",
+              "name": "[format('{0}/{1}', format('{0}-pgflex', parameters('baseName')), 'azure.extensions')]",
+              "properties": {
+                "value": "vector,pg_trgm,hstore,citext,age",
+                "source": "user-override"
+              },
+              "dependsOn": [
+                "postgresServer"
+              ]
+            },
+            "firewallRule": {
+              "condition": "[not(parameters('useExistingPostgres'))]",
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
+              "apiVersion": "2023-03-01-preview",
+              "name": "[format('{0}/{1}', format('{0}-pgflex', parameters('baseName')), 'AllowAzureServices')]",
+              "properties": {
+                "startIpAddress": "0.0.0.0",
+                "endIpAddress": "0.0.0.0"
+              },
+              "dependsOn": [
+                "postgresServer"
+              ]
+            },
+            "database": {
+              "condition": "[not(parameters('useExistingPostgres'))]",
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+              "apiVersion": "2023-03-01-preview",
+              "name": "[format('{0}/{1}', format('{0}-pgflex', parameters('baseName')), parameters('databaseName'))]",
+              "properties": {
+                "charset": "UTF8",
+                "collation": "en_US.utf8"
+              },
+              "dependsOn": [
+                "postgresServer"
+              ]
+            }
+          },
+          "outputs": {
+            "host": {
+              "type": "string",
+              "value": "[if(parameters('useExistingPostgres'), parameters('existingPostgresHost'), reference('postgresServer').fullyQualifiedDomainName)]"
+            },
+            "databaseName": {
+              "type": "string",
+              "value": "[if(parameters('useExistingPostgres'), parameters('existingPostgresDatabase'), parameters('databaseName'))]"
+            },
+            "username": {
+              "type": "string",
+              "value": "[if(parameters('useExistingPostgres'), parameters('existingPostgresUser'), variables('defaultAdminUsername'))]"
+            },
+            "password": {
+              "type": "securestring",
+              "value": "[if(parameters('useExistingPostgres'), parameters('existingPostgresPassword'), parameters('postgresAdminPassword'))]"
+            },
+            "serverName": {
+              "type": "string",
+              "value": "[if(parameters('useExistingPostgres'), split(parameters('existingPostgresHost'), '.')[0], format('{0}-pgflex', parameters('baseName')))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "managedIdentity",
+        "rg"
+      ]
+    },
+    "containerRegistry": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "container-registry",
+      "resourceGroup": "[format('{0}-rg', variables('prefix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "baseName": {
+            "value": "[variables('prefix')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "principalId": {
+            "value": "[reference('managedIdentity').outputs.principalId.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.38.33.27573",
+              "templateHash": "1812492449351370858"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "baseName": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "principalId": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "acrPullRoleId": "7f951dda-4ed3-4680-a7ca-43fe172d538d"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ContainerRegistry/registries",
+              "apiVersion": "2023-01-01-preview",
+              "name": "[replace(format('{0}-acr', parameters('baseName')), '-', '')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "Basic"
+              },
+              "properties": {
+                "adminUserEnabled": false,
+                "publicNetworkAccess": "Enabled"
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.ContainerRegistry/registries/{0}', replace(format('{0}-acr', parameters('baseName')), '-', ''))]",
+              "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}-acr', parameters('baseName')), '-', '')), parameters('principalId'), variables('acrPullRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPullRoleId'))]",
+                "principalId": "[parameters('principalId')]",
+                "principalType": "ServicePrincipal"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}-acr', parameters('baseName')), '-', ''))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "name": {
+              "type": "string",
+              "value": "[replace(format('{0}-acr', parameters('baseName')), '-', '')]"
+            },
+            "loginServer": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}-acr', parameters('baseName')), '-', '')), '2023-01-01-preview').loginServer]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "managedIdentity",
+        "rg"
+      ]
+    },
+    "logAnalytics": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "log-analytics",
+      "resourceGroup": "[format('{0}-rg', variables('prefix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "baseName": {
+            "value": "[variables('prefix')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.38.33.27573",
+              "templateHash": "602550646949490046"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "baseName": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2022-10-01",
+              "name": "[format('{0}-logs', parameters('baseName'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "PerGB2018"
+                },
+                "retentionInDays": 30
+              }
+            }
+          ],
+          "outputs": {
+            "workspaceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('baseName')))]"
+            },
+            "customerId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('baseName'))), '2022-10-01').customerId]"
+            },
+            "primarySharedKey": {
+              "type": "string",
+              "value": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('baseName'))), '2022-10-01').primarySharedKey]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "rg"
+      ]
+    },
+    "containerAppsEnvironment": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "container-apps-environment",
+      "resourceGroup": "[format('{0}-rg', variables('prefix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "baseName": {
+            "value": "[variables('prefix')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "logAnalyticsWorkspaceId": {
+            "value": "[reference('logAnalytics').outputs.workspaceId.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.38.33.27573",
+              "templateHash": "6086323776543918111"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "baseName": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.App/managedEnvironments",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}-ca-env', parameters('baseName'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "appLogsConfiguration": {
+                  "destination": "log-analytics",
+                  "logAnalyticsConfiguration": {
+                    "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', split(parameters('logAnalyticsWorkspaceId'), '/')[8]), '2022-10-01').customerId]",
+                    "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', split(parameters('logAnalyticsWorkspaceId'), '/')[8]), '2022-10-01').primarySharedKey]"
+                  }
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "environmentId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-ca-env', parameters('baseName')))]"
+            },
+            "environmentName": {
+              "type": "string",
+              "value": "[format('{0}-ca-env', parameters('baseName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "logAnalytics",
+        "rg"
+      ]
+    },
+    "application": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "application",
+      "resourceGroup": "[format('{0}-rg', variables('prefix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "baseName": {
+            "value": "[variables('prefix')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "containerAppsEnvironmentId": {
+            "value": "[reference('containerAppsEnvironment').outputs.environmentId.value]"
+          },
+          "containerRegistryName": {
+            "value": "[reference('containerRegistry').outputs.name.value]"
+          },
+          "containerImageName": {
+            "value": "[parameters('backendImageName')]"
+          },
+          "userAssignedIdentityResourceId": {
+            "value": "[reference('managedIdentity').outputs.resourceId.value]"
+          },
+          "userAssignedIdentityClientId": {
+            "value": "[reference('managedIdentity').outputs.clientId.value]"
+          },
+          "openaiEndpoint": {
+            "value": "[reference('openai').outputs.endpoint.value]"
+          },
+          "openaiDeploymentName": {
+            "value": "[reference('openai').outputs.chatDeploymentName.value]"
+          },
+          "openaiEmbeddingDeploymentName": {
+            "value": "[reference('openai').outputs.embeddingDeploymentName.value]"
+          },
+          "postgresHost": {
+            "value": "[reference('postgres').outputs.host.value]"
+          },
+          "postgresDatabase": {
+            "value": "[reference('postgres').outputs.databaseName.value]"
+          },
+          "postgresUser": {
+            "value": "[reference('postgres').outputs.username.value]"
+          },
+          "postgresPassword": {
+            "value": "[listOutputsWithSecureValues('postgres', '2025-04-01').password]"
+          },
+          "aadFrontendClientId": {
+            "value": "[parameters('aadFrontendClientId')]"
+          },
+          "aadFrontendTenantId": {
+            "value": "[parameters('aadFrontendTenantId')]"
+          },
+          "aadApiTenantId": {
+            "value": "[parameters('aadApiTenantId')]"
+          },
+          "aadApiAppId": {
+            "value": "[parameters('aadApiAppId')]"
+          },
+          "aadApiAudience": {
+            "value": "[parameters('aadApiAudience')]"
+          },
+          "disableAuth": {
+            "value": "[parameters('disableAuth')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.38.33.27573",
+              "templateHash": "8095328602719759686"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "baseName": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "containerAppsEnvironmentId": {
+              "type": "string"
+            },
+            "containerRegistryName": {
+              "type": "string"
+            },
+            "containerImageName": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "userAssignedIdentityResourceId": {
+              "type": "string"
+            },
+            "userAssignedIdentityClientId": {
+              "type": "string"
+            },
+            "openaiEndpoint": {
+              "type": "string"
+            },
+            "openaiDeploymentName": {
+              "type": "string"
+            },
+            "openaiEmbeddingDeploymentName": {
+              "type": "string"
+            },
+            "postgresHost": {
+              "type": "string"
+            },
+            "postgresDatabase": {
+              "type": "string"
+            },
+            "postgresUser": {
+              "type": "string"
+            },
+            "postgresPassword": {
+              "type": "securestring"
+            },
+            "aadFrontendClientId": {
+              "type": "string"
+            },
+            "aadFrontendTenantId": {
+              "type": "string"
+            },
+            "aadApiTenantId": {
+              "type": "string"
+            },
+            "aadApiAppId": {
+              "type": "string"
+            },
+            "aadApiAudience": {
+              "type": "string"
+            },
+            "disableAuth": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "appName": "[format('{0}-app', parameters('baseName'))]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.App/containerApps",
+              "apiVersion": "2023-05-01",
+              "name": "[variables('appName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                  "[format('{0}', parameters('userAssignedIdentityResourceId'))]": {}
+                }
+              },
+              "properties": {
+                "environmentId": "[parameters('containerAppsEnvironmentId')]",
+                "configuration": {
+                  "ingress": {
+                    "external": true,
+                    "targetPort": 8000,
+                    "allowInsecure": false,
+                    "traffic": [
+                      {
+                        "latestRevision": true,
+                        "weight": 100
+                      }
+                    ]
+                  },
+                  "registries": [
+                    {
+                      "server": "[format('{0}.azurecr.io', parameters('containerRegistryName'))]",
+                      "identity": "[parameters('userAssignedIdentityResourceId')]"
+                    }
+                  ]
+                },
+                "template": {
+                  "containers": [
+                    {
+                      "name": "backend",
+                      "image": "[if(not(empty(parameters('containerImageName'))), parameters('containerImageName'), 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest')]",
+                      "env": [
+                        {
+                          "name": "GRAPHRAG_API_KEY",
+                          "value": ""
+                        },
+                        {
+                          "name": "GRAPHRAG_API_BASE",
+                          "value": "[parameters('openaiEndpoint')]"
+                        },
+                        {
+                          "name": "GRAPHRAG_API_VERSION",
+                          "value": "2024-02-15-preview"
+                        },
+                        {
+                          "name": "GRAPHRAG_LLM_DEPLOYMENT_NAME",
+                          "value": "[parameters('openaiDeploymentName')]"
+                        },
+                        {
+                          "name": "GRAPHRAG_EMBEDDING_DEPLOYMENT_NAME",
+                          "value": "[parameters('openaiEmbeddingDeploymentName')]"
+                        },
+                        {
+                          "name": "POSTGRES_HOST",
+                          "value": "[parameters('postgresHost')]"
+                        },
+                        {
+                          "name": "POSTGRES_DATABASE",
+                          "value": "[parameters('postgresDatabase')]"
+                        },
+                        {
+                          "name": "POSTGRES_USER",
+                          "value": "[parameters('postgresUser')]"
+                        },
+                        {
+                          "name": "POSTGRES_ADMIN_PASSWORD",
+                          "value": "[parameters('postgresPassword')]"
+                        },
+                        {
+                          "name": "AZURE_CLIENT_ID",
+                          "value": "[parameters('userAssignedIdentityClientId')]"
+                        },
+                        {
+                          "name": "AZURE_USE_MANAGED_IDENTITY",
+                          "value": "true"
+                        },
+                        {
+                          "name": "AAD_FRONTEND_CLIENT_ID",
+                          "value": "[parameters('aadFrontendClientId')]"
+                        },
+                        {
+                          "name": "AAD_FRONTEND_TENANT_ID",
+                          "value": "[parameters('aadFrontendTenantId')]"
+                        },
+                        {
+                          "name": "AAD_API_TENANT_ID",
+                          "value": "[parameters('aadApiTenantId')]"
+                        },
+                        {
+                          "name": "AAD_API_APP_ID",
+                          "value": "[parameters('aadApiAppId')]"
+                        },
+                        {
+                          "name": "AAD_API_AUDIENCE",
+                          "value": "[parameters('aadApiAudience')]"
+                        },
+                        {
+                          "name": "DISABLE_AUTH",
+                          "value": "[parameters('disableAuth')]"
+                        }
+                      ],
+                      "resources": {
+                        "cpu": "[json('2.0')]",
+                        "memory": "4Gi"
+                      }
+                    }
+                  ],
+                  "scale": {
+                    "minReplicas": 1,
+                    "maxReplicas": 5,
+                    "rules": [
+                      {
+                        "name": "http-scaling",
+                        "http": {
+                          "metadata": {
+                            "concurrentRequests": "50"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "fqdn": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.App/containerApps', variables('appName')), '2023-05-01').configuration.ingress.fqdn]"
+            },
+            "name": {
+              "type": "string",
+              "value": "[variables('appName')]"
+            },
+            "url": {
+              "type": "string",
+              "value": "[format('https://{0}', reference(resourceId('Microsoft.App/containerApps', variables('appName')), '2023-05-01').configuration.ingress.fqdn)]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "containerAppsEnvironment",
+        "containerRegistry",
+        "managedIdentity",
+        "openai",
+        "postgres",
+        "rg"
+      ]
+    }
+  },
+  "outputs": {
+    "AZURE_RESOURCE_GROUP": {
+      "type": "string",
+      "value": "[format('{0}-rg', variables('prefix'))]"
+    },
+    "AZURE_LOCATION": {
+      "type": "string",
+      "value": "[parameters('location')]"
+    },
+    "AZURE_CONTAINER_REGISTRY_ENDPOINT": {
+      "type": "string",
+      "value": "[reference('containerRegistry').outputs.loginServer.value]"
+    },
+    "AZURE_CONTAINER_REGISTRY_NAME": {
+      "type": "string",
+      "value": "[reference('containerRegistry').outputs.name.value]"
+    },
+    "AZURE_OPENAI_ENDPOINT": {
+      "type": "string",
+      "value": "[reference('openai').outputs.endpoint.value]"
+    },
+    "AZURE_OPENAI_CHAT_DEPLOYMENT": {
+      "type": "string",
+      "value": "[reference('openai').outputs.chatDeploymentName.value]"
+    },
+    "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": {
+      "type": "string",
+      "value": "[reference('openai').outputs.embeddingDeploymentName.value]"
+    },
+    "POSTGRES_HOST": {
+      "type": "string",
+      "value": "[reference('postgres').outputs.host.value]"
+    },
+    "POSTGRES_DATABASE": {
+      "type": "string",
+      "value": "[reference('postgres').outputs.databaseName.value]"
+    },
+    "POSTGRES_USER": {
+      "type": "string",
+      "value": "[reference('postgres').outputs.username.value]"
+    },
+    "POSTGRES_PASSWORD": {
+      "type": "securestring",
+      "value": "[listOutputsWithSecureValues('postgres', '2025-04-01').password]"
+    },
+    "APPLICATION_URL": {
+      "type": "string",
+      "value": "[format('https://{0}', reference('application').outputs.fqdn.value)]"
+    },
+    "APPLICATION_NAME": {
+      "type": "string",
+      "value": "[reference('application').outputs.name.value]"
+    },
+    "AZURE_CLIENT_ID": {
+      "type": "string",
+      "value": "[reference('managedIdentity').outputs.clientId.value]"
+    },
+    "MANAGED_IDENTITY_RESOURCE_ID": {
+      "type": "string",
+      "value": "[reference('managedIdentity').outputs.resourceId.value]"
+    },
+    "AAD_FRONTEND_CLIENT_ID": {
+      "type": "string",
+      "value": "[parameters('aadFrontendClientId')]"
+    },
+    "AAD_FRONTEND_TENANT_ID": {
+      "type": "string",
+      "value": "[parameters('aadFrontendTenantId')]"
+    },
+    "AAD_API_TENANT_ID": {
+      "type": "string",
+      "value": "[parameters('aadApiTenantId')]"
+    },
+    "AAD_API_APP_ID": {
+      "type": "string",
+      "value": "[parameters('aadApiAppId')]"
+    },
+    "AAD_API_AUDIENCE": {
+      "type": "string",
+      "value": "[parameters('aadApiAudience')]"
+    },
+    "DISABLE_AUTH": {
+      "type": "string",
+      "value": "[parameters('disableAuth')]"
+    }
+  }
+}

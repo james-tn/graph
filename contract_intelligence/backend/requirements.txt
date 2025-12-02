@@ -6,6 +6,8 @@ asyncpg
 pgvector
 openai==2.8.1
 azure-identity
+psycopg2-binary>=2.9
+graphrag
 
 # Authentication
 PyJWT[crypto]>=2.8.0

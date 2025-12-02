@@ -39,6 +39,7 @@ htmlcov/
 # Node modules (frontend is built in separate stage)
 frontend/node_modules/
 frontend/dist/
+backend/utils/node_modules/
 frontend/.vite/
 frontend/.turbo/
 
@@ -100,3 +101,4 @@ pnpm-lock.yaml
 *.temp
 *.bak
 *.swp
+backend/utils/node_modules/

@@ -220,110 +220,6 @@ def execute_sql_query(
         return f"Unexpected Error: {str(e)}\n\nQuery was: {sql_query[:200]}..."
 
 
-# def get_contract_family(
-#     reference_number: Annotated[str, Field(description="Reference number of the parent/master contract (e.g., 'MSA-ABC-202401-005')")],
-#     max_depth: Annotated[int, Field(description="Maximum depth to traverse (default 5)")] = 5
-# ) -> str:
-#     """Get complete contract family tree showing parent contract and all descendants.
-    
-#     This specialized tool finds:
-#     - The master/parent contract
-#     - All direct children (SOWs, amendments, addenda, work orders)
-#     - Nested relationships (e.g., amendments to SOWs under MSA)
-#     - Full hierarchy with levels
-    
-#     Example: For a Master Services Agreement, returns:
-#     - Level 0: MSA-ABC-202401-005 (Master Services Agreement)
-#     - Level 1: SOW-ABC-202403-012 (Statement of Work)
-#     - Level 1: AMD-ABC-202406-025 (Amendment to MSA)
-#     - Level 2: WO-ABC-202404-015 (Work Order under SOW)
-#     """
-#     try:
-#         conn = get_db_connection()
-#         cur = conn.cursor()
-        
-#         # Recursive CTE to get contract tree
-#         query = """
-#         WITH RECURSIVE contract_tree AS (
-#             -- Start with the specified contract
-#             SELECT 
-#                 c.id,
-#                 c.contract_identifier,
-#                 c.reference_number,
-#                 c.title,
-#                 c.contract_type,
-#                 c.effective_date,
-#                 c.status,
-#                 0 as level,
-#                 ARRAY[c.reference_number] as path,
-#                 CAST(NULL AS TEXT) as relationship_type
-#             FROM contracts c
-#             WHERE c.reference_number = %s
-            
-#             UNION ALL
-            
-#             -- Get children recursively
-#             SELECT 
-#                 c.id,
-#                 c.contract_identifier,
-#                 c.reference_number,
-#                 c.title,
-#                 c.contract_type,
-#                 c.effective_date,
-#                 c.status,
-#                 ct.level + 1,
-#                 ct.path || c.reference_number,
-#                 cr.relationship_type
-#             FROM contracts c
-#             JOIN contract_relationships cr ON c.id = cr.child_contract_id
-#             JOIN contract_tree ct ON cr.parent_contract_id = ct.id
-#             WHERE ct.level < %s
-#         )
-#         SELECT 
-#             level,
-#             reference_number,
-#             title,
-#             contract_type,
-#             effective_date,
-#             status,
-#             relationship_type,
-#             array_to_string(path, ' -> ') as hierarchy_path
-#         FROM contract_tree
-#         ORDER BY level, reference_number
-#         """
-        
-#         cur.execute(query, (reference_number, max_depth))
-#         results = cur.fetchall()
-#         cur.close()
-#         conn.close()
-        
-#         if not results:
-#             return f"No contract found with reference number '{reference_number}'"
-        
-#         # Format as hierarchical tree
-#         response = f"📋 **Contract Family Tree for {reference_number}**\n\n"
-        
-#         for row in results:
-#             indent = "  " * row['level']
-#             level_icon = "📄" if row['level'] == 0 else "├─" if row['level'] == 1 else "│ ├─"
-            
-#             response += f"{indent}{level_icon} **{row['reference_number']}**\n"
-#             response += f"{indent}   Title: {row['title']}\n"
-#             response += f"{indent}   Type: {row['contract_type']}\n"
-#             if row['relationship_type']:
-#                 response += f"{indent}   Relationship: {row['relationship_type']}\n"
-#             response += f"{indent}   Status: {row['status']} | Date: {row['effective_date']}\n"
-#             response += f"{indent}   Path: {row['hierarchy_path']}\n\n"
-        
-#         response += f"\n**Total contracts in family:** {len(results)}"
-#         response += f"\n**Maximum depth:** {max(r['level'] for r in results)}"
-        
-#         return response
-    
-#     except Exception as e:
-#         return f"Error getting contract family: {str(e)}"
-
-
 
 class ContractAgent:
     """Schema-aware PostgreSQL agent that writes and executes SQL/Cypher queries."""
@@ -579,6 +475,33 @@ $$) as (party1 agtype, party2 agtype, hops agtype)
 - Use brief bullet points instead of paragraphs
 - Let visualizations tell the story
 - Include only essential details
+
+**MERMAID SYNTAX RULES (CRITICAL - Follow exactly!):**
+
+⚠️ **NEVER use `<br/>` tags** - Use plain text or `<br>` (without slash) if line break absolutely needed
+⚠️ **ALWAYS quote labels with special characters:**
+   - Parentheses: `["Pre-Existing IP (Sec. 6.3)"]` NOT `[Pre-Existing IP (Sec. 6.3)]`
+   - Commas: `["Vendors (Gamma, Horizon)"]` NOT `[Vendors (Gamma, Horizon)]`
+   - Periods: `["Section 6.3. Rights"]` NOT `[Section 6.3. Rights]`
+   - Colons, pipes, arrows: Always quote them
+⚠️ **Valid node IDs only** - Use alphanumeric, underscore, hyphen (a-z, 0-9, _, -)
+⚠️ **XY charts**: Use simple strings in x-axis array, no special chars unquoted
+
+**Examples of CORRECT syntax:**
+```mermaid
+graph TD
+    MSA["MSA-ABC-001 (Master Agreement)"]
+    SOW1["SOW-ABC-012 Development Services"]
+    MSA --> SOW1
+```
+
+```mermaid
+xychart-beta
+    title "Service Risk Distribution"
+    x-axis ["Service Levels", "Hosting", "Support", "Storage"]
+    y-axis "Risk Score" 0 --> 100
+    bar [75, 60, 45, 30]
+```
 
 **Mermaid Chart Types to Use:**
 

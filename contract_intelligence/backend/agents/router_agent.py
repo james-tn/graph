@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
-from openai import AzureOpenAI
+from openai import OpenAI
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,6 +24,7 @@ load_dotenv()
 # Import our specialized agents
 from backend.agents.contract_agent import ContractAgent
 from backend.agents.graphrag_agent import GraphRAGAgent
+from backend.utils.mermaid_validator import validate_mermaid_in_markdown
 
 
 class RouterAgent:
@@ -58,21 +59,19 @@ class RouterAgent:
     def __init__(self):
         """Initialize router with access to both agents."""
         # Validate environment variables
-        api_key = os.environ.get("GRAPHRAG_API_KEY")
-        api_base = os.environ.get("GRAPHRAG_API_BASE")
-        api_version = os.environ.get("GRAPHRAG_API_VERSION", "2024-02-15-preview")
+        api_key = os.environ.get("AZURE_OPENAI_API_KEY")
+        base_url = os.environ.get("AZURE_OPENAI_ENDPOINT")
         
         if not api_key:
-            raise ValueError("GRAPHRAG_API_KEY environment variable is required")
-        if not api_base:
-            raise ValueError("GRAPHRAG_API_BASE environment variable is required")
-        
-        self.openai_client = AzureOpenAI(
+            raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
+        if not base_url:
+            raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
+
+        self.openai_client = OpenAI(
             api_key=api_key,
-            api_version=api_version,
-            azure_endpoint=api_base
+            base_url=base_url
         )
-        self.llm_model = os.environ.get("GRAPHRAG_LLM_DEPLOYMENT_NAME", "gpt-4o")
+        self.llm_model = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.1")
         
         # Get the project root directory (contract_intelligence/)
         # This file is in backend/agents/, so go up two levels
@@ -275,12 +274,18 @@ Route this query."""
         if strategy == "postgres" and postgres_result:
             if postgres_result.get("error"):
                 return f"PostgreSQL query failed: {postgres_result['error']}"
-            return postgres_result.get("response", "No response from PostgreSQL agent")
+            response = postgres_result.get("response", "No response from PostgreSQL agent")
+            # Validate and correct any Mermaid diagrams
+            corrected_response, _ = validate_mermaid_in_markdown(response, auto_correct=True, openai_client=self.openai_client)
+            return corrected_response
         
         elif strategy == "graphrag" and graphrag_result:
             if graphrag_result.get("error"):
                 return f"GraphRAG query failed: {graphrag_result['error']}"
-            return graphrag_result.get("response", "No response from GraphRAG agent")
+            response = graphrag_result.get("response", "No response from GraphRAG agent")
+            # Validate and correct any Mermaid diagrams
+            corrected_response, _ = validate_mermaid_in_markdown(response, auto_correct=True, openai_client=self.openai_client)
+            return corrected_response
         
         else:  # hybrid
             sections = []
@@ -291,13 +296,19 @@ Route this query."""
             # GraphRAG section
             if graphrag_result and not graphrag_result.get("error"):
                 sections.append("### Knowledge Graph Analysis (GraphRAG)")
-                sections.append(graphrag_result.get("response", "No response"))
+                graphrag_response = graphrag_result.get("response", "No response")
+                # Validate and correct Mermaid in GraphRAG response
+                corrected_graphrag, _ = validate_mermaid_in_markdown(graphrag_response, auto_correct=True)
+                sections.append(corrected_graphrag)
                 sections.append("")
             
             # PostgreSQL section
             if postgres_result and not postgres_result.get("error"):
                 sections.append("### Structured Database Query (PostgreSQL)")
-                sections.append(postgres_result.get("response", "No response"))
+                postgres_response = postgres_result.get("response", "No response")
+                # Validate and correct Mermaid in PostgreSQL response
+                corrected_postgres, _ = validate_mermaid_in_markdown(postgres_response, auto_correct=True)
+                sections.append(corrected_postgres)
                 sections.append("")
             
             # Handle errors

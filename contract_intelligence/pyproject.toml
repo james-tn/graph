@@ -13,6 +13,7 @@ dependencies = [
     "pgvector",
     "openai==2.8.1",
     "azure-identity",
+    "psycopg2-binary>=2.9",
     "graphrag",
     "agent-framework==1.0.0b251120",
     "PyPDF2",

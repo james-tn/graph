@@ -9,7 +9,7 @@ param environmentName string
 
 @minLength(1)
 @description('Primary location for all resources')
-param location string
+param location string = 'eastus2'
 
 @description('Base name for all resources')
 param baseName string = 'ci'
@@ -29,6 +29,9 @@ param existingOpenAiDeploymentName string = ''
 
 @description('Existing Azure OpenAI embedding deployment name')
 param existingOpenAiEmbeddingDeploymentName string = ''
+
+@description('Existing Azure OpenAI resource ID (required when the account lives in another resource group or subscription)')
+param existingOpenAiResourceId string = ''
 
 @description('Existing PostgreSQL host (if reusing)')
 param existingPostgresHost string = ''
@@ -80,10 +83,18 @@ var tags = {
 
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
 var prefix = '${baseName}-${resourceToken}'
+var managedIdentityName = '${prefix}-identity'
 
 // Determine if we're using existing resources
 var useExistingOpenAI = !empty(existingOpenAiEndpoint)
 var useExistingPostgres = !empty(existingPostgresHost)
+var hasExistingOpenAiResourceId = !empty(existingOpenAiResourceId)
+var existingOpenAiSegments = split(existingOpenAiResourceId, '/')
+var existingOpenAiSubscriptionId = hasExistingOpenAiResourceId ? existingOpenAiSegments[2] : ''
+var existingOpenAiResourceGroupName = hasExistingOpenAiResourceId ? existingOpenAiSegments[4] : ''
+var existingOpenAiAccountName = hasExistingOpenAiResourceId ? existingOpenAiSegments[8] : ''
+var deployOpenAiModule = !useExistingOpenAI || !hasExistingOpenAiResourceId
+var cognitiveServicesOpenAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 
 // ==================== RESOURCE GROUP ====================
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
@@ -104,7 +115,7 @@ module managedIdentity 'modules/managed-identity.bicep' = {
 }
 
 // ==================== AZURE OPENAI (conditional) ====================
-module openai 'modules/openai.bicep' = {
+module openai 'modules/openai.bicep' = if (deployOpenAiModule) {
   scope: rg
   name: 'openai'
   params: {
@@ -119,6 +130,23 @@ module openai 'modules/openai.bicep' = {
     principalType: 'ServicePrincipal'
   }
 }
+
+// Role assignment path for cross-resource-group OpenAI reuse
+module openaiExternalRole 'modules/openai-external-role.bicep' = if (useExistingOpenAI && hasExistingOpenAiResourceId) {
+  scope: resourceGroup(existingOpenAiSubscriptionId, existingOpenAiResourceGroupName)
+  name: 'openai-external-role'
+  params: {
+    accountName: existingOpenAiAccountName
+    cognitiveServicesOpenAIUserRoleId: cognitiveServicesOpenAIUserRoleId
+    principalId: managedIdentity.outputs.principalId
+    principalType: 'ServicePrincipal'
+    roleAssignmentName: guid(existingOpenAiResourceId, managedIdentityName, cognitiveServicesOpenAIUserRoleId)
+  }
+}
+
+var resolvedOpenAiEndpoint = deployOpenAiModule ? openai.outputs.endpoint : existingOpenAiEndpoint
+var resolvedOpenAiDeploymentName = deployOpenAiModule ? openai.outputs.chatDeploymentName : existingOpenAiDeploymentName
+var resolvedOpenAiEmbeddingDeploymentName = deployOpenAiModule ? openai.outputs.embeddingDeploymentName : existingOpenAiEmbeddingDeploymentName
 
 // ==================== POSTGRESQL (conditional) ====================
 module postgres 'modules/postgres.bicep' = {
@@ -188,9 +216,9 @@ module application 'modules/application.bicep' = {
     containerImageName: backendImageName
     userAssignedIdentityResourceId: managedIdentity.outputs.resourceId
     userAssignedIdentityClientId: managedIdentity.outputs.clientId
-    openaiEndpoint: openai.outputs.endpoint
-    openaiDeploymentName: openai.outputs.chatDeploymentName
-    openaiEmbeddingDeploymentName: openai.outputs.embeddingDeploymentName
+    openaiEndpoint: resolvedOpenAiEndpoint
+    openaiDeploymentName: resolvedOpenAiDeploymentName
+    openaiEmbeddingDeploymentName: resolvedOpenAiEmbeddingDeploymentName
     postgresHost: postgres.outputs.host
     postgresDatabase: postgres.outputs.databaseName
     postgresUser: postgres.outputs.username
@@ -202,13 +230,6 @@ module application 'modules/application.bicep' = {
     aadApiAudience: aadApiAudience
     disableAuth: disableAuth
   }
-  dependsOn: [
-    openai
-    postgres
-    containerRegistry
-    containerAppsEnvironment
-    managedIdentity
-  ]
 }
 
 // ==================== OUTPUTS FOR AZD ====================
@@ -219,9 +240,9 @@ output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.logi
 output AZURE_CONTAINER_REGISTRY_NAME string = containerRegistry.outputs.name
 
 // Azure OpenAI
-output AZURE_OPENAI_ENDPOINT string = openai.outputs.endpoint
-output AZURE_OPENAI_CHAT_DEPLOYMENT string = openai.outputs.chatDeploymentName
-output AZURE_OPENAI_EMBEDDING_DEPLOYMENT string = openai.outputs.embeddingDeploymentName
+output AZURE_OPENAI_ENDPOINT string = resolvedOpenAiEndpoint
+output AZURE_OPENAI_CHAT_DEPLOYMENT string = resolvedOpenAiDeploymentName
+output AZURE_OPENAI_EMBEDDING_DEPLOYMENT string = resolvedOpenAiEmbeddingDeploymentName
 
 // PostgreSQL
 output POSTGRES_HOST string = postgres.outputs.host

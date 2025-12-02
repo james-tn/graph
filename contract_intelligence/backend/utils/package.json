@@ -1,0 +1,15 @@
+{
+  "name": "mermaid-validator",
+  "version": "1.0.0",
+  "description": "Mermaid diagram syntax validator for Python backend",
+  "private": true,
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "^11.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "config": {
+    "puppeteer_skip_chromium_download": false
+  }
+}

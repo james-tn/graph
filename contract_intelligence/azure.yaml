@@ -8,6 +8,17 @@ infra:
   provider: bicep
   path: infra
   module: main.azd
+  parameters:
+    location: ${AZURE_LOCATION=eastus2}
+    existingOpenAiEndpoint: env://existingOpenAiEndpoint
+    existingOpenAiDeploymentName: env://existingOpenAiDeploymentName
+    existingOpenAiEmbeddingDeploymentName: env://existingOpenAiEmbeddingDeploymentName
+    existingOpenAiResourceId: env://existingOpenAiResourceId
+    existingPostgresHost: env://existingPostgresHost
+    existingPostgresDatabase: env://existingPostgresDatabase
+    existingPostgresUser: env://existingPostgresUser
+    existingPostgresPassword: env://existingPostgresPassword
+    postgresAdminPassword: env://postgresAdminPassword
 
 # Services to deploy
 services:

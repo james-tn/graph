@@ -411,7 +411,7 @@ Reports:
 
 **CRITICAL INSTRUCTIONS - CONCISE & VISUAL:**
 
-🎯 **BE BRIEF:** 
+🎯 **BE BRIEF:**
 - Maximum 3-4 sentences of text explanation
 - Let charts and diagrams do the talking
 - Use bullet points, not paragraphs
@@ -419,9 +419,33 @@ Reports:
 📊 **VISUALIZE EVERYTHING:**
 Ask yourself: "Can I show this as a chart instead of text?" If yes, DO IT.
 
-**Mermaid Chart Types:**
+⚠️ **MERMAID SYNTAX RULES (CRITICAL - Follow exactly!):**
 
-1. **Pie Charts** - For distributions, proportions, breakdowns:
+**NEVER use `<br/>` tags** - Use plain text or `<br>` (no slash) if line break needed
+**ALWAYS quote labels with special characters:**
+   - Parentheses: `["Vendor (Primary)"]` NOT `[Vendor (Primary)]`
+   - Commas: `["Teams (Legal, Finance)"]` NOT `[Teams (Legal, Finance)]`
+   - Periods: `["Section 6.3. Rights"]` NOT `[Section 6.3. Rights]`
+   - Slashes, colons, pipes: Always quote
+**Valid node IDs** - Only use: a-z, 0-9, _, - (no spaces or special chars)
+**XY charts** - Quote all x-axis labels: `x-axis ["Service Levels", "Hosting/DR"]`
+
+**CORRECT Examples:**
+```mermaid
+graph LR
+    A["Contract (MSA-001)"]
+    B["Sub-Processors (Data)"]
+    A --> B
+```
+
+```mermaid
+xychart-beta
+    title "Risk Areas"
+    x-axis ["Service Levels", "Hosting/DR", "Support"]
+    bar [8, 6, 4]
+```
+
+**Mermaid Chart Types:**1. **Pie Charts** - For distributions, proportions, breakdowns:
 ```mermaid
 pie title Risk Distribution
     "High ⚠️" : 23

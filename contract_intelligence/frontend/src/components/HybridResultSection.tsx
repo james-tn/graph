@@ -7,32 +7,25 @@ import mermaid from 'mermaid';
 // Initialize mermaid
 if (typeof window !== 'undefined') {
   mermaid.initialize({ 
-    startOnLoad: true, 
-    theme: 'base',
+    startOnLoad: true,
+    theme: 'default',  // Use default light theme - clean and universally readable
     themeVariables: {
-      primaryColor: '#dbeafe',
-      primaryTextColor: '#1e3a8a',
-      primaryBorderColor: '#3b82f6',
-      lineColor: '#60a5fa',
-      secondaryColor: '#fef3c7',
-      secondaryTextColor: '#78350f',
-      tertiaryColor: '#d1fae5',
-      tertiaryTextColor: '#065f46',
-      background: '#1e293b',
-      mainBkg: '#e0e7ff',
-      textColor: '#1e293b',
-      nodeTextColor: '#1e293b',
-      labelTextColor: '#1e293b',
-      edgeLabelBackground: '#ffffff',
-      clusterBkg: '#f1f5f9',
-      clusterBorder: '#cbd5e1',
       fontSize: '14px',
       fontFamily: 'ui-sans-serif, system-ui, sans-serif'
     }
   });
 }
 
-// Mermaid component for rendering diagrams
+// Add CSS to make the mermaid container have a light background
+const style = document.createElement('style');
+style.textContent = `
+  .mermaid svg {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+  }
+`;
+document.head.appendChild(style);// Mermaid component for rendering diagrams
 const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
   const ref = useRef<HTMLDivElement>(null);
 

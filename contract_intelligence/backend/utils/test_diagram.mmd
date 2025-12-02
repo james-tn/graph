@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant Company as Company
+    participant PreIP as Pre-Existing IP (Sec. 6.3)
+    participant NewIP as New IP
+    participant ContractIP as Contract IP (Sec. 6.4)
+    
+    PreIP->>Company: Owned before contract
+    NewIP->>Company: Created during contract
+    ContractIP->>Company: Created for contract deliverables
+    
+    Note over PreIP: Company retains full rights
+    Note over NewIP: Company retains rights (unless delivered under Sec. 6.4)
+    Note over ContractIP: May transfer to customer per agreement
