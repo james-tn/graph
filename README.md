@@ -289,7 +289,7 @@ graph TB
     end
     
     subgraph "AI Services"
-        Azure["Azure OpenAI<br/>gpt-5.1 + Embeddings"]
+        Azure["Azure OpenAI<br/>GPT-4o + Embeddings"]
     end
     
     UI --> Router
@@ -327,10 +327,9 @@ graph TB
    CREATE EXTENSION age;           -- Apache AGE for graph queries
    CREATE EXTENSION pg_trgm;       -- Full-text search
    ```
-    - check the `infra` folder for full `azd` deployment options, including Azure PostgresSQL, OpenAI 
 
 2. **Azure OpenAI** deployments:
-   - `gpt-5.1` or `gpt-4.1`
+   - `gpt-4o` or `gpt-4` (reasoning)
    - `text-embedding-3-small` (embeddings)
 
 3. **Python 3.11+** and **Node.js 20+**
@@ -355,7 +354,22 @@ graph TB
    npm install
    ```
 
-3. **Ingest sample data:**
+3. **Use pre-generated sample data:**
+   
+   Sample contract data is already provided in `data/input/` (700+ contracts). If you want to regenerate it:
+   ```bash
+   # Note: This is a long-running operation (can take hours)
+   python scripts/generate_seed_data.py
+   ```
+
+4. **Ingest data into PostgreSQL:**
+   
+   GraphRAG data is pre-ingested in `data/output/`. You only need to ingest into PostgreSQL:
+   ```bash
+   python data_ingestion/postgres_ingestion.py
+   ```
+   
+   Or to re-run full dual ingestion pipeline:
    ```bash
    python data_ingestion/ingestion_pipeline.py
    ```
@@ -427,7 +441,7 @@ erDiagram
 | **Vector Search** | pgvector | Semantic matching |
 | **Graph Queries** | Apache AGE | Relationship traversal |
 | **Knowledge Graph** | Microsoft GraphRAG | Pattern discovery |
-| **LLM** | Azure OpenAI gpt-5.1 | Natural language |
+| **LLM** | Azure OpenAI GPT-4o | Natural language |
 | **Embeddings** | text-embedding-3-small | Vectors |
 | **Deployment** | Azure Container Apps | Hosting |
 
