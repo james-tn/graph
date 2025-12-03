@@ -354,7 +354,22 @@ graph TB
    npm install
    ```
 
-3. **Ingest sample data:**
+3. **Use pre-generated sample data:**
+   
+   Sample contract data is already provided in `data/input/` (700+ contracts). If you want to regenerate it:
+   ```bash
+   # Note: This is a long-running operation (can take hours)
+   python scripts/generate_seed_data.py
+   ```
+
+4. **Ingest data into PostgreSQL:**
+   
+   GraphRAG data is pre-ingested in `data/output/`. You only need to ingest into PostgreSQL:
+   ```bash
+   python data_ingestion/postgres_ingestion.py
+   ```
+   
+   Or to re-run full dual ingestion pipeline:
    ```bash
    python data_ingestion/ingestion_pipeline.py
    ```
