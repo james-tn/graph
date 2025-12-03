@@ -327,9 +327,10 @@ graph TB
    CREATE EXTENSION age;           -- Apache AGE for graph queries
    CREATE EXTENSION pg_trgm;       -- Full-text search
    ```
+    - check the `infra` folder for full `azd` deployment options, including Azure PostgresSQL, OpenAI 
 
 2. **Azure OpenAI** deployments:
-   - `gpt-5.1` or `gpt-4` (reasoning)
+   - `gpt-5.1` or `gpt-4.1`
    - `text-embedding-3-small` (embeddings)
 
 3. **Python 3.11+** and **Node.js 20+**
