@@ -44,29 +44,57 @@ class MermaidCorrector:
         Returns:
             Corrected Mermaid code
         """
+        print("=" * 70)
+        print("MERMAID CORRECTION REQUEST")
+        print("=" * 70)
+        print(f"Error message: {error_message}")
+        print(f"\nOriginal code ({len(mermaid_code)} chars):")
+        print(mermaid_code)
+        print("-" * 70)
+        
         system_prompt = """You are a Mermaid diagram syntax expert. Your task is to fix syntax errors in Mermaid diagrams.
 
-Common issues to fix:
-1. Remove HTML tags like <br/>, <b>, <i> - use plain text or Mermaid formatting instead
-2. Quote labels that contain special characters (parentheses, commas, periods, colons, arrows, pipes, etc.)
-3. Use valid node IDs (alphanumeric, underscore, hyphen only)
-4. Ensure proper Mermaid syntax for the diagram type (graph, flowchart, sequenceDiagram, etc.)
-5. Fix arrow syntax and connection formatting
-6. Escape or quote special characters properly
+CRITICAL RULES FOR MERMAID SYNTAX:
 
-CRITICAL: When node labels contain parentheses, commas, periods, or other special characters, you MUST wrap the entire label in double quotes.
+1. **Node Labels with Special Characters MUST BE QUOTED:**
+   - If a label contains: ( ) , . : | & " or any special character
+   - Wrap the ENTIRE label in double quotes
+   - Use this format: NodeID["Label text with (special) chars"]
+   
+2. **MindMap Syntax (starts with `mindmap`):**
+   - Root node and child nodes must be on separate lines
+   - Indent child nodes with spaces (2 spaces per level)
+   - NO quotes around node text in mindmaps
+   - Format: 
+     ```
+     mindmap
+       root((Root))
+         Child1
+           Subchild1
+         Child2
+     ```
 
-Examples:
-- WRONG: A[Prime Vendor (Gamma, Horizon, etc.)]
-- RIGHT: A["Prime Vendor (Gamma, Horizon, etc.)"]
+3. **Graph/Flowchart Syntax:**
+   - Node format: NodeID[Label] or NodeID["Label with (special) chars"]
+   - Connection format: A --> B or A -->|"label text"| B
+   - Arrow labels with special chars must be quoted: -->|"text (with) chars"|
 
-- WRONG: B[Pre-Existing IP (Sec. 6.3)]
-- RIGHT: B["Pre-Existing IP (Sec. 6.3)"]
+4. **Common Errors to Fix:**
+   - "Expecting 'SPACELINE', 'NL', 'EOF', got 'NODE_ID'" → Missing quotes around labels with parentheses
+   - "Expecting 'AMP', 'COLON', got 'STR'" → Arrow label needs quotes
+   - Remove ALL HTML tags (<br/>, <b>, <i>, etc.) - use plain text only
 
-- WRONG: participant Vendor as Prime Vendor (Gamma, Horizon)
-- RIGHT: participant Vendor as "Prime Vendor (Gamma, Horizon)"
+**Examples:**
+WRONG: A[Service (data, APIs, hardware)]
+RIGHT:  A["Service (data, APIs, hardware)"]
 
-Return ONLY the corrected Mermaid code, nothing else. Do not include markdown code fences or explanations."""
+WRONG: A -->|backed by| Service Levels & DR\nCapabilities
+RIGHT:  A -->|"backed by"| B["Service Levels & DR Capabilities"]
+
+WRONG: participant User as Prime Vendor (Gamma)
+RIGHT:  participant User as "Prime Vendor (Gamma)"
+
+Return ONLY the corrected Mermaid code. No markdown fences, no explanations."""
 
         user_prompt = f"""Fix this Mermaid diagram that has the following validation error:
 
@@ -80,6 +108,7 @@ Original Mermaid code:
 Return only the corrected Mermaid code without any explanation, comments, or markdown formatting."""
 
         try:
+            print("Calling LLM for Mermaid correction...")
             response = self.openai_client.chat.completions.create(
                 model=self.llm_model,
                 messages=[
@@ -94,10 +123,15 @@ Return only the corrected Mermaid code without any explanation, comments, or mar
             corrected_code = re.sub(r'^```(?:mermaid)?\s*\n?', '', corrected_code)
             corrected_code = re.sub(r'\n?```\s*$', '', corrected_code)
             
+            print(f"\nCorrected code ({len(corrected_code)} chars):")
+            print(corrected_code)
+            print("=" * 70)
+            
             return corrected_code
             
         except Exception as e:
-            print(f"Error calling OpenAI for correction: {e}")
+            print(f"ERROR calling OpenAI for correction: {e}")
+            print("=" * 70)
             # Return original code if correction fails
             return mermaid_code
 

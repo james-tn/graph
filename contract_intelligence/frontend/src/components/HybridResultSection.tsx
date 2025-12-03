@@ -31,18 +31,26 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
   const [correctedChart, setCorrectedChart] = React.useState<string>(chart);
   const [isFixing, setIsFixing] = React.useState(false);
   const [fixAttempts, setFixAttempts] = React.useState(0);
+  const [hasError, setHasError] = React.useState(false);
   const maxAttempts = 3;
 
-  const fixMermaidDiagram = async (code: string, errorMsg: string) => {
-    if (fixAttempts >= maxAttempts) {
-      console.error('Max correction attempts reached');
+  const fixMermaidDiagram = async (code: string, errorMsg: string, currentAttempt: number) => {
+    console.log(`[fixMermaidDiagram] Called with attempt ${currentAttempt}, max ${maxAttempts}`);
+    
+    if (currentAttempt >= maxAttempts) {
+      console.error('[fixMermaidDiagram] Max correction attempts reached');
       return null;
     }
 
+    console.log('[fixMermaidDiagram] Setting isFixing=true, incrementing fixAttempts');
     setIsFixing(true);
-    setFixAttempts(prev => prev + 1);
+    setFixAttempts(currentAttempt + 1);
 
     try {
+      console.log(`[fixMermaidDiagram] Sending POST to /api/mermaid/fix (attempt ${currentAttempt + 1}/${maxAttempts})`);
+      console.log(`[fixMermaidDiagram] Error message: ${errorMsg}`);
+      console.log(`[fixMermaidDiagram] Code length: ${code.length} chars`);
+      
       const response = await fetch('/api/mermaid/fix', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -52,15 +60,19 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
         })
       });
 
+      console.log(`[fixMermaidDiagram] Response status: ${response.status}`);
+      
       if (!response.ok) {
-        throw new Error('Failed to fix diagram');
+        throw new Error(`Failed to fix diagram: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('[fixMermaidDiagram] Received corrected diagram from backend');
+      console.log(`[fixMermaidDiagram] Corrected code length: ${data.corrected_code?.length || 0} chars`);
       setIsFixing(false);
       return data.corrected_code;
     } catch (error) {
-      console.error('Error fixing diagram:', error);
+      console.error('[fixMermaidDiagram] Error during fix:', error);
       setIsFixing(false);
       return null;
     }
@@ -70,32 +82,62 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
     const renderDiagram = async (diagramCode: string) => {
       if (!ref.current) return;
 
+      // Skip if already showing an error and max attempts reached
+      if (hasError && fixAttempts >= maxAttempts) {
+        return;
+      }
+
       try {
         // Generate a valid DOM ID (must start with letter, no dots)
         const id = `mermaid-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
         
+        console.log('Attempting to render Mermaid diagram...');
         const { svg } = await mermaid.render(id, diagramCode);
         
         if (ref.current) {
           ref.current.innerHTML = svg;
+          setHasError(false);
+          console.log('Mermaid diagram rendered successfully');
         }
       } catch (error: any) {
         console.error('Mermaid rendering error:', error);
+        console.log('[renderDiagram] Error details:', {
+          message: error?.message,
+          hasError,
+          fixAttempts,
+          maxAttempts,
+          willAttemptFix: fixAttempts < maxAttempts
+        });
+        setHasError(true);
         
         // Try to fix the diagram automatically
         const errorMessage = error?.message || error?.toString() || 'Unknown rendering error';
-        const fixed = await fixMermaidDiagram(diagramCode, errorMessage);
+        console.log(`[renderDiagram] Calling fixMermaidDiagram with attempt ${fixAttempts}...`);
+        const fixed = await fixMermaidDiagram(diagramCode, errorMessage, fixAttempts);
         
-        if (fixed) {
+        console.log('[renderDiagram] fixMermaidDiagram returned:', {
+          hasFixed: !!fixed,
+          isDifferent: fixed !== diagramCode,
+          fixedLength: fixed?.length || 0,
+          originalLength: diagramCode.length
+        });
+        
+        if (fixed && fixed !== diagramCode) {
           // Try rendering the fixed version
+          console.log('[renderDiagram] Applying corrected diagram...');
           setCorrectedChart(fixed);
+          setHasError(false);
         } else if (ref.current) {
           // Show error if fix failed or max attempts reached
           ref.current.innerHTML = `
             <div class="p-4 bg-red-500/10 border border-red-400/30 rounded-lg">
               <p class="text-red-400 font-semibold mb-2">⚠️ Diagram Rendering Failed</p>
-              <p class="text-red-300 text-sm">${errorMessage}</p>
-              ${fixAttempts >= maxAttempts ? '<p class="text-red-300 text-xs mt-2">Max auto-correction attempts reached</p>' : ''}
+              <p class="text-red-300 text-sm mb-2">${errorMessage}</p>
+              ${fixAttempts >= maxAttempts ? '<p class="text-red-300 text-xs mt-2">Max auto-correction attempts reached (3 attempts)</p>' : ''}
+              <details class="mt-3">
+                <summary class="text-red-300 text-xs cursor-pointer hover:text-red-200">View diagram code</summary>
+                <pre class="text-red-200 text-xs mt-2 overflow-x-auto bg-red-900/20 p-2 rounded">${diagramCode}</pre>
+              </details>
             </div>
           `;
         }
@@ -107,14 +149,14 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
         ref.current.innerHTML = `
           <div class="p-4 bg-yellow-500/10 border border-yellow-400/30 rounded-lg">
             <p class="text-yellow-400 font-semibold">🔧 Auto-correcting diagram...</p>
-            <p class="text-yellow-300 text-sm mt-1">Attempt ${fixAttempts} of ${maxAttempts}</p>
+            <p class="text-yellow-300 text-sm mt-1">Attempt ${fixAttempts + 1} of ${maxAttempts}</p>
           </div>
         `;
       } else {
         renderDiagram(correctedChart);
       }
     }
-  }, [correctedChart, isFixing]);
+  }, [correctedChart, isFixing, fixAttempts, hasError]);
 
   return <div ref={ref} className="my-6 flex justify-center" />;
 };

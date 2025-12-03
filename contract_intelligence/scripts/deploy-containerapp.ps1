@@ -135,7 +135,7 @@ $imageTag = "$acrLoginServer/${ImageRepository}:$timestamp"
 if ($UseLocalDockerBuild) {
     Write-Host "Building image '$imageTag' locally with Docker..."
     Invoke-AzCli @('acr', 'login', '--name', $AcrName) | Out-Null
-    Invoke-LocalCommand -Executable 'docker' -Arguments @('build', '--file', 'Dockerfile', '--tag', $imageTag, '.') | Out-Null
+    Invoke-LocalCommand -Executable 'docker' -Arguments @('build', '--no-cache', '--file', 'Dockerfile', '--tag', $imageTag, '.') | Out-Null
     Write-Host "Pushing '$imageTag' to $acrLoginServer via docker push..."
     Invoke-LocalCommand -Executable 'docker' -Arguments @('push', $imageTag) | Out-Null
 } else {

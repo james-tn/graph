@@ -109,7 +109,7 @@ async def query_contracts(
             request.query,
             force_strategy=strategy_map.get(request.strategy)
         )
-        
+        print("result\n", result)
         return QueryResponse(**result)
     
     except Exception as e:
@@ -188,10 +188,20 @@ async def fix_mermaid_diagram(
     - **error_message**: Error message from frontend rendering attempt
     """
     try:
+        print("\n" + "=" * 70)
+        print("RECEIVED MERMAID FIX REQUEST")
+        print("=" * 70)
+        print(f"Error from frontend: {request.error_message}")
+        print(f"Code length: {len(request.mermaid_code)} chars")
+        
         corrected = correct_mermaid_diagram(
             request.mermaid_code,
             request.error_message
         )
+        
+        success = corrected != request.mermaid_code
+        print(f"Correction successful: {success}")
+        print("=" * 70 + "\n")
         
         return MermaidCorrectionResponse(
             corrected_code=corrected,
