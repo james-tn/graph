@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../agent-framework"
+		},
+		{
+			"path": "../../Users/janguy/OneDrive - Microsoft/Documents/projects/developments/OpenAIWorkshop"
 		}
 	],
 	"settings": {}

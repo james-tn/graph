@@ -289,7 +289,7 @@ graph TB
     end
     
     subgraph "AI Services"
-        Azure["Azure OpenAI<br/>GPT-4o + Embeddings"]
+        Azure["Azure OpenAI<br/>gpt-5.1 + Embeddings"]
     end
     
     UI --> Router
@@ -329,7 +329,7 @@ graph TB
    ```
 
 2. **Azure OpenAI** deployments:
-   - `gpt-4o` or `gpt-4` (reasoning)
+   - `gpt-5.1` or `gpt-4` (reasoning)
    - `text-embedding-3-small` (embeddings)
 
 3. **Python 3.11+** and **Node.js 20+**
@@ -426,7 +426,7 @@ erDiagram
 | **Vector Search** | pgvector | Semantic matching |
 | **Graph Queries** | Apache AGE | Relationship traversal |
 | **Knowledge Graph** | Microsoft GraphRAG | Pattern discovery |
-| **LLM** | Azure OpenAI GPT-4o | Natural language |
+| **LLM** | Azure OpenAI gpt-5.1 | Natural language |
 | **Embeddings** | text-embedding-3-small | Vectors |
 | **Deployment** | Azure Container Apps | Hosting |
 
