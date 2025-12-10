@@ -289,7 +289,7 @@ graph TB
     end
     
     subgraph "AI Services"
-        Azure["Azure OpenAI<br/>GPT-4o + Embeddings"]
+        Azure["Azure OpenAI<br/>gpt-5.1 + Embeddings"]
     end
     
     UI --> Router
@@ -329,7 +329,7 @@ graph TB
    ```
 
 2. **Azure OpenAI** deployments:
-   - `gpt-4o` or `gpt-4` (reasoning)
+   - `gpt-5.1` or `gpt-4` (reasoning)
    - `text-embedding-3-small` (embeddings)
 
 3. **Python 3.11+** and **Node.js 20+**
@@ -548,21 +548,89 @@ graph LR
 **Graph Capabilities:**
 
 🔗 **Multi-Hop Traversal Examples:**
+
 ```cypher
-// Find all high-risk obligations for a party
+// 1. Find all high-impact obligations for Quantum Labs (top obligation holder)
 MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
-WHERE p.name =~ '.*Acme.*' AND o.is_high_impact = true
-RETURN p.name, c.reference_number, cl.section_label, o.description
+WHERE p.name = 'Quantum Labs' AND o.is_high_impact = true
+RETURN p.name, c.reference_number, cl.section_label, o.description, o.due_date
+LIMIT 20
 
-// Trace contract hierarchy with financial terms
-MATCH (parent:Contract)<-[:SOW_OF]-(child:Contract)-[:HAS_VALUE]->(mv:MonetaryValue)
-WHERE parent.reference_number = 'MSA-ABC-001'
-RETURN parent.title, child.reference_number, mv.amount, mv.currency
+// 2. Trace Zenith Technologies MSA contract family with all financial values
+MATCH (parent:Contract)<-[:SOW_OF|AMENDS|ADDENDUM_TO|WORK_ORDER_OF*1..2]-(child:Contract)
+OPTIONAL MATCH (child)-[:HAS_VALUE]->(mv:MonetaryValue)
+WHERE parent.reference_number = 'MSA-ZEN-202403-197'
+RETURN parent.title, child.reference_number, child.contract_type, 
+       mv.amount, mv.currency, mv.value_type
+ORDER BY child.contract_type
 
-// Find parties connected through shared risks
-MATCH (p1:Party)-[:IS_PARTY_TO]->(c:Contract)-[:HAS_RISK]->(r:Risk)<-[:HAS_RISK]-(c2:Contract)<-[:IS_PARTY_TO]-(p2:Party)
-WHERE r.risk_level = 'high'
-RETURN p1.name, p2.name, r.risk_type, count(r) as shared_risk_count
+// 3. Find all parties connected to Phoenix Industries through shared contracts
+MATCH (p1:Party {name: 'Phoenix Industries'})-[:IS_PARTY_TO]->(c:Contract)<-[:IS_PARTY_TO]-(p2:Party)
+WHERE p1 <> p2
+RETURN p1.name, p2.name, count(c) as shared_contracts, 
+       collect(c.reference_number)[0..5] as sample_contracts
+ORDER BY shared_contracts DESC
+LIMIT 10
+
+// 4. Discover high-risk clauses and their responsible parties in active contracts
+MATCH (c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
+MATCH (p:Party)-[:RESPONSIBLE_FOR]->(o)
+WHERE c.status = 'active' AND cl.risk_level = 'high'
+RETURN c.reference_number, c.title, cl.section_label, cl.clause_type_id,
+       p.name as responsible_party, o.description, o.is_high_impact
+LIMIT 20
+
+// 5. Find all payment terms and monetary values for Contoso Enterprises contracts
+MATCH (p:Party {name: 'Contoso Enterprises'})-[:IS_PARTY_TO]->(c:Contract)
+MATCH (c)-[:CONTAINS_CLAUSE]->(cl:Clause)
+OPTIONAL MATCH (cl)-[:HAS_VALUE]->(mv:MonetaryValue)
+WHERE cl.clause_type_id = 'Payment Terms'
+RETURN c.reference_number, c.contract_type, cl.section_label, 
+       mv.amount, mv.currency, mv.value_type
+ORDER BY mv.amount DESC
+LIMIT 20
+
+// 6. Analyze Data Processing Agreement DPA-SUM-202502-324 family tree depth
+MATCH path = (root:Contract {reference_number: 'DPA-SUM-202502-324'})
+             <-[:AMENDS|ADDENDUM_TO|WORK_ORDER_OF*]-(descendant:Contract)
+RETURN root.title, descendant.reference_number, descendant.contract_type,
+       length(path) as hierarchy_depth,
+       [rel in relationships(path) | type(rel)] as relationship_chain
+ORDER BY hierarchy_depth, descendant.contract_type
+
+// 7. Find rights granted to Atlas Ventures and their expiration dates
+MATCH (p:Party {name: 'Atlas Ventures'})-[:IS_PARTY_TO]->(c:Contract)
+MATCH (c)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:GRANTS_RIGHT]->(r:Right)
+MATCH (p)-[:HOLDS_RIGHT]->(r)
+RETURN c.reference_number, c.contract_type, cl.section_label, 
+       r.description, r.expiration_date
+ORDER BY r.expiration_date
+LIMIT 20
+
+// 8. Map all vendors with California governing law and their risk exposure
+MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:HAS_RISK]->(r:Risk)
+WHERE c.governing_law = 'California' AND r.risk_level = 'high'
+RETURN p.name, p.party_type, count(DISTINCT c) as contract_count,
+       count(r) as high_risk_count, collect(DISTINCT r.risk_type)[0..3] as risk_types
+ORDER BY high_risk_count DESC
+LIMIT 10
+
+// 9. Find all defined terms in Intellectual Property clauses across portfolio
+MATCH (c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:DEFINES_TERM]->(t:Term)
+WHERE cl.clause_type_id = 'Intellectual Property'
+RETURN c.reference_number, c.contract_type, cl.section_label,
+       t.term_name, t.definition
+LIMIT 20
+
+// 10. Identify amendment chains for any Master Services Agreement
+MATCH path = (msa:Contract {contract_type: 'Master Services Agreement'})
+             <-[:AMENDS*]-(amd:Contract)
+WHERE msa.status = 'active'
+RETURN msa.reference_number, msa.title,
+       length(path) as amendment_depth,
+       collect(amd.reference_number) as amendment_chain
+ORDER BY amendment_depth DESC
+LIMIT 10
 ```
 
 **Node Types (9):** Contract, Party, Clause, Obligation, Right, Term, MonetaryValue, Risk, Condition
@@ -589,7 +657,7 @@ RETURN p1.name, p2.name, r.risk_type, count(r) as shared_risk_count
 | **Vector Search** | pgvector | Semantic matching |
 | **Graph Queries** | Apache AGE | Relationship traversal |
 | **Knowledge Graph** | Microsoft GraphRAG | Pattern discovery |
-| **LLM** | Azure OpenAI GPT-4o | Natural language |
+| **LLM** | Azure OpenAI gpt-5.1 | Natural language |
 | **Embeddings** | text-embedding-3-small | Vectors |
 | **Deployment** | Azure Container Apps | Hosting |
 

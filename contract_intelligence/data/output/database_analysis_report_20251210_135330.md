@@ -1,6 +1,6 @@
 # Contract Intelligence Database Analysis Report
 
-**Generated:** 2025-11-29 11:32:15
+**Generated:** 2025-12-10 13:53:30
 
 **Database:** cipgraph
 
@@ -291,4 +291,4 @@ pie title Clause Risk Distribution
 - Full-text search vectors created for keyword matching
 - Graph relationships established for multi-hop reasoning
 
-*Report generated automatically on 2025-11-29 at 11:32:15*
+*Report generated automatically on 2025-12-10 at 13:53:30*
