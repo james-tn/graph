@@ -404,6 +404,8 @@ npm run dev
 
 ## 📊 Database Schema
 
+### PostgreSQL Relational Schema
+
 ```mermaid
 erDiagram
     CONTRACTS ||--o{ CONTRACT_RELATIONSHIPS : "parent/child"
@@ -414,6 +416,10 @@ erDiagram
     
     CLAUSES ||--o{ OBLIGATIONS : defines
     CLAUSES ||--o{ RIGHTS : grants
+    CLAUSES ||--o{ TERMS : defines_terms
+    CLAUSES ||--o{ MONETARY_VALUES : clause_values
+    CLAUSES ||--o{ RISKS : clause_risks
+    CLAUSES ||--o{ CONDITIONS : has_conditions
     
     PARTIES ||--o{ PARTIES_CONTRACTS : participates
     PARTIES ||--o{ OBLIGATIONS : responsible
@@ -436,7 +442,138 @@ erDiagram
         string risk_level
         vector embedding
     }
+    
+    OBLIGATIONS {
+        uuid id PK
+        uuid clause_id FK
+        text description
+        uuid responsible_party_id FK
+        date due_date
+        boolean is_high_impact
+    }
+    
+    RIGHTS {
+        uuid id PK
+        uuid clause_id FK
+        text description
+        uuid holder_party_id FK
+        date expiration_date
+    }
+    
+    TERMS {
+        uuid id PK
+        uuid clause_id FK
+        string term_name
+        text definition
+    }
+    
+    MONETARY_VALUES {
+        uuid id PK
+        uuid contract_id FK
+        uuid clause_id FK
+        decimal amount
+        string currency
+        string value_type
+    }
+    
+    RISKS {
+        uuid id PK
+        uuid contract_id FK
+        uuid clause_id FK
+        string risk_type
+        string risk_level
+        text rationale
+    }
+    
+    CONDITIONS {
+        uuid id PK
+        uuid clause_id FK
+        string condition_type
+        text description
+    }
 ```
+
+### Apache AGE Graph Schema
+
+The graph layer provides multi-hop relationship traversal across the contract intelligence domain:
+
+```mermaid
+graph LR
+    subgraph "Core Entities"
+        Contract["📋 Contract<br/>reference_number<br/>title<br/>contract_type<br/>status"]
+        Party["👤 Party<br/>name<br/>party_type"]
+        Clause["📄 Clause<br/>section_label<br/>title<br/>risk_level"]
+    end
+    
+    subgraph "Obligations & Rights"
+        Obligation["⚖️ Obligation<br/>description<br/>due_date<br/>is_high_impact"]
+        Right["✅ Right<br/>description<br/>expiration_date"]
+    end
+    
+    subgraph "Terms & Definitions"
+        Term["📖 Term<br/>term_name<br/>definition"]
+    end
+    
+    subgraph "Financial & Risk"
+        MonetaryValue["💰 MonetaryValue<br/>amount<br/>currency<br/>value_type"]
+        Risk["⚠️ Risk<br/>risk_type<br/>risk_level<br/>rationale"]
+        Condition["🔒 Condition<br/>condition_type<br/>description"]
+    end
+    
+    Party -->|IS_PARTY_TO| Contract
+    Contract -->|CONTAINS_CLAUSE| Clause
+    Clause -->|IMPOSES_OBLIGATION| Obligation
+    Party -->|RESPONSIBLE_FOR| Obligation
+    Clause -->|GRANTS_RIGHT| Right
+    Party -->|HOLDS_RIGHT| Right
+    Clause -->|DEFINES_TERM| Term
+    Contract -->|HAS_VALUE| MonetaryValue
+    Clause -->|HAS_VALUE| MonetaryValue
+    Contract -->|HAS_RISK| Risk
+    Clause -->|HAS_RISK| Risk
+    Contract -->|AMENDS<br/>SOW_OF<br/>ADDENDUM_TO<br/>WORK_ORDER_OF| Contract
+    Clause -->|HAS_CONDITION| Condition
+    
+    style Contract fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    style Party fill:#fff4e6,stroke:#ff9800,stroke-width:2px
+    style Clause fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+    style Obligation fill:#ffebee,stroke:#c62828,stroke-width:2px
+    style Right fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Term fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style MonetaryValue fill:#e0f2f1,stroke:#00695c,stroke-width:2px
+    style Risk fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    style Condition fill:#f1f8e9,stroke:#558b2f,stroke-width:2px
+```
+
+**Graph Capabilities:**
+
+🔗 **Multi-Hop Traversal Examples:**
+```cypher
+// Find all high-risk obligations for a party
+MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
+WHERE p.name =~ '.*Acme.*' AND o.is_high_impact = true
+RETURN p.name, c.reference_number, cl.section_label, o.description
+
+// Trace contract hierarchy with financial terms
+MATCH (parent:Contract)<-[:SOW_OF]-(child:Contract)-[:HAS_VALUE]->(mv:MonetaryValue)
+WHERE parent.reference_number = 'MSA-ABC-001'
+RETURN parent.title, child.reference_number, mv.amount, mv.currency
+
+// Find parties connected through shared risks
+MATCH (p1:Party)-[:IS_PARTY_TO]->(c:Contract)-[:HAS_RISK]->(r:Risk)<-[:HAS_RISK]-(c2:Contract)<-[:IS_PARTY_TO]-(p2:Party)
+WHERE r.risk_level = 'high'
+RETURN p1.name, p2.name, r.risk_type, count(r) as shared_risk_count
+```
+
+**Node Types (9):** Contract, Party, Clause, Obligation, Right, Term, MonetaryValue, Risk, Condition
+
+**Edge Types (15):** IS_PARTY_TO, CONTAINS_CLAUSE, IMPOSES_OBLIGATION, RESPONSIBLE_FOR, GRANTS_RIGHT, HOLDS_RIGHT, DEFINES_TERM, HAS_VALUE, HAS_RISK, HAS_CONDITION, AMENDS, SOW_OF, ADDENDUM_TO, WORK_ORDER_OF, RELATED_TO
+
+**Key Graph Features:**
+- ✅ All nodes have `db_id` property linking back to PostgreSQL primary keys
+- ✅ Bidirectional queries: Start from any entity and traverse relationships
+- ✅ Flexible patterns: Find paths, count hops, filter by properties
+- ✅ Contract families: AMENDS, SOW_OF, ADDENDUM_TO relationships preserve hierarchy
 
 ---
 
