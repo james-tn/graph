@@ -271,26 +271,38 @@ def create_term_nodes(cur, conn):
     """)
     terms = cur.fetchall()
     
-    count = 0
-    for term in terms:
-        term_name = term['term_name'].replace("'", "\\'")[:50]
-        definition = (term['definition_text'] or '').replace("'", "\\'")[:200]
-        
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            CREATE (t:Term {{
-                db_id: {term['id']},
-                contract_db_id: {term['contract_id']},
-                name: '{term_name}',
-                definition: '{definition}'
-            }})
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-        count += 1
+    if not terms:
+        print("  ✓ No terms to create")
+        return
     
-    conn.commit()
+    count = 0
+    batch_size = 50
+    
+    for i in range(0, len(terms), batch_size):
+        batch = terms[i:i+batch_size]
+        
+        for term in batch:
+            term_name = term['term_name'].replace("'", "\\'")[:50]
+            definition = (term['definition_text'] or '').replace("'", "\\'")[:200]
+            
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                CREATE (t:Term {{
+                    db_id: {term['id']},
+                    contract_db_id: {term['contract_id']},
+                    name: '{term_name}',
+                    definition: '{definition}'
+                }})
+            $$) as (result agtype);
+            """
+            
+            execute_age_query(cur, cypher)
+            count += 1
+        
+        conn.commit()
+        if count % 100 == 0 and count < len(terms):
+            print(f"    Created {count}/{len(terms)} terms...")
+    
     print(f"  ✓ Created {count} Term nodes")
 
 
@@ -305,30 +317,42 @@ def create_monetary_value_nodes(cur, conn):
     """)
     monetary_values = cur.fetchall()
     
-    count = 0
-    for mv in monetary_values:
-        value_type = (mv['value_type'] or 'Unknown').replace("'", "\\'")[:100]
-        context = (mv['context'] or '').replace("'", "\\'")[:200]
-        
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            CREATE (m:MonetaryValue {{
-                db_id: {mv['id']},
-                contract_db_id: {mv['contract_id']},
-                clause_db_id: {mv['clause_id'] or 'null'},
-                amount: {mv['amount']},
-                currency: '{mv['currency']}',
-                value_type: '{value_type}',
-                context: '{context}',
-                multiple_of_fees: {mv['multiple_of_fees'] or 'null'}
-            }})
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-        count += 1
+    if not monetary_values:
+        print("  ✓ No monetary values to create")
+        return
     
-    conn.commit()
+    count = 0
+    batch_size = 50
+    
+    for i in range(0, len(monetary_values), batch_size):
+        batch = monetary_values[i:i+batch_size]
+        
+        for mv in batch:
+            value_type = (mv['value_type'] or 'Unknown').replace("'", "\\'")[:100]
+            context = (mv['context'] or '').replace("'", "\\'")[:200]
+            
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                CREATE (m:MonetaryValue {{
+                    db_id: {mv['id']},
+                    contract_db_id: {mv['contract_id']},
+                    clause_db_id: {mv['clause_id'] or 'null'},
+                    amount: {mv['amount']},
+                    currency: '{mv['currency']}',
+                    value_type: '{value_type}',
+                    context: '{context}',
+                    multiple_of_fees: {mv['multiple_of_fees'] or 'null'}
+                }})
+            $$) as (result agtype);
+            """
+            
+            execute_age_query(cur, cypher)
+            count += 1
+        
+        conn.commit()
+        if count % 100 == 0 and count < len(monetary_values):
+            print(f"    Created {count}/{len(monetary_values)} monetary values...")
+    
     print(f"  ✓ Created {count} MonetaryValue nodes")
 
 
@@ -343,30 +367,42 @@ def create_risk_nodes(cur, conn):
     """)
     risks = cur.fetchall()
     
-    count = 0
-    for risk in risks:
-        risk_type = (risk['risk_type_custom'] or 'Unknown').replace("'", "\\'")[:100]
-        rationale = (risk['rationale'] or '').replace("'", "\\'")[:200]
-        detected_by = (risk['detected_by'] or 'System').replace("'", "\\'")
-        
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            CREATE (r:Risk {{
-                db_id: {risk['id']},
-                contract_db_id: {risk['contract_id']},
-                clause_db_id: {risk['clause_id'] or 'null'},
-                risk_type: '{risk_type}',
-                risk_level: '{risk['risk_level']}',
-                rationale: '{rationale}',
-                detected_by: '{detected_by}'
-            }})
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-        count += 1
+    if not risks:
+        print("  ✓ No risks to create")
+        return
     
-    conn.commit()
+    count = 0
+    batch_size = 50
+    
+    for i in range(0, len(risks), batch_size):
+        batch = risks[i:i+batch_size]
+        
+        for risk in batch:
+            risk_type = (risk['risk_type_custom'] or 'Unknown').replace("'", "\\'")[:100]
+            rationale = (risk['rationale'] or '').replace("'", "\\'")[:200]
+            detected_by = (risk['detected_by'] or 'System').replace("'", "\\'")
+            
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                CREATE (r:Risk {{
+                    db_id: {risk['id']},
+                    contract_db_id: {risk['contract_id']},
+                    clause_db_id: {risk['clause_id'] or 'null'},
+                    risk_type: '{risk_type}',
+                    risk_level: '{risk['risk_level']}',
+                    rationale: '{rationale}',
+                    detected_by: '{detected_by}'
+                }})
+            $$) as (result agtype);
+            """
+            
+            execute_age_query(cur, cypher)
+            count += 1
+        
+        conn.commit()
+        if count % 100 == 0 and count < len(risks):
+            print(f"    Created {count}/{len(risks)} risks...")
+    
     print(f"  ✓ Created {count} Risk nodes")
 
 
@@ -380,25 +416,37 @@ def create_condition_nodes(cur, conn):
     """)
     conditions = cur.fetchall()
     
-    count = 0
-    for condition in conditions:
-        description = (condition['description'] or '').replace("'", "\\'")[:200]
-        trigger = (condition['trigger_event'] or '').replace("'", "\\'")[:200]
-        
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            CREATE (c:Condition {{
-                db_id: {condition['id']},
-                description: '{description}',
-                trigger_event: '{trigger}'
-            }})
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-        count += 1
+    if not conditions:
+        print("  ✓ No conditions to create")
+        return
     
-    conn.commit()
+    count = 0
+    batch_size = 50
+    
+    for i in range(0, len(conditions), batch_size):
+        batch = conditions[i:i+batch_size]
+        
+        for condition in batch:
+            description = (condition['description'] or '').replace("'", "\\'")[:200]
+            trigger = (condition['trigger_event'] or '').replace("'", "\\'")[:200]
+            
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                CREATE (c:Condition {{
+                    db_id: {condition['id']},
+                    description: '{description}',
+                    trigger_event: '{trigger}'
+                }})
+            $$) as (result agtype);
+            """
+            
+            execute_age_query(cur, cypher)
+            count += 1
+        
+        conn.commit()
+        if count % 100 == 0 and count < len(conditions):
+            print(f"    Created {count}/{len(conditions)} conditions...")
+    
     print(f"  ✓ Created {count} Condition nodes")
 
 
@@ -758,6 +806,10 @@ def main():
     cur.execute("SET search_path = ag_catalog, '$user', public;")
     conn.commit()
     print("✓ AGE ready")
+    
+    # Create graph
+    create_graph(cur, conn)
+    
     # Create nodes
     create_contract_nodes(cur, conn)
     create_party_nodes(cur, conn)
@@ -768,10 +820,6 @@ def main():
     create_monetary_value_nodes(cur, conn)
     create_risk_nodes(cur, conn)
     create_condition_nodes(cur, conn)
-    
-    # Create relationships
-    create_relationships(cur, conn)
-    create_term_nodes(cur, conn)
     
     # Create relationships
     create_relationships(cur, conn)
