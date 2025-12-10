@@ -389,7 +389,7 @@ graph TB
 
 **Backend (Terminal 1):**
 ```bash
-start_backend.bat  # or: uvicorn backend.app.main:app --reload
+uvicorn backend.app.main:app --reload
 ```
 
 **Frontend (Terminal 2):**

@@ -741,8 +741,8 @@ Identify common vendor subcontractor patterns
 ### Local Development
 
 ```bash
-# Backend
-start_backend.bat
+uvicorn backe
+nd.app.main:app --reload
 
 # Frontend
 cd frontend
