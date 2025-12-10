@@ -118,26 +118,38 @@ def create_party_nodes(cur, conn):
     """)
     parties = cur.fetchall()
     
-    count = 0
-    for party in parties:
-        party_name = party['name'].replace("'", "\\'")
-        
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            CREATE (p:Party {{
-                db_id: {party['id']},
-                name: '{party_name}',
-                type: '{party['party_type'] or 'Unknown'}',
-                address: '{(party['address'] or '').replace("'", "\\'")[:100]}',
-                jurisdiction: '{party['jurisdiction_name'] or ''}'
-            }})
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-        count += 1
+    if not parties:
+        print("  ✓ No parties to create")
+        return
     
-    conn.commit()
+    count = 0
+    batch_size = 50
+    
+    for i in range(0, len(parties), batch_size):
+        batch = parties[i:i+batch_size]
+        
+        for party in batch:
+            party_name = party['name'].replace("'", "\\'")
+            
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                CREATE (p:Party {{
+                    db_id: {party['id']},
+                    name: '{party_name}',
+                    type: '{party['party_type'] or 'Unknown'}',
+                    address: '{(party['address'] or '').replace("'", "\\'")[:100]}',
+                    jurisdiction: '{party['jurisdiction_name'] or ''}'
+                }})
+            $$) as (result agtype);
+            """
+            
+            execute_age_query(cur, cypher)
+            count += 1
+        
+        conn.commit()
+        if count % 100 == 0 and count < len(parties):
+            print(f"    Created {count}/{len(parties)} parties...")
+    
     print(f"  ✓ Created {count} Party nodes")
 
 
@@ -201,29 +213,41 @@ def create_obligation_nodes(cur, conn):
     """)
     obligations = cur.fetchall()
     
-    count = 0
-    for obligation in obligations:
-        description = obligation['description'].replace("'", "\\'")[:200]
-        penalty = (obligation['penalty_description'] or '').replace("'", "\\'")[:100]
-        
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            CREATE (o:Obligation {{
-                db_id: {obligation['id']},
-                clause_db_id: {obligation['clause_id']},
-                description: '{description}',
-                responsible_party_db_id: {obligation['responsible_party_id'] or 'null'},
-                beneficiary_party_db_id: {obligation['beneficiary_party_id'] or 'null'},
-                penalty: '{penalty}',
-                is_high_impact: {str(obligation['is_high_impact']).lower()}
-            }})
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-        count += 1
+    if not obligations:
+        print("  ✓ No obligations to create")
+        return
     
-    conn.commit()
+    count = 0
+    batch_size = 50
+    
+    for i in range(0, len(obligations), batch_size):
+        batch = obligations[i:i+batch_size]
+        
+        for obligation in batch:
+            description = obligation['description'].replace("'", "\\'")[:200]
+            penalty = (obligation['penalty_description'] or '').replace("'", "\\'")[:100]
+            
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                CREATE (o:Obligation {{
+                    db_id: {obligation['id']},
+                    clause_db_id: {obligation['clause_id']},
+                    description: '{description}',
+                    responsible_party_db_id: {obligation['responsible_party_id'] or 'null'},
+                    beneficiary_party_db_id: {obligation['beneficiary_party_id'] or 'null'},
+                    penalty: '{penalty}',
+                    is_high_impact: {str(obligation['is_high_impact']).lower()}
+                }})
+            $$) as (result agtype);
+            """
+            
+            execute_age_query(cur, cypher)
+            count += 1
+        
+        conn.commit()
+        if count % 100 == 0 and count < len(obligations):
+            print(f"    Created {count}/{len(obligations)} obligations...")
+    
     print(f"  ✓ Created {count} Obligation nodes")
 
 
@@ -237,27 +261,39 @@ def create_right_nodes(cur, conn):
     """)
     rights = cur.fetchall()
     
-    count = 0
-    for right in rights:
-        description = right['description'].replace("'", "\\'")[:200]
-        condition = (right['condition_description'] or '').replace("'", "\\'")[:100]
-        
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            CREATE (r:Right {{
-                db_id: {right['id']},
-                clause_db_id: {right['clause_id']},
-                description: '{description}',
-                holder_party_db_id: {right['holder_party_id'] or 'null'},
-                condition: '{condition}'
-            }})
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-        count += 1
+    if not rights:
+        print("  ✓ No rights to create")
+        return
     
-    conn.commit()
+    count = 0
+    batch_size = 50
+    
+    for i in range(0, len(rights), batch_size):
+        batch = rights[i:i+batch_size]
+        
+        for right in batch:
+            description = right['description'].replace("'", "\\'")[:200]
+            condition = (right['condition_description'] or '').replace("'", "\\'")[:100]
+            
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                CREATE (r:Right {{
+                    db_id: {right['id']},
+                    clause_db_id: {right['clause_id']},
+                    description: '{description}',
+                    holder_party_db_id: {right['holder_party_id'] or 'null'},
+                    condition: '{condition}'
+                }})
+            $$) as (result agtype);
+            """
+            
+            execute_age_query(cur, cypher)
+            count += 1
+        
+        conn.commit()
+        if count % 100 == 0 and count < len(rights):
+            print(f"    Created {count}/{len(rights)} rights...")
+    
     print(f"  ✓ Created {count} Right nodes")
 
 
@@ -463,59 +499,70 @@ def create_relationships(cur, conn):
     """)
     party_contracts = cur.fetchall()
     
-    for pc in party_contracts:
-        role = (pc['role_name'] or 'Unknown').replace("'", "\\'")
-        
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            MATCH (p:Party {{db_id: {pc['party_id']}}}), 
-                  (c:Contract {{db_id: {pc['contract_id']}}})
-            CREATE (p)-[:IS_PARTY_TO {{role: '{role}'}}]->(c)
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
+    count = 0
+    batch_size = 50
+    for i in range(0, len(party_contracts), batch_size):
+        batch = party_contracts[i:i+batch_size]
+        for pc in batch:
+            role = (pc['role_name'] or 'Unknown').replace("'", "\\'")
+            
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                MATCH (p:Party {{db_id: {pc['party_id']}}}), 
+                      (c:Contract {{db_id: {pc['contract_id']}}})
+                CREATE (p)-[:IS_PARTY_TO {{role: '{role}'}}]->(c)
+            $$) as (result agtype);
+            """
+            
+            execute_age_query(cur, cypher)
+            count += 1
+        conn.commit()
     
-    conn.commit()
-    print(f"    ✓ Created {len(party_contracts)} IS_PARTY_TO edges")
+    print(f"    ✓ Created {count} IS_PARTY_TO edges")
     
     # CONTAINS_CLAUSE relationships
     print("  Creating CONTAINS_CLAUSE edges...")
     cur.execute("SELECT id, contract_id FROM clauses")
     clauses = cur.fetchall()
     
-    for clause in clauses:
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            MATCH (c:Contract {{db_id: {clause['contract_id']}}}), 
-                  (cl:Clause {{db_id: {clause['id']}}})
-            CREATE (c)-[:CONTAINS_CLAUSE]->(cl)
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-    
-    conn.commit()
-    print(f"    ✓ Created {len(clauses)} CONTAINS_CLAUSE edges")
+    count = 0
+    batch_size = 50
+    for i in range(0, len(clauses), batch_size):
+        batch = clauses[i:i+batch_size]
+        for clause in batch:
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                MATCH (c:Contract {{db_id: {clause['contract_id']}}}), 
+                      (cl:Clause {{db_id: {clause['id']}}})
+                CREATE (c)-[:CONTAINS_CLAUSE]->(cl)
+            $$) as (result agtype);
+            """
+            execute_age_query(cur, cypher)
+            count += 1
+        conn.commit()
+    print(f"    ✓ Created {count} CONTAINS_CLAUSE edges")
     
     # IMPOSES_OBLIGATION relationships
     print("  Creating IMPOSES_OBLIGATION edges...")
     cur.execute("SELECT id, clause_id FROM obligations")
     obligations = cur.fetchall()
     
-    for obligation in obligations:
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            MATCH (cl:Clause {{db_id: {obligation['clause_id']}}}), 
-                  (o:Obligation {{db_id: {obligation['id']}}})
-            CREATE (cl)-[:IMPOSES_OBLIGATION]->(o)
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-    
-    conn.commit()
-    print(f"    ✓ Created {len(obligations)} IMPOSES_OBLIGATION edges")
+    count = 0
+    batch_size = 50
+    for i in range(0, len(obligations), batch_size):
+        batch = obligations[i:i+batch_size]
+        for obligation in batch:
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                MATCH (cl:Clause {{db_id: {obligation['clause_id']}}}), 
+                      (o:Obligation {{db_id: {obligation['id']}}})
+                CREATE (cl)-[:IMPOSES_OBLIGATION]->(o)
+            $$) as (result agtype);
+            """
+            execute_age_query(cur, cypher)
+            count += 1
+        conn.commit()
+    print(f"    ✓ Created {count} IMPOSES_OBLIGATION edges")
     
     # RESPONSIBLE_FOR relationships (Party -> Obligation)
     print("  Creating RESPONSIBLE_FOR edges...")
@@ -526,38 +573,44 @@ def create_relationships(cur, conn):
     """)
     responsible = cur.fetchall()
     
-    for obligation in responsible:
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            MATCH (p:Party {{db_id: {obligation['responsible_party_id']}}}), 
-                  (o:Obligation {{db_id: {obligation['id']}}})
-            CREATE (p)-[:RESPONSIBLE_FOR]->(o)
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-    
-    conn.commit()
-    print(f"    ✓ Created {len(responsible)} RESPONSIBLE_FOR edges")
+    count = 0
+    batch_size = 50
+    for i in range(0, len(responsible), batch_size):
+        batch = responsible[i:i+batch_size]
+        for obligation in batch:
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                MATCH (p:Party {{db_id: {obligation['responsible_party_id']}}}), 
+                      (o:Obligation {{db_id: {obligation['id']}}})
+                CREATE (p)-[:RESPONSIBLE_FOR]->(o)
+            $$) as (result agtype);
+            """
+            execute_age_query(cur, cypher)
+            count += 1
+        conn.commit()
+    print(f"    ✓ Created {count} RESPONSIBLE_FOR edges")
     
     # GRANTS_RIGHT relationships
     print("  Creating GRANTS_RIGHT edges...")
     cur.execute("SELECT id, clause_id FROM rights")
     rights = cur.fetchall()
     
-    for right in rights:
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            MATCH (cl:Clause {{db_id: {right['clause_id']}}}), 
-                  (r:Right {{db_id: {right['id']}}})
-            CREATE (cl)-[:GRANTS_RIGHT]->(r)
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-    
-    conn.commit()
-    print(f"    ✓ Created {len(rights)} GRANTS_RIGHT edges")
+    count = 0
+    batch_size = 50
+    for i in range(0, len(rights), batch_size):
+        batch = rights[i:i+batch_size]
+        for right in batch:
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                MATCH (cl:Clause {{db_id: {right['clause_id']}}}), 
+                      (r:Right {{db_id: {right['id']}}})
+                CREATE (cl)-[:GRANTS_RIGHT]->(r)
+            $$) as (result agtype);
+            """
+            execute_age_query(cur, cypher)
+            count += 1
+        conn.commit()
+    print(f"    ✓ Created {count} GRANTS_RIGHT edges")
     
     # HOLDS_RIGHT relationships (Party -> Right)
     print("  Creating HOLDS_RIGHT edges...")
@@ -568,38 +621,44 @@ def create_relationships(cur, conn):
     """)
     holders = cur.fetchall()
     
-    for right in holders:
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            MATCH (p:Party {{db_id: {right['holder_party_id']}}}), 
-                  (r:Right {{db_id: {right['id']}}})
-            CREATE (p)-[:HOLDS_RIGHT]->(r)
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-    
-    conn.commit()
-    print(f"    ✓ Created {len(holders)} HOLDS_RIGHT edges")
+    count = 0
+    batch_size = 50
+    for i in range(0, len(holders), batch_size):
+        batch = holders[i:i+batch_size]
+        for right in batch:
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                MATCH (p:Party {{db_id: {right['holder_party_id']}}}), 
+                      (r:Right {{db_id: {right['id']}}})
+                CREATE (p)-[:HOLDS_RIGHT]->(r)
+            $$) as (result agtype);
+            """
+            execute_age_query(cur, cypher)
+            count += 1
+        conn.commit()
+    print(f"    ✓ Created {count} HOLDS_RIGHT edges")
     
     # DEFINES_TERM relationships
     print("  Creating DEFINES_TERM edges...")
     cur.execute("SELECT id, contract_id FROM term_definitions")
     terms = cur.fetchall()
     
-    for term in terms:
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            MATCH (c:Contract {{db_id: {term['contract_id']}}}), 
-                  (t:Term {{db_id: {term['id']}}})
-            CREATE (c)-[:DEFINES_TERM]->(t)
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-    
-    conn.commit()
-    print(f"    ✓ Created {len(terms)} DEFINES_TERM edges")
+    count = 0
+    batch_size = 50
+    for i in range(0, len(terms), batch_size):
+        batch = terms[i:i+batch_size]
+        for term in batch:
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                MATCH (c:Contract {{db_id: {term['contract_id']}}}), 
+                      (t:Term {{db_id: {term['id']}}})
+                CREATE (c)-[:DEFINES_TERM]->(t)
+            $$) as (result agtype);
+            """
+            execute_age_query(cur, cypher)
+            count += 1
+        conn.commit()
+    print(f"    ✓ Created {count} DEFINES_TERM edges")
     
     # HAS_VALUE relationships (Contract/Clause -> MonetaryValue)
     print("  Creating HAS_VALUE edges...")
@@ -610,30 +669,32 @@ def create_relationships(cur, conn):
     monetary_values = cur.fetchall()
     
     value_count = 0
-    for mv in monetary_values:
-        if mv['clause_id']:
-            # Link from Clause
-            cypher = f"""
-            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-                MATCH (cl:Clause {{db_id: {mv['clause_id']}}}), 
-                      (m:MonetaryValue {{db_id: {mv['id']}}})
-                CREATE (cl)-[:HAS_VALUE]->(m)
-            $$) as (result agtype);
-            """
-            execute_age_query(cur, cypher)
-        else:
-            # Link from Contract (contract-level value)
-            cypher = f"""
-            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-                MATCH (c:Contract {{db_id: {mv['contract_id']}}}), 
-                      (m:MonetaryValue {{db_id: {mv['id']}}})
-                CREATE (c)-[:HAS_VALUE]->(m)
-            $$) as (result agtype);
-            """
-            execute_age_query(cur, cypher)
-        value_count += 1
-    
-    conn.commit()
+    batch_size = 50
+    for i in range(0, len(monetary_values), batch_size):
+        batch = monetary_values[i:i+batch_size]
+        for mv in batch:
+            if mv['clause_id']:
+                # Link from Clause
+                cypher = f"""
+                SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                    MATCH (cl:Clause {{db_id: {mv['clause_id']}}}), 
+                          (m:MonetaryValue {{db_id: {mv['id']}}})
+                    CREATE (cl)-[:HAS_VALUE]->(m)
+                $$) as (result agtype);
+                """
+                execute_age_query(cur, cypher)
+            else:
+                # Link from Contract (contract-level value)
+                cypher = f"""
+                SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                    MATCH (c:Contract {{db_id: {mv['contract_id']}}}), 
+                          (m:MonetaryValue {{db_id: {mv['id']}}})
+                    CREATE (c)-[:HAS_VALUE]->(m)
+                $$) as (result agtype);
+                """
+                execute_age_query(cur, cypher)
+            value_count += 1
+        conn.commit()
     print(f"    ✓ Created {value_count} HAS_VALUE edges")
     
     # HAS_RISK relationships (Contract/Clause -> Risk)
@@ -645,30 +706,32 @@ def create_relationships(cur, conn):
     risks = cur.fetchall()
     
     risk_count = 0
-    for risk in risks:
-        if risk['clause_id']:
-            # Link from Clause
-            cypher = f"""
-            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-                MATCH (cl:Clause {{db_id: {risk['clause_id']}}}), 
-                      (r:Risk {{db_id: {risk['id']}}})
-                CREATE (cl)-[:HAS_RISK]->(r)
-            $$) as (result agtype);
-            """
-            execute_age_query(cur, cypher)
-        else:
-            # Link from Contract
-            cypher = f"""
-            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-                MATCH (c:Contract {{db_id: {risk['contract_id']}}}), 
-                      (r:Risk {{db_id: {risk['id']}}})
-                CREATE (c)-[:HAS_RISK]->(r)
-            $$) as (result agtype);
-            """
-            execute_age_query(cur, cypher)
-        risk_count += 1
-    
-    conn.commit()
+    batch_size = 50
+    for i in range(0, len(risks), batch_size):
+        batch = risks[i:i+batch_size]
+        for risk in batch:
+            if risk['clause_id']:
+                # Link from Clause
+                cypher = f"""
+                SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                    MATCH (cl:Clause {{db_id: {risk['clause_id']}}}), 
+                          (r:Risk {{db_id: {risk['id']}}})
+                    CREATE (cl)-[:HAS_RISK]->(r)
+                $$) as (result agtype);
+                """
+                execute_age_query(cur, cypher)
+            else:
+                # Link from Contract
+                cypher = f"""
+                SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                    MATCH (c:Contract {{db_id: {risk['contract_id']}}}), 
+                          (r:Risk {{db_id: {risk['id']}}})
+                    CREATE (c)-[:HAS_RISK]->(r)
+                $$) as (result agtype);
+                """
+                execute_age_query(cur, cypher)
+            risk_count += 1
+        conn.commit()
     print(f"    ✓ Created {risk_count} HAS_RISK edges")
     
     # Contract relationship edges (MSA -> SOW, amendments, etc.)
@@ -681,33 +744,35 @@ def create_relationships(cur, conn):
     contract_relationships = cur.fetchall()
     
     rel_count = 0
-    for cr in contract_relationships:
-        rel_type = cr['relationship_type'].upper()
-        
-        # Map relationship types to edge labels
-        edge_label_map = {
-            'AMENDMENT': 'AMENDS',
-            'SOW': 'SOW_OF',
-            'ADDENDUM': 'ADDENDUM_TO',
-            'WORK_ORDER': 'WORK_ORDER_OF',
-            'MAINTENANCE': 'MAINTENANCE_OF',
-            'RELATED': 'RELATED_TO'
-        }
-        
-        edge_label = edge_label_map.get(rel_type, 'RELATED_TO')
-        
-        cypher = f"""
-        SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
-            MATCH (child:Contract {{db_id: {cr['child_contract_id']}}}), 
-                  (parent:Contract {{db_id: {cr['parent_contract_id']}}})
-            CREATE (child)-[:{edge_label}]->(parent)
-        $$) as (result agtype);
-        """
-        
-        execute_age_query(cur, cypher)
-        rel_count += 1
-    
-    conn.commit()
+    batch_size = 50
+    for i in range(0, len(contract_relationships), batch_size):
+        batch = contract_relationships[i:i+batch_size]
+        for cr in batch:
+            rel_type = cr['relationship_type'].upper()
+            
+            # Map relationship types to edge labels
+            edge_label_map = {
+                'AMENDMENT': 'AMENDS',
+                'SOW': 'SOW_OF',
+                'ADDENDUM': 'ADDENDUM_TO',
+                'WORK_ORDER': 'WORK_ORDER_OF',
+                'MAINTENANCE': 'MAINTENANCE_OF',
+                'RELATED': 'RELATED_TO'
+            }
+            
+            edge_label = edge_label_map.get(rel_type, 'RELATED_TO')
+            
+            cypher = f"""
+            SELECT * FROM ag_catalog.cypher('{GRAPH_NAME}', $$
+                MATCH (child:Contract {{db_id: {cr['child_contract_id']}}}), 
+                      (parent:Contract {{db_id: {cr['parent_contract_id']}}})
+                CREATE (child)-[:{edge_label}]->(parent)
+            $$) as (result agtype);
+            """
+            
+            execute_age_query(cur, cypher)
+            rel_count += 1
+        conn.commit()
     print(f"    ✓ Created {rel_count} contract relationship edges")
 
 

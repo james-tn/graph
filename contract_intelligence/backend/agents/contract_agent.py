@@ -299,8 +299,40 @@ class ContractAgent:
 
 ### Apache AGE Graph
 Graph: `contract_intelligence`
-Nodes: Contract, Clause, Party, Obligation, Right
-Edges: IS_PARTY_TO, CONTAINS_CLAUSE, IMPOSES_OBLIGATION, GRANTS_RIGHT, HOLDS_RIGHT
+
+**Node Types** (all have `db_id` property linking to PostgreSQL primary key):
+- **Contract**: db_id, reference_number, title, contract_type, status
+- **Party**: db_id, name, party_type
+- **Clause**: db_id, section_label, title, clause_type, risk_level
+- **Obligation**: db_id, description, due_date, is_high_impact
+- **Right**: db_id, description, expiration_date
+- **Term**: db_id, term_name, definition
+- **MonetaryValue**: db_id, amount, currency, value_type
+- **Risk**: db_id, risk_type, risk_level, rationale
+- **Condition**: db_id, condition_type, description
+
+**Relationship Types** (edges):
+- **IS_PARTY_TO**: Party → Contract (links parties to contracts)
+- **CONTAINS_CLAUSE**: Contract → Clause (contract sections)
+- **IMPOSES_OBLIGATION**: Clause → Obligation (contractual duties)
+- **RESPONSIBLE_FOR**: Party → Obligation (who must perform)
+- **GRANTS_RIGHT**: Clause → Right (contractual entitlements)
+- **HOLDS_RIGHT**: Party → Right (who holds the right)
+- **DEFINES_TERM**: Clause → Term (defined terms)
+- **HAS_VALUE**: Contract/Clause → MonetaryValue (financial amounts)
+- **HAS_RISK**: Contract/Clause → Risk (identified risks)
+- **AMENDS**: Contract → Contract (amendment relationships)
+- **SOW_OF**: Contract → Contract (SOW to MSA)
+- **ADDENDUM_TO**: Contract → Contract (addendum relationships)
+- **WORK_ORDER_OF**: Contract → Contract (work order to parent)
+- **MAINTENANCE_OF**: Contract → Contract (maintenance agreement)
+- **RELATED_TO**: Contract → Contract (generic relationships)
+
+**Key Properties for Cypher Queries:**
+- Use `db_id` to match nodes with PostgreSQL data
+- Use case-insensitive regex for text matching: `p.name =~ '(?i).*acme.*'`
+- Filter by node properties: `WHERE c.status = 'active'`, `WHERE cl.risk_level = 'high'`
+- Access properties in RETURN: `RETURN p.name, c.reference_number, cl.risk_level`
 
 ## WHEN TO USE WHICH CAPABILITY
 
