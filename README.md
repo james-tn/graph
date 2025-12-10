@@ -289,7 +289,7 @@ graph TB
     end
     
     subgraph "AI Services"
-        Azure["Azure OpenAI<br/>GPT-4o + Embeddings"]
+        Azure["Azure OpenAI<br/>gpt-5.1 + Embeddings"]
     end
     
     UI --> Router
@@ -329,7 +329,7 @@ graph TB
    ```
 
 2. **Azure OpenAI** deployments:
-   - `gpt-4o` or `gpt-4` (reasoning)
+   - `gpt-5.1` or `gpt-4` (reasoning)
    - `text-embedding-3-small` (embeddings)
 
 3. **Python 3.11+** and **Node.js 20+**
@@ -369,9 +369,20 @@ graph TB
    python data_ingestion/postgres_ingestion.py
    ```
    
+   This will automatically:
+   - Create the PostgreSQL schema with all tables
+   - Extract and ingest contract data using LLM
+   - Build the Apache AGE graph with nodes and relationships
+   - Generate a data exploration report
+   
    Or to re-run full dual ingestion pipeline:
    ```bash
    python data_ingestion/ingestion_pipeline.py
+   ```
+   
+   **Note:** The graph build step is integrated into the ingestion pipeline. If you need to rebuild only the graph (after data updates):
+   ```bash
+   python data_ingestion/build_graph.py
    ```
 
 ### Run the Application
@@ -393,6 +404,8 @@ npm run dev
 
 ## 📊 Database Schema
 
+### PostgreSQL Relational Schema
+
 ```mermaid
 erDiagram
     CONTRACTS ||--o{ CONTRACT_RELATIONSHIPS : "parent/child"
@@ -403,6 +416,10 @@ erDiagram
     
     CLAUSES ||--o{ OBLIGATIONS : defines
     CLAUSES ||--o{ RIGHTS : grants
+    CLAUSES ||--o{ TERMS : defines_terms
+    CLAUSES ||--o{ MONETARY_VALUES : clause_values
+    CLAUSES ||--o{ RISKS : clause_risks
+    CLAUSES ||--o{ CONDITIONS : has_conditions
     
     PARTIES ||--o{ PARTIES_CONTRACTS : participates
     PARTIES ||--o{ OBLIGATIONS : responsible
@@ -425,7 +442,206 @@ erDiagram
         string risk_level
         vector embedding
     }
+    
+    OBLIGATIONS {
+        uuid id PK
+        uuid clause_id FK
+        text description
+        uuid responsible_party_id FK
+        date due_date
+        boolean is_high_impact
+    }
+    
+    RIGHTS {
+        uuid id PK
+        uuid clause_id FK
+        text description
+        uuid holder_party_id FK
+        date expiration_date
+    }
+    
+    TERMS {
+        uuid id PK
+        uuid clause_id FK
+        string term_name
+        text definition
+    }
+    
+    MONETARY_VALUES {
+        uuid id PK
+        uuid contract_id FK
+        uuid clause_id FK
+        decimal amount
+        string currency
+        string value_type
+    }
+    
+    RISKS {
+        uuid id PK
+        uuid contract_id FK
+        uuid clause_id FK
+        string risk_type
+        string risk_level
+        text rationale
+    }
+    
+    CONDITIONS {
+        uuid id PK
+        uuid clause_id FK
+        string condition_type
+        text description
+    }
 ```
+
+### Apache AGE Graph Schema
+
+The graph layer provides multi-hop relationship traversal across the contract intelligence domain:
+
+```mermaid
+graph LR
+    subgraph "Core Entities"
+        Contract["📋 Contract<br/>reference_number<br/>title<br/>contract_type<br/>status"]
+        Party["👤 Party<br/>name<br/>party_type"]
+        Clause["📄 Clause<br/>section_label<br/>title<br/>risk_level"]
+    end
+    
+    subgraph "Obligations & Rights"
+        Obligation["⚖️ Obligation<br/>description<br/>due_date<br/>is_high_impact"]
+        Right["✅ Right<br/>description<br/>expiration_date"]
+    end
+    
+    subgraph "Terms & Definitions"
+        Term["📖 Term<br/>term_name<br/>definition"]
+    end
+    
+    subgraph "Financial & Risk"
+        MonetaryValue["💰 MonetaryValue<br/>amount<br/>currency<br/>value_type"]
+        Risk["⚠️ Risk<br/>risk_type<br/>risk_level<br/>rationale"]
+        Condition["🔒 Condition<br/>condition_type<br/>description"]
+    end
+    
+    Party -->|IS_PARTY_TO| Contract
+    Contract -->|CONTAINS_CLAUSE| Clause
+    Clause -->|IMPOSES_OBLIGATION| Obligation
+    Party -->|RESPONSIBLE_FOR| Obligation
+    Clause -->|GRANTS_RIGHT| Right
+    Party -->|HOLDS_RIGHT| Right
+    Clause -->|DEFINES_TERM| Term
+    Contract -->|HAS_VALUE| MonetaryValue
+    Clause -->|HAS_VALUE| MonetaryValue
+    Contract -->|HAS_RISK| Risk
+    Clause -->|HAS_RISK| Risk
+    Contract -->|AMENDS<br/>SOW_OF<br/>ADDENDUM_TO<br/>WORK_ORDER_OF| Contract
+    Clause -->|HAS_CONDITION| Condition
+    
+    style Contract fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    style Party fill:#fff4e6,stroke:#ff9800,stroke-width:2px
+    style Clause fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+    style Obligation fill:#ffebee,stroke:#c62828,stroke-width:2px
+    style Right fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Term fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style MonetaryValue fill:#e0f2f1,stroke:#00695c,stroke-width:2px
+    style Risk fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    style Condition fill:#f1f8e9,stroke:#558b2f,stroke-width:2px
+```
+
+**Graph Capabilities:**
+
+🔗 **Multi-Hop Traversal Examples:**
+
+```cypher
+// 1. Find all high-impact obligations for Quantum Labs (top obligation holder)
+MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
+WHERE p.name = 'Quantum Labs' AND o.is_high_impact = true
+RETURN p.name, c.reference_number, cl.section_label, o.description, o.due_date
+LIMIT 20
+
+// 2. Trace Zenith Technologies MSA contract family with all financial values
+MATCH (parent:Contract)<-[:SOW_OF|AMENDS|ADDENDUM_TO|WORK_ORDER_OF*1..2]-(child:Contract)
+OPTIONAL MATCH (child)-[:HAS_VALUE]->(mv:MonetaryValue)
+WHERE parent.reference_number = 'MSA-ZEN-202403-197'
+RETURN parent.title, child.reference_number, child.contract_type, 
+       mv.amount, mv.currency, mv.value_type
+ORDER BY child.contract_type
+
+// 3. Find all parties connected to Phoenix Industries through shared contracts
+MATCH (p1:Party {name: 'Phoenix Industries'})-[:IS_PARTY_TO]->(c:Contract)<-[:IS_PARTY_TO]-(p2:Party)
+WHERE p1 <> p2
+RETURN p1.name, p2.name, count(c) as shared_contracts, 
+       collect(c.reference_number)[0..5] as sample_contracts
+ORDER BY shared_contracts DESC
+LIMIT 10
+
+// 4. Discover high-risk clauses and their responsible parties in active contracts
+MATCH (c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
+MATCH (p:Party)-[:RESPONSIBLE_FOR]->(o)
+WHERE c.status = 'active' AND cl.risk_level = 'high'
+RETURN c.reference_number, c.title, cl.section_label, cl.clause_type_id,
+       p.name as responsible_party, o.description, o.is_high_impact
+LIMIT 20
+
+// 5. Find all payment terms and monetary values for Contoso Enterprises contracts
+MATCH (p:Party {name: 'Contoso Enterprises'})-[:IS_PARTY_TO]->(c:Contract)
+MATCH (c)-[:CONTAINS_CLAUSE]->(cl:Clause)
+OPTIONAL MATCH (cl)-[:HAS_VALUE]->(mv:MonetaryValue)
+WHERE cl.clause_type_id = 'Payment Terms'
+RETURN c.reference_number, c.contract_type, cl.section_label, 
+       mv.amount, mv.currency, mv.value_type
+ORDER BY mv.amount DESC
+LIMIT 20
+
+// 6. Analyze Data Processing Agreement DPA-SUM-202502-324 family tree depth
+MATCH path = (root:Contract {reference_number: 'DPA-SUM-202502-324'})
+             <-[:AMENDS|ADDENDUM_TO|WORK_ORDER_OF*]-(descendant:Contract)
+RETURN root.title, descendant.reference_number, descendant.contract_type,
+       length(path) as hierarchy_depth,
+       [rel in relationships(path) | type(rel)] as relationship_chain
+ORDER BY hierarchy_depth, descendant.contract_type
+
+// 7. Find rights granted to Atlas Ventures and their expiration dates
+MATCH (p:Party {name: 'Atlas Ventures'})-[:IS_PARTY_TO]->(c:Contract)
+MATCH (c)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:GRANTS_RIGHT]->(r:Right)
+MATCH (p)-[:HOLDS_RIGHT]->(r)
+RETURN c.reference_number, c.contract_type, cl.section_label, 
+       r.description, r.expiration_date
+ORDER BY r.expiration_date
+LIMIT 20
+
+// 8. Map all vendors with California governing law and their risk exposure
+MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:HAS_RISK]->(r:Risk)
+WHERE c.governing_law = 'California' AND r.risk_level = 'high'
+RETURN p.name, p.party_type, count(DISTINCT c) as contract_count,
+       count(r) as high_risk_count, collect(DISTINCT r.risk_type)[0..3] as risk_types
+ORDER BY high_risk_count DESC
+LIMIT 10
+
+// 9. Find all defined terms in Intellectual Property clauses across portfolio
+MATCH (c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:DEFINES_TERM]->(t:Term)
+WHERE cl.clause_type_id = 'Intellectual Property'
+RETURN c.reference_number, c.contract_type, cl.section_label,
+       t.term_name, t.definition
+LIMIT 20
+
+// 10. Identify amendment chains for any Master Services Agreement
+MATCH path = (msa:Contract {contract_type: 'Master Services Agreement'})
+             <-[:AMENDS*]-(amd:Contract)
+WHERE msa.status = 'active'
+RETURN msa.reference_number, msa.title,
+       length(path) as amendment_depth,
+       collect(amd.reference_number) as amendment_chain
+ORDER BY amendment_depth DESC
+LIMIT 10
+```
+
+**Node Types (9):** Contract, Party, Clause, Obligation, Right, Term, MonetaryValue, Risk, Condition
+
+**Edge Types (15):** IS_PARTY_TO, CONTAINS_CLAUSE, IMPOSES_OBLIGATION, RESPONSIBLE_FOR, GRANTS_RIGHT, HOLDS_RIGHT, DEFINES_TERM, HAS_VALUE, HAS_RISK, HAS_CONDITION, AMENDS, SOW_OF, ADDENDUM_TO, WORK_ORDER_OF, RELATED_TO
+
+**Key Graph Features:**
+- ✅ All nodes have `db_id` property linking back to PostgreSQL primary keys
+- ✅ Bidirectional queries: Start from any entity and traverse relationships
+- ✅ Flexible patterns: Find paths, count hops, filter by properties
+- ✅ Contract families: AMENDS, SOW_OF, ADDENDUM_TO relationships preserve hierarchy
 
 ---
 
@@ -441,7 +657,7 @@ erDiagram
 | **Vector Search** | pgvector | Semantic matching |
 | **Graph Queries** | Apache AGE | Relationship traversal |
 | **Knowledge Graph** | Microsoft GraphRAG | Pattern discovery |
-| **LLM** | Azure OpenAI GPT-4o | Natural language |
+| **LLM** | Azure OpenAI gpt-5.1 | Natural language |
 | **Embeddings** | text-embedding-3-small | Vectors |
 | **Deployment** | Azure Container Apps | Hosting |
 
