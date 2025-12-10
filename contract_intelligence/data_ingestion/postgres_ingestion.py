@@ -737,6 +737,18 @@ def run_postgres_ingestion(
         if resolved > 0:
             print(f"  ✓ Resolved {resolved} orphaned relationships")
     
+    # Build Apache AGE graph from PostgreSQL data
+    if successful > 0:
+        print("\n" + "=" * 70)
+        print("Building Apache AGE Graph")
+        print("=" * 70)
+        try:
+            from build_graph import main as build_graph_main
+            build_graph_main()
+        except Exception as e:
+            print(f"\n⚠️ Graph build encountered an issue: {e}")
+            print("You can build the graph manually later: python data_ingestion/build_graph.py")
+    
     # Get statistics
     print("\n[*] Database Statistics:")
     stats = get_database_statistics()

@@ -369,9 +369,20 @@ graph TB
    python data_ingestion/postgres_ingestion.py
    ```
    
+   This will automatically:
+   - Create the PostgreSQL schema with all tables
+   - Extract and ingest contract data using LLM
+   - Build the Apache AGE graph with nodes and relationships
+   - Generate a data exploration report
+   
    Or to re-run full dual ingestion pipeline:
    ```bash
    python data_ingestion/ingestion_pipeline.py
+   ```
+   
+   **Note:** The graph build step is integrated into the ingestion pipeline. If you need to rebuild only the graph (after data updates):
+   ```bash
+   python data_ingestion/build_graph.py
    ```
 
 ### Run the Application
