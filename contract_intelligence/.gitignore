@@ -45,7 +45,4 @@ cache/
 Thumbs.db
 
 # Project specific
-data/output/*.parquet
-data/output/lancedb/
-data/output/*.json
 test_graphrag/

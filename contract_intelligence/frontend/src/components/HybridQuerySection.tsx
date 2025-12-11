@@ -21,7 +21,7 @@ const SAMPLE_QUERIES = [
     category: "vendor-risk"
   },
   {
-    text: "For a specific vendor, for example Atlas Ventures, show me all of our high-impact obligations to them, grouped by contract, with a short description of each obligation.",
+    text: "For Atlas Ventures, show me all of our high-impact obligations to them, grouped by contract, with a short description of each obligation.",
     type: "postgres",
     desc: "Vendor-specific obligation analysis + contract grouping",
     category: "vendor-risk"
@@ -70,12 +70,6 @@ const SAMPLE_QUERIES = [
     text: "What are our highest risk liability clauses?",
     type: "postgres",
     desc: "Legal risk assessment - liability exposure",
-    category: "clause-risk"
-  },
-  {
-    text: "Compare indemnification terms across all vendor agreements",
-    type: "postgres",
-    desc: "Cross-vendor risk comparison",
     category: "clause-risk"
   },
   {
