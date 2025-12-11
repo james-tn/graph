@@ -797,7 +797,9 @@ def print_graph_statistics(cur):
         result = execute_age_query(cur, cypher)
         if result:
             count = result[0]['count']
-            print(f"  {node_type} nodes: {count}")
+            # AGE returns agtype, convert to int for display
+            count_int = int(str(count)) if count else 0
+            print(f"  {node_type} nodes: {count_int}")
     
     # Count relationships
     print("\n  Relationships:")
@@ -817,8 +819,10 @@ def print_graph_statistics(cur):
         result = execute_age_query(cur, cypher)
         if result:
             count = result[0]['count']
-            if count > 0:  # Only show non-zero counts
-                print(f"    {rel_type}: {count}")
+            # AGE returns agtype, convert to int for comparison and display
+            count_int = int(str(count)) if count else 0
+            if count_int > 0:  # Only show non-zero counts
+                print(f"    {rel_type}: {count_int}")
     
     print("=" * 70)
 
