@@ -553,30 +553,29 @@ graph LR
 // 1. Find all high-impact obligations for Quantum Labs (top obligation holder)
 MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
 WHERE p.name = 'Quantum Labs' AND o.is_high_impact = true
-RETURN p.name, c.reference_number, cl.section_label, o.description, o.due_date
+RETURN p.name, c.identifier, cl.section, o.description
 LIMIT 20
 
 // 2. Trace Zenith Technologies MSA contract family with all financial values
-MATCH (parent:Contract)<-[:SOW_OF|AMENDS|ADDENDUM_TO|WORK_ORDER_OF*1..2]-(child:Contract)
+MATCH (parent:Contract {identifier: 'MSA-ZEN-202403-197'})<--(child:Contract)
 OPTIONAL MATCH (child)-[:HAS_VALUE]->(mv:MonetaryValue)
-WHERE parent.reference_number = 'MSA-ZEN-202403-197'
-RETURN parent.title, child.reference_number, child.contract_type, 
+RETURN parent.title, child.identifier, child.type, 
        mv.amount, mv.currency, mv.value_type
-ORDER BY child.contract_type
+ORDER BY child.type
 
 // 3. Find all parties connected to Phoenix Industries through shared contracts
 MATCH (p1:Party {name: 'Phoenix Industries'})-[:IS_PARTY_TO]->(c:Contract)<-[:IS_PARTY_TO]-(p2:Party)
 WHERE p1 <> p2
 RETURN p1.name, p2.name, count(c) as shared_contracts, 
-       collect(c.reference_number)[0..5] as sample_contracts
+       collect(c.identifier)[0..5] as sample_contracts
 ORDER BY shared_contracts DESC
 LIMIT 10
 
 // 4. Discover high-risk clauses and their responsible parties in active contracts
 MATCH (c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
 MATCH (p:Party)-[:RESPONSIBLE_FOR]->(o)
-WHERE c.status = 'active' AND cl.risk_level = 'high'
-RETURN c.reference_number, c.title, cl.section_label, cl.clause_type_id,
+WHERE cl.risk_level = 'high'
+RETURN c.identifier, c.title, cl.section, cl.type,
        p.name as responsible_party, o.description, o.is_high_impact
 LIMIT 20
 
@@ -584,51 +583,47 @@ LIMIT 20
 MATCH (p:Party {name: 'Contoso Enterprises'})-[:IS_PARTY_TO]->(c:Contract)
 MATCH (c)-[:CONTAINS_CLAUSE]->(cl:Clause)
 OPTIONAL MATCH (cl)-[:HAS_VALUE]->(mv:MonetaryValue)
-WHERE cl.clause_type_id = 'Payment Terms'
-RETURN c.reference_number, c.contract_type, cl.section_label, 
+WHERE cl.type = 'Payment Terms'
+RETURN c.identifier, c.type, cl.section, 
        mv.amount, mv.currency, mv.value_type
 ORDER BY mv.amount DESC
 LIMIT 20
 
 // 6. Analyze Data Processing Agreement DPA-SUM-202502-324 family tree depth
-MATCH path = (root:Contract {reference_number: 'DPA-SUM-202502-324'})
-             <-[:AMENDS|ADDENDUM_TO|WORK_ORDER_OF*]-(descendant:Contract)
-RETURN root.title, descendant.reference_number, descendant.contract_type,
+MATCH path = (root:Contract {identifier: 'DPA-SUM-202502-324'})<--(descendant:Contract)
+RETURN root.title, descendant.identifier, descendant.type,
        length(path) as hierarchy_depth,
        [rel in relationships(path) | type(rel)] as relationship_chain
-ORDER BY hierarchy_depth, descendant.contract_type
+ORDER BY hierarchy_depth, descendant.type
 
 // 7. Find rights granted to Atlas Ventures and their expiration dates
 MATCH (p:Party {name: 'Atlas Ventures'})-[:IS_PARTY_TO]->(c:Contract)
 MATCH (c)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:GRANTS_RIGHT]->(r:Right)
 MATCH (p)-[:HOLDS_RIGHT]->(r)
-RETURN c.reference_number, c.contract_type, cl.section_label, 
-       r.description, r.expiration_date
-ORDER BY r.expiration_date
+RETURN c.identifier, c.type, cl.section, r.description
+ORDER BY r.description
 LIMIT 20
 
 // 8. Map all vendors with California governing law and their risk exposure
 MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:HAS_RISK]->(r:Risk)
 WHERE c.governing_law = 'California' AND r.risk_level = 'high'
-RETURN p.name, p.party_type, count(DISTINCT c) as contract_count,
+RETURN p.name, p.type as party_type, count(DISTINCT c) as contract_count,
        count(r) as high_risk_count, collect(DISTINCT r.risk_type)[0..3] as risk_types
 ORDER BY high_risk_count DESC
 LIMIT 10
 
 // 9. Find all defined terms in Intellectual Property clauses across portfolio
 MATCH (c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:DEFINES_TERM]->(t:Term)
-WHERE cl.clause_type_id = 'Intellectual Property'
-RETURN c.reference_number, c.contract_type, cl.section_label,
+WHERE cl.type = 'Intellectual Property'
+RETURN c.identifier, c.type as contract_type, cl.section,
        t.term_name, t.definition
 LIMIT 20
 
 // 10. Identify amendment chains for any Master Services Agreement
-MATCH path = (msa:Contract {contract_type: 'Master Services Agreement'})
-             <-[:AMENDS*]-(amd:Contract)
-WHERE msa.status = 'active'
-RETURN msa.reference_number, msa.title,
+MATCH path = (msa:Contract {type: 'Master Services Agreement'})<-[:AMENDS]-(amd:Contract)
+RETURN msa.identifier, msa.title,
        length(path) as amendment_depth,
-       collect(amd.reference_number) as amendment_chain
+       collect(amd.identifier) as amendment_chain
 ORDER BY amendment_depth DESC
 LIMIT 10
 ```

@@ -9,12 +9,6 @@ interface HybridQuerySectionProps {
 const SAMPLE_QUERIES = [
   // A. Vendor Risk and Exposure
   {
-    text: "For each of our main vendors, how many contracts do we have with them, and how many of those include high-risk clauses? Which vendors look riskiest overall?",
-    type: "postgres",
-    desc: "Vendor risk aggregation + high-risk clause counting",
-    category: "vendor-risk"
-  },
-  {
     text: "For vendors like Acme Corp and Phoenix Industries, how does their risk profile compare? I'd like to see: how many contracts we have with each, how many high-risk clauses they have, and which types of risk show up most often for each vendor.",
     type: "postgres",
     desc: "Multi-vendor risk comparison + risk type analysis",
@@ -41,15 +35,27 @@ const SAMPLE_QUERIES = [
     category: "families"
   },
   {
-    text: "Among our larger vendor relationships, which contract families (for example, an MSA and its SOWs, work orders, amendments, and addenda) have the highest number of high-risk clauses overall?",
+    text: "How many active SOWs do we have under each MSA?",
     type: "postgres",
-    desc: "Contract family risk aggregation + hierarchical analysis",
+    desc: "Portfolio management - active engagement tracking",
     category: "families"
   },
   {
-    text: "Show me the contract family trees for our biggest vendors, and for each family give me: how many related documents there are, and a simple summary of how many high-risk clauses appear in that family.",
+    text: "Show contract family tree for our largest vendor relationship",
     type: "postgres",
-    desc: "Multi-family analysis + risk concentration",
+    desc: "Visual hierarchy for strategic vendor analysis",
+    category: "families"
+  },
+  {
+    text: "Show all amendments to our Data Processing Agreements",
+    type: "postgres",
+    desc: "Track DPA modifications and compliance changes",
+    category: "families"
+  },
+  {
+    text: "Among our larger vendor relationships, which contract families (for example, an MSA and its SOWs, work orders, amendments, and addenda) have the highest number of high-risk clauses overall?",
+    type: "postgres",
+    desc: "Contract family risk aggregation + hierarchical analysis",
     category: "families"
   },
   {
@@ -60,6 +66,18 @@ const SAMPLE_QUERIES = [
   },
   
   // C. Clause-Level Risk Patterns
+  {
+    text: "What are our highest risk liability clauses?",
+    type: "postgres",
+    desc: "Legal risk assessment - liability exposure",
+    category: "clause-risk"
+  },
+  {
+    text: "Compare indemnification terms across all vendor agreements",
+    type: "postgres",
+    desc: "Cross-vendor risk comparison",
+    category: "clause-risk"
+  },
   {
     text: "Across our entire contract portfolio, which types of clauses are most often marked as high risk? For example, is it more often limitation of liability, termination, payment terms, or service levels?",
     type: "postgres",
@@ -72,14 +90,26 @@ const SAMPLE_QUERIES = [
     desc: "Vendor risk ranking by specific clause types",
     category: "clause-risk"
   },
-  {
-    text: "For our top 10 vendors, summarize for me: how many high-risk termination clauses they have, how many high-risk payment terms, and how many high-risk service level clauses.",
-    type: "postgres",
-    desc: "Multi-vendor clause-specific risk breakdown",
-    category: "clause-risk"
-  },
   
   // D. Monetary Exposure vs Risk
+  {
+    text: "Total contract value by vendor",
+    type: "postgres",
+    desc: "Financial portfolio overview",
+    category: "monetary"
+  },
+  {
+    text: "What are our payment terms with Acme Corp?",
+    type: "postgres",
+    desc: "Vendor-specific financial terms analysis",
+    category: "monetary"
+  },
+  {
+    text: "Which contracts have penalty clauses and what are the amounts?",
+    type: "postgres",
+    desc: "Financial risk exposure - penalty identification",
+    category: "monetary"
+  },
   {
     text: "Which individual contracts combine a large contract value with high-risk clauses? Show me the top set by contract value, along with the vendor and a brief risk summary for each.",
     type: "postgres",
@@ -92,14 +122,20 @@ const SAMPLE_QUERIES = [
     desc: "Vendor financial risk exposure aggregation",
     category: "monetary"
   },
-  {
-    text: "Which vendors have a lot of contract value with us, but only low- or medium-risk clauses? I'd like to see where our commercial exposure is high but the legal risk looks relatively low.",
-    type: "postgres",
-    desc: "High-value low-risk vendor identification",
-    category: "monetary"
-  },
   
   // E. Obligations and Rights
+  {
+    text: "Find all contracts with auto-renewal clauses and notice periods",
+    type: "postgres",
+    desc: "Contract discovery - renewal management",
+    category: "obligations"
+  },
+  {
+    text: "Which contracts expire in Q2 2025?",
+    type: "postgres",
+    desc: "Expiration tracking for proactive management",
+    category: "obligations"
+  },
   {
     text: "Which vendors are associated with the largest number of high-impact obligations across all of their contracts with us?",
     type: "postgres",
@@ -135,6 +171,30 @@ const SAMPLE_QUERIES = [
     category: "portfolio"
   },
   {
+    text: "How do our IP terms compare to industry standards?",
+    type: "graphrag",
+    desc: "Industry benchmarking - intellectual property",
+    category: "portfolio"
+  },
+  {
+    text: "Which vendors have similar service level obligations?",
+    type: "graphrag",
+    desc: "SLA pattern analysis across vendors",
+    category: "portfolio"
+  },
+  {
+    text: "Show all parties connected to high-risk obligations",
+    type: "graphrag",
+    desc: "Risk network mapping - party relationships",
+    category: "portfolio"
+  },
+  {
+    text: "Which contracts share similar confidentiality terms?",
+    type: "graphrag",
+    desc: "Confidentiality pattern clustering",
+    category: "portfolio"
+  },
+  {
     text: "How do our vendor contracts typically structure liability and indemnification language? What patterns emerge?",
     type: "graphrag",
     desc: "Qualitative language pattern analysis",
@@ -147,33 +207,9 @@ const SAMPLE_QUERIES = [
     category: "portfolio"
   },
   {
-    text: "Explain the relationship between contract types and risk profiles - what patterns do you see in how different agreement types handle risk?",
-    type: "graphrag",
-    desc: "Cross-contract thematic comparison",
-    category: "portfolio"
-  },
-  {
-    text: "What common themes appear in our termination and renewal clauses? How do these differ conceptually across vendors?",
-    type: "graphrag",
-    desc: "Conceptual theme extraction",
-    category: "portfolio"
-  },
-  {
     text: "Provide a narrative overview of how intellectual property rights are typically addressed across our technology vendor contracts.",
     type: "graphrag",
     desc: "Abstractive IP strategy summary",
-    category: "portfolio"
-  },
-  {
-    text: "What insights can you provide about the relationships between parties, obligations, and risk levels in our contract network?",
-    type: "graphrag",
-    desc: "Graph relationship insights",
-    category: "portfolio"
-  },
-  {
-    text: "How do our contracts balance rights and obligations? What patterns suggest areas where we might be over-exposed or under-protected?",
-    type: "graphrag",
-    desc: "Qualitative risk-benefit analysis",
     category: "portfolio"
   }
 ];

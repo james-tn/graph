@@ -75,7 +75,7 @@ def create_contract_nodes(cur, conn):
     # Fetch contracts
     cur.execute("""
         SELECT c.id, c.contract_identifier, c.title, c.contract_type, 
-               c.effective_date, c.expiration_date, c.governing_law,
+               c.effective_date, c.expiration_date, c.governing_law, c.status,
                j.name as jurisdiction_name
         FROM contracts c
         LEFT JOIN jurisdictions j ON c.jurisdiction_id = j.id
@@ -91,6 +91,7 @@ def create_contract_nodes(cur, conn):
                 identifier: '{contract['contract_identifier']}',
                 title: '{contract['title'].replace("'", "\'")}',
                 type: '{contract['contract_type'] or 'Unknown'}',
+                status: '{contract['status'] or 'active'}',
                 effective_date: '{contract['effective_date'] or ''}',
                 expiration_date: '{contract['expiration_date'] or ''}',
                 governing_law: '{contract['governing_law'] or ''}',

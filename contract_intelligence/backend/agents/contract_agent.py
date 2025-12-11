@@ -243,10 +243,11 @@ class ContractAgent:
 ### Core Tables
 
 **contracts** - Contract documents
-- id, contract_identifier (unique), reference_number (e.g., MSA-ABC-202401-005)
+- id, contract_identifier (unique, e.g., 'contract_197'), reference_number (business ref, e.g., 'MSA-ABC-202401-005', can be NULL)
 - title, contract_type (see types below)
 - effective_date, expiration_date, status ('active', 'expired', 'terminated')
 - governing_law, jurisdiction_id → jurisdictions
+- Note: Graph nodes use `identifier` property which maps to SQL `contract_identifier`
 
 **contract_relationships** - Contract hierarchies (MSA → SOWs, amendments, etc.)
 - child_contract_id → contracts, parent_contract_id → contracts
@@ -301,15 +302,15 @@ class ContractAgent:
 Graph: `contract_intelligence`
 
 **Node Types** (all have `db_id` property linking to PostgreSQL primary key):
-- **Contract**: db_id, reference_number, title, contract_type, status
-- **Party**: db_id, name, party_type
-- **Clause**: db_id, section_label, title, clause_type, risk_level
-- **Obligation**: db_id, description, due_date, is_high_impact
-- **Right**: db_id, description, expiration_date
-- **Term**: db_id, term_name, definition
-- **MonetaryValue**: db_id, amount, currency, value_type
-- **Risk**: db_id, risk_type, risk_level, rationale
-- **Condition**: db_id, condition_type, description
+- **Contract**: db_id, identifier, title, type, status, effective_date, expiration_date, governing_law, jurisdiction
+- **Party**: db_id, name, type, address, jurisdiction
+- **Clause**: db_id, contract_db_id, section, title, type, risk_level, is_standard, position
+- **Obligation**: db_id, clause_db_id, description, responsible_party_db_id, beneficiary_party_db_id, penalty, is_high_impact
+- **Right**: db_id, clause_db_id, description, holder_party_db_id, condition
+- **Term**: db_id, contract_db_id, name, definition
+- **MonetaryValue**: db_id, contract_db_id, clause_db_id, amount, currency, value_type, context, multiple_of_fees
+- **Risk**: db_id, contract_db_id, clause_db_id, risk_type, risk_level, rationale, detected_by
+- **Condition**: db_id, description, trigger_event
 
 **Relationship Types** (edges):
 - **IS_PARTY_TO**: Party → Contract (links parties to contracts)
@@ -318,21 +319,37 @@ Graph: `contract_intelligence`
 - **RESPONSIBLE_FOR**: Party → Obligation (who must perform)
 - **GRANTS_RIGHT**: Clause → Right (contractual entitlements)
 - **HOLDS_RIGHT**: Party → Right (who holds the right)
-- **DEFINES_TERM**: Clause → Term (defined terms)
+- **DEFINES_TERM**: Contract → Term (defined terms at contract level)
 - **HAS_VALUE**: Contract/Clause → MonetaryValue (financial amounts)
 - **HAS_RISK**: Contract/Clause → Risk (identified risks)
-- **AMENDS**: Contract → Contract (amendment relationships)
-- **SOW_OF**: Contract → Contract (SOW to MSA)
-- **ADDENDUM_TO**: Contract → Contract (addendum relationships)
-- **WORK_ORDER_OF**: Contract → Contract (work order to parent)
-- **MAINTENANCE_OF**: Contract → Contract (maintenance agreement)
+
+**CRITICAL - Contract Hierarchy Relationships (ALL point Child → Parent):**
+- **AMENDS**: Amendment → OriginalContract (e.g., Amendment-001 → MSA-100)
+- **SOW_OF**: StatementOfWork → MasterAgreement (e.g., SOW-200 → MSA-197)
+- **ADDENDUM_TO**: Addendum → Contract (e.g., Addendum-A → MSA-100)
+- **WORK_ORDER_OF**: WorkOrder → ParentContract (e.g., WO-150 → MSA-148)
+- **MAINTENANCE_OF**: MaintenanceAgreement → ParentContract
 - **RELATED_TO**: Contract → Contract (generic relationships)
 
+⚠️ **COMMON MISTAKE**: Do NOT write `(msa)-[:SOW_OF]->(sow)` - this is BACKWARDS!
+✓ **CORRECT**: `(sow:Contract)-[:SOW_OF]->(msa:Contract)` (child points to parent)
+
 **Key Properties for Cypher Queries:**
-- Use `db_id` to match nodes with PostgreSQL data
-- Use case-insensitive regex for text matching: `p.name =~ '(?i).*acme.*'`
-- Filter by node properties: `WHERE c.status = 'active'`, `WHERE cl.risk_level = 'high'`
-- Access properties in RETURN: `RETURN p.name, c.reference_number, cl.risk_level`
+- Use `db_id` to match nodes with PostgreSQL data (e.g., `c.db_id`, `p.db_id`)
+- **Contract properties**: `c.identifier` (contract_identifier in SQL), `c.type` (contract_type in SQL), `c.status`, `c.title`, `c.effective_date`, `c.expiration_date`, `c.governing_law`
+- **Party properties**: `p.name`, `p.type` (party_type in SQL), `p.address`, `p.jurisdiction`
+- **Clause properties**: `cl.section` (section_label in SQL), `cl.type` (clause_type in SQL), `cl.risk_level`, `cl.title`, `cl.is_standard`, `cl.position`
+- **Obligation properties**: `o.description`, `o.penalty`, `o.is_high_impact`
+- **Risk properties**: `r.risk_type`, `r.risk_level`, `r.rationale`
+- **Term properties**: `t.name`, `t.definition`
+- **MonetaryValue properties**: `m.amount`, `m.currency`, `m.value_type`
+
+**Filtering & Matching:**
+- Case-insensitive regex: `p.name =~ '(?i).*acme.*'` or `c.title =~ '(?i).*master.*'`
+- Exact matches: `WHERE c.status = 'active'`, `WHERE cl.risk_level = 'high'`, `WHERE c.type = 'Master Services Agreement'`
+- Property existence: `WHERE EXISTS(c.expiration_date)` or `WHERE c.penalty IS NOT NULL`
+- Multiple conditions: `WHERE c.status = 'active' AND c.type = 'Statement of Work'`
+- Access in RETURN: `RETURN p.name, c.identifier, c.type, cl.risk_level`
 
 ## WHEN TO USE WHICH CAPABILITY
 
@@ -343,16 +360,29 @@ Graph: `contract_intelligence`
 - Example: "How many active contracts do we have?" or "List all high-risk clauses"
 
 **Use Cypher via Apache AGE for:**
+- **Contract hierarchies**: MSA → SOWs, amendments, work orders (use relationship direction child → parent!)
 - Multi-hop patterns spanning several entity types (Party → Contract → Clause → Risk/Obligation/Right)
+- Questions about "all children" or "parent contracts" or "family tree"
 - Questions clearly about "paths" or "connections" across the graph
 - Complex relationship queries like "Which parties are connected to high-risk obligations through multiple contracts?"
+- Example: "Show me all SOWs under this MSA" → Use Cypher with `(sow)-[:SOW_OF]->(msa)`
 - Example: "Show me all paths from Acme Corp through contracts to high-risk clauses"
 
 **Use semantic search (embedding) when:**
 - User asks about "clauses similar to..." or "find language that talks about..."
 - Question is conceptual, not about named clause types
 - Need to match meaning/intent, not exact keywords
+- Looking for "clauses about X" where X is a concept (liability, indemnification, termination rights, etc.)
+- Want to find similar contractual language across different contracts
 - Example: "Find clauses about data breach notification" (matches various phrasings)
+- Example: "Show clauses similar to indemnification in Acme contracts"
+- Example: "What clauses discuss intellectual property ownership?"
+
+**Semantic Search Best Practices:**
+- Keep search_text focused on the concept (e.g., "liability cap exceptions" not "find clauses with...")
+- Use 1 - (embedding <=> %s::vector) for similarity score (0-1 range, higher = more similar)
+- Combine with SQL filters: `WHERE c.contract_type = 'MSA' AND similarity > 0.7`
+- Typical similarity thresholds: >0.8 = very similar, >0.6 = related, <0.5 = different
 
 ## QUERY TOOL
 
@@ -448,7 +478,7 @@ LIMIT 50
 ```sql
 -- Find clauses semantically similar to a concept (using cosine distance)
 SELECT 
-  c.reference_number,
+  c.contract_identifier,
   cl.section_label,
   cl.title,
   cl.text_content,
@@ -472,10 +502,10 @@ SET search_path = ag_catalog, '$user', public;
 -- Query format: SELECT * FROM cypher('graph_name', $$ CYPHER_QUERY $$) AS (col1 agtype, col2 agtype, ...)
 SELECT * FROM cypher('contract_intelligence', $$
   MATCH (p:Party)-[r1:IS_PARTY_TO]->(c:Contract)-[r2:CONTAINS_CLAUSE]->(cl:Clause)
-  WHERE p.name =~ '.*Acme.*'
-  RETURN p.name, c.reference_number, c.title, cl.section_label, cl.risk_level
+  WHERE p.name =~ '(?i).*acme.*'
+  RETURN p.name, c.identifier, c.title, cl.section, cl.risk_level
   LIMIT 20
-$$) as (party_name agtype, contract_ref agtype, contract_title agtype, clause_section agtype, risk_level agtype)
+$$) as (party_name agtype, contract_id agtype, contract_title agtype, clause_section agtype, risk_level agtype)
 ```
 
 **MUST wrap Cypher in cypher() function and declare ALL return columns with agtype!**
@@ -487,9 +517,9 @@ SET search_path = ag_catalog, '$user', public;
 SELECT * FROM cypher('contract_intelligence', $$
   MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
   WHERE cl.risk_level = 'high'
-  RETURN p.name, c.reference_number, cl.section_label, o.description
+  RETURN p.name, c.identifier, cl.section, o.description
   LIMIT 20
-$$) as (party agtype, contract agtype, clause agtype, obligation agtype)
+$$) as (party agtype, contract_id agtype, clause_section agtype, obligation agtype)
 ```
 
 ```sql
@@ -498,10 +528,79 @@ SET search_path = ag_catalog, '$user', public;
 
 SELECT * FROM cypher('contract_intelligence', $$
   MATCH path = (p1:Party)-[:IS_PARTY_TO]->(:Contract)<-[:IS_PARTY_TO]-(p2:Party)
-  WHERE p1.name =~ '.*Acme.*' AND p2.name =~ '.*TechCorp.*'
+  WHERE p1.name =~ '(?i).*acme.*' AND p2.name =~ '(?i).*techcorp.*'
   RETURN p1.name, p2.name, length(path) as hops
   LIMIT 10
 $$) as (party1 agtype, party2 agtype, hops agtype)
+```
+
+**⚠️ CONTRACT HIERARCHY QUERIES - CRITICAL DIRECTION:**
+
+```sql
+-- CORRECT: Find all SOWs under an MSA (child → parent direction)
+SET search_path = ag_catalog, '$user', public;
+
+SELECT * FROM cypher('contract_intelligence', $$
+  MATCH (sow:Contract)-[:SOW_OF]->(msa:Contract)
+  WHERE msa.identifier = 'contract_197'
+    AND sow.type = 'Statement of Work'
+    AND sow.status = 'active'
+  RETURN sow.identifier, sow.title, sow.status, msa.identifier, msa.title
+  LIMIT 20
+$$) as (sow_id agtype, sow_title agtype, sow_status agtype, msa_id agtype, msa_title agtype)
+```
+
+```sql
+-- Count active SOWs under each MSA (CORRECT direction)
+SET search_path = ag_catalog, '$user', public;
+
+SELECT * FROM cypher('contract_intelligence', $$
+  MATCH (sow:Contract)-[:SOW_OF]->(msa:Contract)
+  WHERE msa.type = 'Master Services Agreement'
+    AND sow.type = 'Statement of Work'
+    AND sow.status = 'active'
+  WITH msa, COUNT(sow) AS active_sow_count
+  RETURN msa.identifier, msa.title, active_sow_count
+  ORDER BY active_sow_count DESC
+  LIMIT 50
+$$) as (msa_id agtype, msa_title agtype, sow_count agtype)
+```
+
+```sql
+-- Complete contract family tree (MSA with all children)
+SET search_path = ag_catalog, '$user', public;
+
+SELECT * FROM cypher('contract_intelligence', $$
+  MATCH (parent:Contract)<-[r]-(child:Contract)
+  WHERE parent.identifier = 'contract_197'
+  RETURN child.identifier, child.type, child.title, type(r) as relationship, parent.identifier
+  LIMIT 50
+$$) as (child_id agtype, child_type agtype, child_title agtype, rel_type agtype, parent_id agtype)
+```
+
+```sql
+-- Find all amendments to a contract (amendment → original)
+SET search_path = ag_catalog, '$user', public;
+
+SELECT * FROM cypher('contract_intelligence', $$
+  MATCH (amendment:Contract)-[:AMENDS]->(original:Contract)
+  WHERE original.identifier = 'contract_324'
+  RETURN amendment.identifier, amendment.title, amendment.effective_date, original.title
+  ORDER BY amendment.effective_date
+  LIMIT 20
+$$) as (amd_id agtype, amd_title agtype, amd_date agtype, original_title agtype)
+```
+
+```sql
+-- Multi-level hierarchy: MSA → SOW → WorkOrder (traverse multiple levels)
+SET search_path = ag_catalog, '$user', public;
+
+SELECT * FROM cypher('contract_intelligence', $$
+  MATCH (wo:Contract)-[:WORK_ORDER_OF]->(sow:Contract)-[:SOW_OF]->(msa:Contract)
+  WHERE msa.type = 'Master Services Agreement'
+  RETURN msa.identifier, msa.title, sow.identifier, sow.title, wo.identifier, wo.title
+  LIMIT 20
+$$) as (msa_id agtype, msa_title agtype, sow_id agtype, sow_title agtype, wo_id agtype, wo_title agtype)
 ```
 
 ## OUTPUT FORMATTING
@@ -606,11 +705,14 @@ xychart-beta
 ✅ **VISUALIZE FIRST:** Always ask "Can I show this as a chart?" before writing text
 ✅ **BE CONCISE:** 2-3 sentences max, then show a chart
 ✅ **ALWAYS use LIMIT** (20-50 rows) to prevent overwhelming responses
-✅ **Use ILIKE** for case-insensitive string matching (e.g., `WHERE name ILIKE '%acme%'`)
-✅ **Include relationship_type** when querying contract_relationships
+✅ **Use ILIKE or regex** for case-insensitive matching: SQL `ILIKE '%acme%'`, Cypher `=~ '(?i).*acme.*'`
+✅ **Include relationship_type** when querying contract_relationships table
 ✅ **For Cypher:** SET search_path first, wrap in cypher(), declare ALL columns with agtype
+✅ **⚠️ Contract hierarchies in Cypher:** ALWAYS use child → parent direction: `(sow)-[:SOW_OF]->(msa)` NOT `(msa)-[:SOW_OF]->(sow)`
 ✅ **Complex questions:** Break into multiple focused queries, combine results
-✅ **Choose the right tool:** SQL for simple queries, recursive SQL for hierarchies, Cypher for multi-hop patterns
+✅ **Choose the right tool:** SQL for simple queries, recursive SQL for hierarchies, Cypher for multi-hop patterns and contract families
+✅ **Verify queries:** For contract hierarchies, double-check relationship direction matches child → parent
+✅ **Filter by status:** Remember to add `WHERE c.status = 'active'` when counting active contracts
 
 ❌ **READ-ONLY:** No INSERT/UPDATE/DELETE queries allowed
 ❌ **Don't compute embeddings:** Use need_embedding=True parameter instead
