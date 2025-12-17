@@ -100,6 +100,80 @@ PARTY_ROLES = [
 
 CURRENCIES = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR"]
 
+# Entity name suffixes to strip during normalization
+ENTITY_SUFFIXES = [
+    r",?\s*inc\.?$",
+    r",?\s*incorporated$",
+    r",?\s*corp\.?$",
+    r",?\s*corporation$",
+    r",?\s*llc\.?$",
+    r",?\s*l\.l\.c\.?$",
+    r",?\s*ltd\.?$",
+    r",?\s*limited$",
+    r",?\s*co\.?$",
+    r",?\s*company$",
+    r",?\s*plc\.?$",
+    r",?\s*p\.l\.c\.?$",
+    r",?\s*gmbh$",
+    r",?\s*ag$",
+    r",?\s*s\.a\.?$",
+    r",?\s*n\.v\.?$",
+    r",?\s*b\.v\.?$",
+    r",?\s*pty\.?$",
+    r",?\s*pvt\.?$",
+    r",?\s*private$",
+    r",?\s*lp\.?$",
+    r",?\s*l\.p\.?$",
+    r",?\s*llp\.?$",
+    r",?\s*l\.l\.p\.?$",
+]
+
+
+def normalize_entity_name(name: str) -> str:
+    """
+    Normalize an entity name for deduplication matching.
+    
+    This function creates a canonical form of entity names by:
+    1. Converting to lowercase
+    2. Stripping common legal suffixes (Inc., LLC, Corp., Ltd., etc.)
+    3. Normalizing whitespace and punctuation
+    4. Removing special characters
+    
+    Args:
+        name: The original entity name
+        
+    Returns:
+        Normalized/canonical name for matching purposes
+        
+    Examples:
+        "Acme Corporation, Inc." -> "acme corporation"
+        "CONTOSO CORP." -> "contoso"
+        "Summit Tech, LLC" -> "summit tech"
+    """
+    import re
+    
+    if not name:
+        return ""
+    
+    # Convert to lowercase
+    canonical = name.lower().strip()
+    
+    # Remove common legal suffixes (iterate multiple times for chained suffixes)
+    for _ in range(3):  # Handle cases like "Acme Corp., Inc."
+        for suffix_pattern in ENTITY_SUFFIXES:
+            canonical = re.sub(suffix_pattern, "", canonical, flags=re.IGNORECASE)
+    
+    # Normalize punctuation: remove periods, commas, and extra spaces
+    canonical = re.sub(r'[.,;:]+', ' ', canonical)
+    
+    # Remove special characters but keep alphanumeric and spaces
+    canonical = re.sub(r'[^a-z0-9\s]', '', canonical)
+    
+    # Normalize multiple spaces to single space
+    canonical = re.sub(r'\s+', ' ', canonical).strip()
+    
+    return canonical
+
 
 # Pydantic models for structured outputs
 class Party(BaseModel):

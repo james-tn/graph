@@ -15,8 +15,16 @@ export const uploadFile = async (file: File) => {
   return response.data;
 };
 
-export const runIndex = async () => {
-  const response = await api.post('/index');
+export const runIndex = async (runPostgres: boolean = true, runGraphrag: boolean = false) => {
+  const response = await api.post('/index', { 
+    run_postgres: runPostgres,
+    run_graphrag: runGraphrag 
+  });
+  return response.data;
+};
+
+export const getIndexStatus = async (taskId: string) => {
+  const response = await api.get(`/index/status/${taskId}`);
   return response.data;
 };
 

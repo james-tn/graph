@@ -389,7 +389,7 @@ graph TB
 
 **Backend (Terminal 1):**
 ```bash
-uvicorn backend.app.main:app --reload
+start_backend.bat  # or: uvicorn backend.app.main:app --reload
 ```
 
 **Frontend (Terminal 2):**
@@ -549,19 +549,33 @@ graph LR
 
 🔗 **Multi-Hop Traversal Examples:**
 
+Each example shows both **Cypher** (graph traversal) and **SQL** (traditional JOINs) to compare approaches.
+
 ```cypher
-// 1. Find all high-impact obligations for Quantum Labs (top obligation holder)
+// 1. Identify critical obligations requiring immediate attention for key business partners
 MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
 WHERE p.name = 'Quantum Labs' AND o.is_high_impact = true
 RETURN p.name, c.identifier, cl.section, o.description
 LIMIT 20
+```
 
-// 2. Trace Zenith Technologies MSA contract family with all financial values
-MATCH (parent:Contract {identifier: 'MSA-ZEN-202403-197'})<--(child:Contract)
-OPTIONAL MATCH (child)-[:HAS_VALUE]->(mv:MonetaryValue)
-RETURN parent.title, child.identifier, child.type, 
-       mv.amount, mv.currency, mv.value_type
-ORDER BY child.type
+```sql
+-- SQL equivalent using JOINs
+SELECT p.name, c.contract_identifier, cl.section_label, o.description
+FROM parties p
+JOIN parties_contracts pc ON p.id = pc.party_id
+JOIN contracts c ON pc.contract_id = c.id
+JOIN clauses cl ON c.id = cl.contract_id
+JOIN obligations o ON cl.id = o.clause_id
+WHERE p.name = 'Quantum Labs' AND o.is_high_impact = true
+LIMIT 20;
+
+// 2. Map all subsidiary agreements under a Master Services Agreement to understand scope of engagement
+MATCH (parent:Contract {identifier: 'contract_197'})<--(child:Contract)
+WITH DISTINCT parent.title as parent_title, child.identifier as child_id, child.type as child_type
+RETURN parent_title, child_id, child_type
+ORDER BY child_id
+LIMIT 10
 
 // 3. Find all parties connected to Phoenix Industries through shared contracts
 MATCH (p1:Party {name: 'Phoenix Industries'})-[:IS_PARTY_TO]->(c:Contract)<-[:IS_PARTY_TO]-(p2:Party)
@@ -575,26 +589,30 @@ LIMIT 10
 MATCH (c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
 MATCH (p:Party)-[:RESPONSIBLE_FOR]->(o)
 WHERE cl.risk_level = 'high'
-RETURN c.identifier, c.title, cl.section, cl.type,
-       p.name as responsible_party, o.description, o.is_high_impact
+WITH c.identifier as contract_id, c.title as title, cl.section as section, cl.type as clause_type,
+     p.name as responsible_party, o.description as description, o.is_high_impact as is_high_impact
+RETURN contract_id, title, section, clause_type, responsible_party, description, is_high_impact
+ORDER BY contract_id, responsible_party
 LIMIT 20
 
 // 5. Find all payment terms and monetary values for Contoso Enterprises contracts
 MATCH (p:Party {name: 'Contoso Enterprises'})-[:IS_PARTY_TO]->(c:Contract)
 MATCH (c)-[:CONTAINS_CLAUSE]->(cl:Clause)
-OPTIONAL MATCH (cl)-[:HAS_VALUE]->(mv:MonetaryValue)
+MATCH (cl)-[:HAS_VALUE]->(mv:MonetaryValue)
 WHERE cl.type = 'Payment Terms'
-RETURN c.identifier, c.type, cl.section, 
-       mv.amount, mv.currency, mv.value_type
-ORDER BY mv.amount DESC
+WITH c.identifier as contract_id, c.type as contract_type, cl.section as clause_section,
+     mv.amount as amount, mv.currency as currency, mv.value_type as value_type
+RETURN contract_id, contract_type, clause_section, amount, currency, value_type
+ORDER BY amount DESC
 LIMIT 20
 
-// 6. Analyze Data Processing Agreement DPA-SUM-202502-324 family tree depth
-MATCH path = (root:Contract {identifier: 'DPA-SUM-202502-324'})<--(descendant:Contract)
-RETURN root.title, descendant.identifier, descendant.type,
-       length(path) as hierarchy_depth,
-       [rel in relationships(path) | type(rel)] as relationship_chain
-ORDER BY hierarchy_depth, descendant.type
+// 6. Assess complexity of data processing relationships by analyzing agreement hierarchy levels
+MATCH path = (root:Contract {identifier: 'contract_324'})<--(descendant:Contract)
+WITH root.title as root_title, descendant.identifier as desc_id, descendant.type as desc_type,
+     length(path) as hierarchy_depth, [rel in relationships(path) | type(rel)] as relationship_chain
+RETURN root_title, desc_id, desc_type, hierarchy_depth, relationship_chain
+ORDER BY desc_id
+LIMIT 10
 
 // 7. Find rights granted to Atlas Ventures and their expiration dates
 MATCH (p:Party {name: 'Atlas Ventures'})-[:IS_PARTY_TO]->(c:Contract)
@@ -605,18 +623,23 @@ ORDER BY r.description
 LIMIT 20
 
 // 8. Map all vendors with California governing law and their risk exposure
-MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:HAS_RISK]->(r:Risk)
+// Note: Traverse through clauses since risks are clause-level, not contract-level
+MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:HAS_RISK]->(r:Risk)
 WHERE c.governing_law = 'California' AND r.risk_level = 'high'
-RETURN p.name, p.type as party_type, count(DISTINCT c) as contract_count,
-       count(r) as high_risk_count, collect(DISTINCT r.risk_type)[0..3] as risk_types
+WITH p.name as party_name, p.type as party_type, count(DISTINCT c) as contract_count,
+     count(r) as high_risk_count, collect(DISTINCT r.risk_type)[0..3] as risk_types
+RETURN party_name, party_type, contract_count, high_risk_count, risk_types
 ORDER BY high_risk_count DESC
 LIMIT 10
 
 // 9. Find all defined terms in Intellectual Property clauses across portfolio
-MATCH (c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:DEFINES_TERM]->(t:Term)
+// Note: Terms are at contract level, not clause level
+MATCH (c:Contract)-[:DEFINES_TERM]->(t:Term)
+MATCH (c)-[:CONTAINS_CLAUSE]->(cl:Clause)
 WHERE cl.type = 'Intellectual Property'
-RETURN c.identifier, c.type as contract_type, cl.section,
-       t.term_name, t.definition
+WITH DISTINCT c.identifier as contract_id, c.type as contract_type, t.name as term_name, t.definition as definition
+RETURN contract_id, contract_type, term_name, definition
+ORDER BY contract_id, term_name
 LIMIT 20
 
 // 10. Identify amendment chains for any Master Services Agreement
@@ -637,6 +660,13 @@ LIMIT 10
 - ✅ Bidirectional queries: Start from any entity and traverse relationships
 - ✅ Flexible patterns: Find paths, count hops, filter by properties
 - ✅ Contract families: AMENDS, SOW_OF, ADDENDUM_TO relationships preserve hierarchy
+
+**Property Name Mapping (Graph vs SQL):**
+- Contract: `identifier` (graph) = `contract_identifier` (SQL), `type` (graph) = `contract_type` (SQL)
+- Clause: `section` (graph) = `section_label` (SQL), `type` (graph) = clause_types.name (SQL JOIN)
+- Party: `type` (graph) = `party_type` (SQL)
+- Risk: `risk_type` (graph) = risk_types.name (SQL JOIN)
+- MonetaryValue, Obligation, Right, Term, Condition: Same property names in both
 
 ---
 
@@ -669,7 +699,7 @@ contract_intelligence/
 ├── frontend/
 │   └── src/
 │       └── components/      # Query interface, results
-├── data_ingestion/          # Dual ingestion pipeline
+├── data_ingestion/          # Dual ingestion pipeline (see [Data Ingestion README](data_ingestion/README.md))
 ├── data/
 │   ├── input/              # Raw contract markdown
 │   └── output/             # GraphRAG artifacts
@@ -677,6 +707,16 @@ contract_intelligence/
 ├── scripts/                # Deployment, seed data
 └── Dockerfile              # Multi-stage build
 ```
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Data Ingestion Pipeline](contract_intelligence/data_ingestion/README.md) | Comprehensive guide to PostgreSQL ingestion, entity resolution, schema, and graph construction |
+| [GraphRAG Configuration](contract_intelligence/graphrag_config/README.md) | Microsoft GraphRAG setup and indexing |
+| [Backend API](contract_intelligence/backend/README.md) | FastAPI endpoints and agent architecture |
 
 ---
 
@@ -730,14 +770,13 @@ Identify common vendor subcontractor patterns
 ### Azure Container Apps
 
 ```bash
-.\scripts\deploy-containerapp.ps1 -ImageTag latest --UseLocalDockerBuild
+.\scripts\deploy-containerapp.ps1 -UseLocalDockerBuild -SubscriptionId YOUR_SUBSCRIPTION_ID
 ```
 
 ### Local Development
 
 ```bash
-# Backend
-start_backend.bat
+uvicorn backend.app.main:app --reload
 
 # Frontend
 cd frontend

@@ -1,4 +1,8 @@
 -- Contract Intelligence Platform - PostgreSQL Schema
+
+-- Enable pg_trgm extension for fuzzy matching / entity resolution
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- Drop existing objects
 DROP TABLE IF EXISTS extraction_jobs CASCADE;
 DROP TABLE IF EXISTS risks CASCADE;
@@ -86,13 +90,14 @@ CREATE TABLE contract_relationships (
 CREATE TABLE parties (
     id SERIAL PRIMARY KEY,
     tenant_id VARCHAR(50) DEFAULT 'default',
-    name VARCHAR(300) NOT NULL,
+    name VARCHAR(300) NOT NULL,  -- Display name (original)
+    canonical_name VARCHAR(300) NOT NULL,  -- Normalized name for deduplication
     party_type VARCHAR(200),  -- Increased for longer party type descriptions
     address TEXT,
     jurisdiction_id INTEGER REFERENCES jurisdictions(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(tenant_id, name)
+    UNIQUE(tenant_id, canonical_name)  -- Dedupe on canonical name, not display name
 );
 
 CREATE TABLE parties_contracts (
@@ -223,6 +228,8 @@ CREATE INDEX idx_contract_relationships_parent_ref ON contract_relationships(par
 
 CREATE INDEX idx_parties_tenant ON parties(tenant_id);
 CREATE INDEX idx_parties_name ON parties(name);
+CREATE INDEX idx_parties_canonical ON parties(canonical_name);
+CREATE INDEX idx_parties_canonical_trgm ON parties USING gin(canonical_name gin_trgm_ops);  -- Trigram index for fuzzy matching
 
 CREATE INDEX idx_clauses_contract ON clauses(contract_id);
 CREATE INDEX idx_clauses_type ON clauses(clause_type_id);

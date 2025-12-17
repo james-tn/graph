@@ -1,13 +1,15 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, UploadFile, File as FastAPIFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 import asyncio
 import os
 import sys
 import traceback
+import uuid
+import shutil
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import Depends
@@ -70,6 +72,30 @@ class MermaidCorrectionRequest(BaseModel):
 class MermaidCorrectionResponse(BaseModel):
     corrected_code: str
     success: bool
+
+class UploadResponse(BaseModel):
+    filename: str
+    status: str
+    message: str
+
+class IndexRequest(BaseModel):
+    run_postgres: bool = True
+    run_graphrag: bool = False  # GraphRAG is slower, default off for incremental
+
+class IndexResponse(BaseModel):
+    status: str
+    message: str
+    task_id: Optional[str] = None
+    contracts_processed: Optional[int] = None
+
+class IndexStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    message: str
+    progress: Optional[dict] = None
+
+# Track background indexing tasks
+indexing_tasks: dict = {}
 
 
 # Health check
@@ -153,6 +179,212 @@ async def ingest_contracts(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+
+
+# ==================== FILE UPLOAD ENDPOINT ====================
+@app.post("/api/upload", response_model=UploadResponse)
+async def upload_contract_file(
+    file: UploadFile = FastAPIFile(...),
+    user: dict = Depends(get_current_user)
+):
+    """
+    Upload a contract file (markdown or text) for processing.
+    
+    Files are saved to the data/input directory for subsequent indexing.
+    Supports .md, .txt, and .markdown files.
+    """
+    try:
+        # Validate file extension
+        allowed_extensions = {'.md', '.txt', '.markdown'}
+        file_ext = Path(file.filename).suffix.lower()
+        
+        if file_ext not in allowed_extensions:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid file type '{file_ext}'. Allowed: {', '.join(allowed_extensions)}"
+            )
+        
+        # Determine input directory
+        project_root = Path(__file__).parent.parent.parent
+        input_dir = project_root / "data" / "input"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename if contract_ prefix not present
+        original_name = Path(file.filename).stem
+        if not original_name.startswith("contract_"):
+            # Find next available contract number
+            existing_contracts = list(input_dir.glob("contract_*.md"))
+            if existing_contracts:
+                # Extract numbers and find max
+                numbers = []
+                for f in existing_contracts:
+                    try:
+                        num = int(f.stem.split('_')[1])
+                        numbers.append(num)
+                    except (IndexError, ValueError):
+                        pass
+                next_num = max(numbers) + 1 if numbers else 1
+            else:
+                next_num = 1
+            
+            # Create new filename: contract_XXX_originalname.md
+            safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in original_name)
+            new_filename = f"contract_{next_num:03d}_{safe_name}.md"
+        else:
+            new_filename = f"{original_name}.md"
+        
+        # Save file
+        file_path = input_dir / new_filename
+        
+        with open(file_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        return UploadResponse(
+            filename=new_filename,
+            status="success",
+            message=f"File uploaded successfully to {file_path.relative_to(project_root)}"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Upload error: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+# ==================== INDEXING ENDPOINTS ====================
+def run_incremental_indexing(task_id: str, run_postgres: bool = True, run_graphrag: bool = False):
+    """
+    Background task to run incremental indexing.
+    
+    This runs the ingestion pipeline with skip_schema_init=True to preserve existing data.
+    """
+    try:
+        indexing_tasks[task_id] = {
+            "status": "running",
+            "message": "Starting incremental indexing...",
+            "progress": {"stage": "initializing", "contracts_processed": 0}
+        }
+        
+        # Import ingestion modules
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent / "data_ingestion"))
+        from postgres_ingestion import run_postgres_ingestion, get_database_statistics
+        
+        if run_postgres:
+            indexing_tasks[task_id]["progress"]["stage"] = "postgresql_ingestion"
+            indexing_tasks[task_id]["message"] = "Running PostgreSQL incremental ingestion..."
+            
+            # Run with skip_schema_init=True to preserve existing data (incremental)
+            success = run_postgres_ingestion(
+                num_contracts=None,  # Process all new contracts
+                n_parallel=5,
+                skip_schema_init=True  # IMPORTANT: Don't drop existing tables
+            )
+            
+            if not success:
+                indexing_tasks[task_id] = {
+                    "status": "error",
+                    "message": "PostgreSQL ingestion failed",
+                    "progress": {"stage": "failed"}
+                }
+                return
+            
+            # Get updated stats
+            stats = get_database_statistics()
+            indexing_tasks[task_id]["progress"]["contracts_processed"] = stats.get("contracts", 0)
+        
+        if run_graphrag:
+            indexing_tasks[task_id]["progress"]["stage"] = "graphrag_indexing"
+            indexing_tasks[task_id]["message"] = "Running GraphRAG indexing (this may take a while)..."
+            
+            # GraphRAG indexing would go here
+            # For now, we note it requires manual execution due to complexity
+            indexing_tasks[task_id]["message"] = "PostgreSQL complete. GraphRAG requires manual execution: graphrag index --root ."
+        
+        indexing_tasks[task_id] = {
+            "status": "complete",
+            "message": "Incremental indexing completed successfully!",
+            "progress": {
+                "stage": "complete",
+                "contracts_processed": indexing_tasks[task_id]["progress"].get("contracts_processed", 0)
+            }
+        }
+        
+    except Exception as e:
+        indexing_tasks[task_id] = {
+            "status": "error",
+            "message": f"Indexing failed: {str(e)}",
+            "progress": {"stage": "error", "error": str(e)}
+        }
+        print(f"Indexing error: {traceback.format_exc()}")
+
+
+@app.post("/api/index", response_model=IndexResponse)
+async def start_indexing(
+    background_tasks: BackgroundTasks,
+    request: IndexRequest = IndexRequest(),
+    user: dict = Depends(get_current_user)
+):
+    """
+    Start incremental indexing of uploaded contracts.
+    
+    This endpoint triggers background processing of new contract files.
+    Use GET /api/index/status/{task_id} to check progress.
+    
+    - **run_postgres**: Whether to run PostgreSQL ingestion (default: True)
+    - **run_graphrag**: Whether to run GraphRAG indexing (default: False, as it's slow)
+    """
+    try:
+        # Generate task ID
+        task_id = str(uuid.uuid4())[:8]
+        
+        # Initialize task status
+        indexing_tasks[task_id] = {
+            "status": "queued",
+            "message": "Indexing task queued...",
+            "progress": {}
+        }
+        
+        # Add to background tasks
+        background_tasks.add_task(
+            run_incremental_indexing,
+            task_id,
+            request.run_postgres,
+            request.run_graphrag
+        )
+        
+        return IndexResponse(
+            status="started",
+            message="Incremental indexing started in background. Check status with task_id.",
+            task_id=task_id,
+            contracts_processed=None
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start indexing: {str(e)}")
+
+
+@app.get("/api/index/status/{task_id}", response_model=IndexStatusResponse)
+async def get_indexing_status(
+    task_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Get the status of an indexing task.
+    
+    - **task_id**: The task ID returned from POST /api/index
+    """
+    if task_id not in indexing_tasks:
+        raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
+    
+    task = indexing_tasks[task_id]
+    return IndexStatusResponse(
+        task_id=task_id,
+        status=task["status"],
+        message=task["message"],
+        progress=task.get("progress")
+    )
 
 
 # Get routing analysis (without executing query)

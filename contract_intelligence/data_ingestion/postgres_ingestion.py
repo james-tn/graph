@@ -20,7 +20,8 @@ from contract_extractor import (
     extract_contract_metadata,
     segment_clauses,
     classify_and_analyze_clause,
-    get_embedding
+    get_embedding,
+    normalize_entity_name
 )
 
 # Load environment
@@ -186,9 +187,12 @@ def ingest_contract_comprehensive(filepath: Path):
             """, (jurisdiction_id, contract_id))
             conn.commit()
         
-        # Insert parties with jurisdictions
+        # Insert parties with jurisdictions (with entity resolution)
         party_map = {}  # name -> party_id
         parties_data = metadata.get("parties", [])
+        
+        # Similarity threshold for fuzzy matching (0.0 to 1.0)
+        SIMILARITY_THRESHOLD = 0.8
         
         for party_info in parties_data:
             party_name = party_info.get("name")
@@ -197,6 +201,10 @@ def ingest_contract_comprehensive(filepath: Path):
             
             # Truncate party name if needed
             party_name = truncate_field(party_name, 300, f"party.name")
+            
+            # Generate canonical name for entity resolution
+            canonical_name = normalize_entity_name(party_name)
+            canonical_name = truncate_field(canonical_name, 300, "party.canonical_name")
             
             party_jurisdiction_id = None
             if party_info.get("jurisdiction"):
@@ -213,15 +221,55 @@ def ingest_contract_comprehensive(filepath: Path):
             # Truncate address if needed
             party_address = truncate_field(party_info.get("address"), 1000, "party.address")
             
+            # ENTITY RESOLUTION: Check for existing similar parties using pg_trgm
+            # First try exact canonical match, then fuzzy match
             cur.execute("""
-                INSERT INTO parties (name, party_type, address, jurisdiction_id)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (tenant_id, name) DO UPDATE 
-                SET address = EXCLUDED.address, updated_at = CURRENT_TIMESTAMP
-                RETURNING id
-            """, (party_name, "Corporation", party_address, party_jurisdiction_id))
+                SELECT id, name, canonical_name, 
+                       similarity(canonical_name, %s) as sim_score
+                FROM parties
+                WHERE tenant_id = 'default'
+                  AND (
+                      canonical_name = %s  -- Exact canonical match
+                      OR similarity(canonical_name, %s) > %s  -- Fuzzy match above threshold
+                  )
+                ORDER BY similarity(canonical_name, %s) DESC
+                LIMIT 1
+            """, (canonical_name, canonical_name, canonical_name, SIMILARITY_THRESHOLD, canonical_name))
             
-            party_id = cur.fetchone()['id']
+            existing_party = cur.fetchone()
+            
+            if existing_party:
+                # Reuse existing party (entity resolution match)
+                party_id = existing_party['id']
+                sim_score = existing_party['sim_score']
+                existing_name = existing_party['name']
+                
+                if sim_score < 1.0:
+                    # Log fuzzy match for visibility
+                    print(f"  🔗 Entity resolved: '{party_name}' → '{existing_name}' (similarity: {sim_score:.2f})")
+                
+                # Optionally update address if we have new info
+                if party_address:
+                    cur.execute("""
+                        UPDATE parties 
+                        SET address = COALESCE(%s, address), 
+                            jurisdiction_id = COALESCE(%s, jurisdiction_id),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    """, (party_address, party_jurisdiction_id, party_id))
+            else:
+                # Insert new party with both display name and canonical name
+                cur.execute("""
+                    INSERT INTO parties (name, canonical_name, party_type, address, jurisdiction_id)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (tenant_id, canonical_name) DO UPDATE 
+                    SET address = COALESCE(EXCLUDED.address, parties.address), 
+                        updated_at = CURRENT_TIMESTAMP
+                    RETURNING id
+                """, (party_name, canonical_name, "Corporation", party_address, party_jurisdiction_id))
+                
+                party_id = cur.fetchone()['id']
+            
             party_map[party_name] = party_id
             
             # Link party to contract

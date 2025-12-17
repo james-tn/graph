@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
-import { uploadFile, runIndex } from '../api';
+import { uploadFile, runIndex, getIndexStatus } from '../api';
 
 interface IndexStatus {
-  status: 'idle' | 'running' | 'complete' | 'error';
+  status: 'idle' | 'queued' | 'running' | 'complete' | 'error';
   message: string;
+  taskId?: string;
+  progress?: {
+    stage?: string;
+    contracts_processed?: number;
+  };
 }
 
 export const UploadSection: React.FC = () => {
@@ -12,6 +17,38 @@ export const UploadSection: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [indexStatus, setIndexStatus] = useState<IndexStatus>({ status: 'idle', message: '' });
   const [message, setMessage] = useState<string | null>(null);
+
+  // Poll for status updates when indexing is in progress
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    
+    if (indexStatus.status === 'queued' || indexStatus.status === 'running') {
+      if (indexStatus.taskId) {
+        intervalId = setInterval(async () => {
+          try {
+            const status = await getIndexStatus(indexStatus.taskId!);
+            setIndexStatus({
+              status: status.status,
+              message: status.message,
+              taskId: indexStatus.taskId,
+              progress: status.progress
+            });
+            
+            // Stop polling when complete or error
+            if (status.status === 'complete' || status.status === 'error') {
+              if (intervalId) clearInterval(intervalId);
+            }
+          } catch (error) {
+            console.error('Error checking status:', error);
+          }
+        }, 2000); // Poll every 2 seconds
+      }
+    }
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [indexStatus.status, indexStatus.taskId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -41,22 +78,45 @@ export const UploadSection: React.FC = () => {
   };
 
   const handleIndex = async () => {
-    setIndexStatus({ status: 'running', message: 'Starting indexing process...' });
+    setIndexStatus({ status: 'queued', message: 'Starting indexing process...' });
     setMessage('Indexing started in background. This may take several minutes.');
     
-    // Start indexing in background
-    runIndex()
-      .then(() => {
-        setIndexStatus({ status: 'complete', message: 'Indexing completed successfully!' });
-      })
-      .catch((error) => {
-        setIndexStatus({ status: 'error', message: `Indexing failed: ${error.message}` });
+    try {
+      const result = await runIndex(true, false); // PostgreSQL only by default
+      
+      if (result.task_id) {
+        setIndexStatus({ 
+          status: 'running', 
+          message: result.message,
+          taskId: result.task_id
+        });
+      } else {
+        setIndexStatus({ status: 'error', message: result.message || 'Indexing failed to start' });
+      }
+    } catch (error: any) {
+      setIndexStatus({ 
+        status: 'error', 
+        message: `Indexing failed: ${error.message || 'Unknown error'}` 
       });
+    }
   };
 
   const handleCheckStatus = async () => {
-    // This would call a status endpoint if we implement one
-    setMessage(`Current status: ${indexStatus.status}`);
+    if (indexStatus.taskId) {
+      try {
+        const status = await getIndexStatus(indexStatus.taskId);
+        setIndexStatus({
+          status: status.status,
+          message: status.message,
+          taskId: indexStatus.taskId,
+          progress: status.progress
+        });
+      } catch (error) {
+        setMessage('Error checking status');
+      }
+    } else {
+      setMessage(`Current status: ${indexStatus.status}`);
+    }
   };
 
   return (
@@ -123,13 +183,13 @@ export const UploadSection: React.FC = () => {
           
           <button
             onClick={handleIndex}
-            disabled={indexStatus.status === 'running'}
+            disabled={indexStatus.status === 'running' || indexStatus.status === 'queued'}
             className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-bold text-lg shadow-2xl shadow-green-500/50 transition-all duration-300 transform hover:scale-105"
           >
-            {indexStatus.status === 'running' ? (
+            {(indexStatus.status === 'running' || indexStatus.status === 'queued') ? (
               <>
                 <Loader2 className="w-6 h-6 animate-spin" />
-                Indexing in Progress...
+                {indexStatus.status === 'queued' ? 'Queuing...' : 'Indexing in Progress...'}
               </>
             ) : (
               <>
@@ -148,16 +208,28 @@ export const UploadSection: React.FC = () => {
                 ? 'bg-green-500/10 text-green-300 border-green-500/30'
                 : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
             }`}>
-              {indexStatus.status === 'running' && <Loader2 className="w-5 h-5 animate-spin flex-shrink-0 mt-0.5" />}
+              {(indexStatus.status === 'running' || indexStatus.status === 'queued') && <Loader2 className="w-5 h-5 animate-spin flex-shrink-0 mt-0.5" />}
               {indexStatus.status === 'complete' && <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />}
               {indexStatus.status === 'error' && <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />}
-              <div>
+              <div className="flex-1">
                 <div className="font-bold mb-1">
+                  {indexStatus.status === 'queued' && 'Indexing Queued'}
                   {indexStatus.status === 'running' && 'Indexing in Progress'}
                   {indexStatus.status === 'complete' && 'Indexing Complete'}
                   {indexStatus.status === 'error' && 'Indexing Failed'}
                 </div>
                 <div>{indexStatus.message}</div>
+                {indexStatus.progress && (
+                  <div className="mt-2 text-xs opacity-75">
+                    {indexStatus.progress.stage && <span>Stage: {indexStatus.progress.stage}</span>}
+                    {indexStatus.progress.contracts_processed !== undefined && (
+                      <span className="ml-3">Contracts: {indexStatus.progress.contracts_processed}</span>
+                    )}
+                  </div>
+                )}
+                {indexStatus.taskId && (
+                  <div className="mt-1 text-xs opacity-50">Task ID: {indexStatus.taskId}</div>
+                )}
               </div>
             </div>
           )}

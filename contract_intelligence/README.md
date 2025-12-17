@@ -699,7 +699,7 @@ contract_intelligence/
 ├── frontend/
 │   └── src/
 │       └── components/      # Query interface, results
-├── data_ingestion/          # Dual ingestion pipeline
+├── data_ingestion/          # Dual ingestion pipeline (see [Data Ingestion README](data_ingestion/README.md))
 ├── data/
 │   ├── input/              # Raw contract markdown
 │   └── output/             # GraphRAG artifacts
@@ -707,6 +707,16 @@ contract_intelligence/
 ├── scripts/                # Deployment, seed data
 └── Dockerfile              # Multi-stage build
 ```
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Data Ingestion Pipeline](data_ingestion/README.md) | Comprehensive guide to PostgreSQL ingestion, entity resolution, schema, and graph construction |
+| [GraphRAG Configuration](graphrag_config/README.md) | Microsoft GraphRAG setup and indexing |
+| [Backend API](backend/README.md) | FastAPI endpoints and agent architecture |
 
 ---
 
