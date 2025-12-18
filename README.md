@@ -1,807 +1,743 @@
-# 🏢 Contract Intelligence Platform
+# 🧠 Content Intelligence Platform
 
-> **Enterprise-grade AI-powered contract analysis with dual graph engines for deep insights across your entire contract portfolio**
-
-Transform mountains of legal documents into actionable intelligence. Unlike traditional RAG systems that treat each document in isolation, this platform understands the **complex relationships** between contracts, parties, obligations, and risks across your entire legal corpus.
+> **A configurable, AI-powered framework for transforming domain-specific documents into queryable knowledge graphs with deep cross-document intelligence**
 
 ---
 
-## 🎯 The Business Case
+## 🎯 Vision
 
-### The Problem with Traditional Approaches
+Traditional document processing treats each document in isolation. **Content Intelligence Platform** breaks this paradigm by:
 
-Most contract analysis tools fall into these categories:
+1. **Understanding your domain** through AI-assisted schema generation
+2. **Extracting structured knowledge** from unstructured content
+3. **Building rich relationship graphs** that reveal hidden connections
+4. **Enabling natural language queries** across your entire corpus
 
-**❌ Simple Document Q&A (Flat RAG)**
-- Treats each contract independently
-- No understanding of hierarchies (MSA → SOWs → Amendments)
-- Cannot answer "Who are we exposed to across all vendor relationships?"
-- Misses patterns across contract families
-
-**❌ Basic Database Queries**
-- Requires knowing exact field names and SQL
-- No semantic understanding ("find liability caps" vs "WHERE clause_type = 'Limitation of Liability'")
-- Cannot discover cross-document patterns
-- Limited to structured fields only
-
-### ✅ Our Solution: Dual-Graph Hybrid Intelligence
-
-This platform combines **two complementary graph approaches** to deliver comprehensive contract intelligence:
-
-```mermaid
-graph TB
-    subgraph "User Query"
-        Q["Natural Language Question<br/>e.g., 'Show contract family tree for MSA-ZEN-202403-197'"]
-    end
-    
-    subgraph "Intelligent Router"
-        R["AI Router Agent<br/>Analyzes query intent<br/>Selects optimal engine(s)"]
-    end
-    
-    subgraph "PostgreSQL Graph"
-        P1["Structured Data<br/>+ Apache AGE Graph"]
-        P2["Precise SQL Queries"]
-        P3["Relationship Traversal"]
-        P4["Semantic Vector Search"]
-    end
-    
-    subgraph "Microsoft GraphRAG"
-        G1["Knowledge Graph<br/>Entity Extraction"]
-        G2["Community Detection"]
-        G3["Cross-Document Patterns"]
-        G4["Global Insights"]
-    end
-    
-    subgraph "Visualization Layer"
-        V["Rich Mermaid Charts<br/>Contract Trees, Risk Maps<br/>Relationship Networks"]
-    end
-    
-    Q --> R
-    R -->|Structured Queries| P1
-    R -->|Pattern Discovery| G1
-    P1 --> P2
-    P1 --> P3
-    P1 --> P4
-    P2 --> V
-    P3 --> V
-    P4 --> V
-    G1 --> G2
-    G1 --> G3
-    G1 --> G4
-    G2 --> V
-    G3 --> V
-    G4 --> V
-    
-    style Q fill:#e1f5ff,stroke:#0066cc,stroke-width:3px
-    style R fill:#fff4e6,stroke:#ff9800,stroke-width:2px
-    style P1 fill:#e8f5e9,stroke:#2e7d32
-    style G1 fill:#f3e5f5,stroke:#6a1b9a
-    style V fill:#ffebee,stroke:#c62828
-```
-
----
-
-## 🚀 Key Differentiators
-
-### 1️⃣ PostgreSQL Graph: Precision & Structure
-
-**When to use:** Specific queries about known contracts, parties, obligations, financial terms
-
-**Capabilities:**
-- 📋 **Contract Hierarchies**: MSAs → SOWs → Amendments → Work Orders with full lineage tracking
-- 🔗 **Apache AGE Graph**: Multi-hop relationship traversal (Party → Contract → Clause → Obligation)
-- 🔍 **Semantic Search**: pgvector embeddings (1536d) for conceptual clause matching
-- 💰 **Financial Analytics**: Aggregate spend, payment terms, currency analysis
-- ⚖️ **Risk Tracking**: High/medium/low risk clauses with rationale
-
-**Example Query:**
-```
-"Show the complete contract family tree for Zenith Technologies MSA-ZEN-202403-197"
-```
-
-**AI-Generated Visualization:**
-
-```mermaid
-graph TD
-    MSA["MSA-ZEN-202403-197<br/>Master Services Agreement<br/>📋 active"]
-    
-    SOW1["SOW-ZEN-202403-200<br/>Statement of Work<br/>📄 active"]
-    SOW2["SOW-ZEN-202403-355<br/>Statement of Work<br/>📄 active"]
-    WO1["WO-ZEN-202403-203<br/>Work Order<br/>📌 active"]
-    WO2["WO-ZEN-202403-243<br/>Work Order<br/>📌 active"]
-    AMD1["AMD-ZEN-202403-201<br/>Amendment to MSA<br/>📝 active"]
-    
-    ADD1["ADD-ZEN-202403-205<br/>Addendum to SOW<br/>📝 active"]
-    ADD2["ADD-ZEN-202403-244<br/>Addendum to SOW<br/>📝 active"]
-    ADD3["ADD-ZEN-202403-261<br/>Addendum to SOW<br/>📝 active"]
-    AMD2["AMD-ZEN-202403-220<br/>Amendment to SOW<br/>📝 active"]
-    
-    WO3["WO-ZEN-202403-403<br/>Work Order under SOW 355<br/>📌 active"]
-    
-    MSA --> SOW1
-    MSA --> SOW2
-    MSA --> WO1
-    MSA --> WO2
-    MSA --> AMD1
-    
-    SOW1 --> ADD1
-    SOW1 --> ADD2
-    SOW1 --> ADD3
-    SOW1 --> AMD2
-    
-    SOW2 --> WO3
-    
-    style MSA fill:#e1f5ff,stroke:#0066cc,stroke-width:3px
-    style SOW1 fill:#fff4e6,stroke:#ff9800
-    style SOW2 fill:#fff4e6,stroke:#ff9800
-    style WO1 fill:#e8f5e9,stroke:#4caf50
-    style WO2 fill:#e8f5e9,stroke:#4caf50
-    style WO3 fill:#e8f5e9,stroke:#4caf50
-    style AMD1 fill:#f3e5f5,stroke:#9c27b0
-    style ADD1 fill:#f3e5f5,stroke:#9c27b0
-    style ADD2 fill:#f3e5f5,stroke:#9c27b0
-    style ADD3 fill:#f3e5f5,stroke:#9c27b0
-    style AMD2 fill:#f3e5f5,stroke:#9c27b0
-```
-
-**Insight:** See the full contract lineage at a glance - 1 MSA spawns 2 SOWs, 3 Work Orders, 1 amendment, and 4 addendums
-
----
-
-### 2️⃣ Microsoft GraphRAG: Pattern Discovery & Global Insights
-
-**When to use:** Strategic questions, pattern analysis, risk assessments across all contracts
-
-**Capabilities:**
-- 🌐 **Global Search**: Corpus-wide pattern detection across 12,750+ entities
-- 🏘️ **Community Detection**: Groups related clauses, parties, and themes
-- 📊 **Trend Analysis**: "What are common themes in high-risk clauses?"
-- 🔄 **Cross-Contract Intelligence**: Relationships not explicit in any single document
-- 📈 **Strategic Insights**: Industry practice, vendor comparison, risk exposure
-
-**Example Query:**
-```
-"What are the most common themes and patterns in our high-risk clauses across all contracts?"
-```
-
-**AI-Generated Analysis:**
-
-```mermaid
-pie title "High-Risk Clause Themes"
-    "Third-Party & Dependency Risk" : 25
-    "Electronic Signatures & Counterparts" : 22
-    "IP / Work Product vs. Background IP" : 20
-    "Operational Services & SLAs" : 18
-    "Interpretation & Construction" : 8
-    "Execution Authority" : 7
-```
-
-```mermaid
-mindmap
-  root((High-Risk Patterns))
-    Third-Party & Dependency
-      Third-Party Materials
-      Sub-processors & Subcontractors
-      Service deps on external vendors
-      Licensing & IP compliance
-    IP & Ownership
-      Work Product vs Vendor IP
-      Vendor Background IP
-      Trade secrets in deliverables
-      Client rights derivative
-    Execution & Formalities
-      Counterparts E-Signatures
-      Master execution engine
-      E-signature enforceability
-      Fragmented documents risk
-    Services & SLA Operations
-      Hosting managed environments
-      Application support desk
-      Staff augmentation
-      Third-party coordination
-```
-
-**Insight:** Two meta-patterns emerge: (1) Heavy reliance on third parties + electronic execution, (2) Fine-grained IP carve-outs tightly wired into service structures
-
----
-
-## 🎨 Rich Visual Intelligence
-
-Every query generates **context-appropriate visualizations** automatically generated by AI:
-
-### Contract Hierarchies
-Visual family trees showing parent-child relationships
-
-### Risk Distributions
-Pie charts and bar graphs showing risk levels across portfolio
-
-### Party Networks
-Relationship graphs between clients, vendors, and subcontractors
-
-### Financial Analytics
-Charts showing contract values, payment terms, and spending patterns
-
----
-
-## 💼 Enterprise Use Cases
-
-### Legal & Compliance Teams
-
-**🔍 Contract Discovery**
-- "Find all contracts with auto-renewal clauses and notice periods"
-- "Which contracts expire in Q2 2025?"
-- "Show all amendments to our Data Processing Agreements"
-
-**⚖️ Risk Assessment**
-- "What are our highest risk liability clauses?"
-- "Which contracts have uncapped liability?"
-- "Compare indemnification terms across all vendor agreements"
-
-### Finance & Procurement
-
-**💰 Financial Analysis**
-- "Total contract value by vendor"
-- "What are our payment terms with Acme Corp?"
-- "Which contracts have penalty clauses and what are the amounts?"
-
-**📊 Portfolio Management**
-- "How many active SOWs do we have under each MSA?"
-- "Show contract family tree for our largest vendor relationship"
-
-### Strategic Analysis
-
-**🎯 Pattern Discovery**
-- "What are common themes in our high-risk clauses across all contracts?"
-- "How do our IP terms compare to industry standards?"
-- "Which vendors have similar service level obligations?"
-
-**🔄 Relationship Mapping**
-- "Show all parties connected to high-risk obligations"
-- "Map the vendor subcontractor relationships"
-- "Which contracts share similar confidentiality terms?"
+The platform is **domain-agnostic by design** — whether you're analyzing contracts, research papers, medical records, or financial reports, the same powerful infrastructure adapts to your specific ontology.
 
 ---
 
 ## 🏗️ Architecture Overview
 
-```mermaid
-graph TB
-    subgraph "Frontend Layer"
-        UI["React UI<br/>Natural Language Interface<br/>Rich Visualizations"]
-    end
-    
-    subgraph "Intelligence Layer"
-        Router["Router Agent<br/>Query Analysis<br/>Engine Selection"]
-        PG_Agent["PostgreSQL Agent<br/>SQL + Cypher Generation"]
-        GR_Agent["GraphRAG Agent<br/>Local/Global Search"]
-    end
-    
-    subgraph "PostgreSQL Data Layer"
-        PG_DB[("PostgreSQL 16")]
-        PG_Vec["pgvector<br/>1536d embeddings"]
-        PG_AGE["Apache AGE<br/>Graph traversal"]
-        PG_FTS["pg_trgm<br/>Full-text search"]
-    end
-    
-    subgraph "GraphRAG Data Layer"
-        GR_Data["Knowledge Graph<br/>12,750 entities<br/>30,788 relationships"]
-        GR_Vec["LanceDB<br/>Vector store"]
-    end
-    
-    subgraph "AI Services"
-        Azure["Azure OpenAI<br/>gpt-5.1 + Embeddings"]
-    end
-    
-    UI --> Router
-    Router --> PG_Agent
-    Router --> GR_Agent
-    
-    PG_Agent --> PG_DB
-    PG_DB --> PG_Vec
-    PG_DB --> PG_AGE
-    PG_DB --> PG_FTS
-    
-    GR_Agent --> GR_Data
-    GR_Data --> GR_Vec
-    
-    PG_Agent -.->|LLM calls| Azure
-    GR_Agent -.->|LLM calls| Azure
-    Router -.->|Analysis| Azure
-    
-    style UI fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
-    style Router fill:#fff4e6,stroke:#ff9800,stroke-width:2px
-    style PG_DB fill:#e8f5e9,stroke:#2e7d32
-    style GR_Data fill:#f3e5f5,stroke:#6a1b9a
-    style Azure fill:#ffebee,stroke:#c62828
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                           CONTENT INTELLIGENCE PLATFORM                                  │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 1: SCHEMA GENERATION (AI-Assisted)                                               │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                         │
+│   ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐                   │
+│   │  Sample Documents│   │  Business Goals  │   │  Sample Questions│                   │
+│   │  (5-10 examples) │   │  & Requirements  │   │  Users Will Ask  │                   │
+│   └────────┬─────────┘   └────────┬─────────┘   └────────┬─────────┘                   │
+│            │                      │                      │                              │
+│            └──────────────────────┼──────────────────────┘                              │
+│                                   ▼                                                     │
+│                    ┌──────────────────────────────┐                                     │
+│                    │   🤖 Schema Generation AI    │                                     │
+│                    │   • Analyzes document types  │                                     │
+│                    │   • Identifies entities      │                                     │
+│                    │   • Discovers relationships  │                                     │
+│                    │   • Suggests properties      │                                     │
+│                    └──────────────┬───────────────┘                                     │
+│                                   ▼                                                     │
+│                    ┌──────────────────────────────┐                                     │
+│                    │   📋 Graph Schema (Editable) │  ◄── YAML/JSON output               │
+│                    │   • Ontology definition      │      Human-reviewable               │
+│                    │   • Entity specifications    │      Version controlled             │
+│                    │   • Relationship types       │                                     │
+│                    │   • Property schemas         │                                     │
+│                    │   • Extraction prompts       │                                     │
+│                    └──────────────────────────────┘                                     │
+│                                                                                         │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 2: INFRASTRUCTURE GENERATION                                                     │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                         │
+│   Graph Schema ───► ┌──────────────────────────────────────────────────────────────┐   │
+│                     │                                                              │   │
+│                     │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐ │   │
+│                     │  │ PostgreSQL     │  │ Apache AGE     │  │ Extraction     │ │   │
+│                     │  │ Schema (DDL)   │  │ Graph Schema   │  │ Prompts        │ │   │
+│                     │  │                │  │                │  │                │ │   │
+│                     │  │ • Tables       │  │ • Node labels  │  │ • Per entity   │ │   │
+│                     │  │ • Columns      │  │ • Edge types   │  │ • Per relation │ │   │
+│                     │  │ • Indexes      │  │ • Properties   │  │ • Validation   │ │   │
+│                     │  │ • Constraints  │  │ • Constraints  │  │ • Examples     │ │   │
+│                     │  └────────────────┘  └────────────────┘  └────────────────┘ │   │
+│                     │                                                              │   │
+│                     └──────────────────────────────────────────────────────────────┘   │
+│                                                                                         │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 3: CONTENT INGESTION                                                             │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                         │
+│   ┌─────────────────┐                                                                   │
+│   │ Raw Documents   │    Unstructured: PDFs, Markdown, Text, HTML, DOCX                 │
+│   │ (Any Format)    │    Structured: Tables, CSVs, JSON, XML                            │
+│   └────────┬────────┘                                                                   │
+│            │                                                                            │
+│            ▼                                                                            │
+│   ┌─────────────────────────────────────────────────────────────────────────────┐      │
+│   │                         INGESTION PIPELINE                                   │      │
+│   │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐      │      │
+│   │  │ Document    │ → │ LLM Entity  │ → │ Entity      │ → │ Graph       │      │      │
+│   │  │ Parsing     │   │ Extraction  │   │ Resolution  │   │ Construction│      │      │
+│   │  │             │   │ (Schema-    │   │ (Fuzzy      │   │ (AGE Nodes  │      │      │
+│   │  │ • Text      │   │  guided)    │   │  Dedup)     │   │  & Edges)   │      │      │
+│   │  │ • Tables    │   │             │   │             │   │             │      │      │
+│   │  │ • Structure │   │             │   │             │   │             │      │      │
+│   │  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘      │      │
+│   │         │                                                    │              │      │
+│   │         ▼                                                    ▼              │      │
+│   │  ┌─────────────┐                                      ┌─────────────┐      │      │
+│   │  │ Embeddings  │                                      │ PostgreSQL  │      │      │
+│   │  │ (pgvector)  │                                      │ + AGE Graph │      │      │
+│   │  └─────────────┘                                      └─────────────┘      │      │
+│   └─────────────────────────────────────────────────────────────────────────────┘      │
+│                                                                                         │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 4: INTELLIGENT QUERY                                                             │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                         │
+│   User: "What are the key risks across all our vendor relationships?"                   │
+│                                                                                         │
+│            │                                                                            │
+│            ▼                                                                            │
+│   ┌─────────────────────────────────────────────────────────────────────────────┐      │
+│   │                         QUERY AGENT LAYER                                    │      │
+│   │                                                                              │      │
+│   │  ┌──────────────────────────────────────────────────────────────────────┐   │      │
+│   │  │  🤖 Router Agent                                                      │   │      │
+│   │  │  • Understands graph schema (ontology context)                        │   │      │
+│   │  │  • Routes to appropriate query strategy                               │   │      │
+│   │  │  • Synthesizes multi-source results                                   │   │      │
+│   │  └──────────────────────────────────────────────────────────────────────┘   │      │
+│   │                    │                   │                   │                │      │
+│   │                    ▼                   ▼                   ▼                │      │
+│   │  ┌────────────────────┐ ┌────────────────────┐ ┌────────────────────┐      │      │
+│   │  │  SQL Agent         │ │  Graph Agent       │ │  Semantic Agent    │      │      │
+│   │  │  • Aggregations    │ │  • Cypher queries  │ │  • Vector search   │      │      │
+│   │  │  • Joins           │ │  • Path finding    │ │  • Similarity      │      │      │
+│   │  │  • Filtering       │ │  • Multi-hop       │ │  • Conceptual      │      │      │
+│   │  └────────────────────┘ └────────────────────┘ └────────────────────┘      │      │
+│   │                                                                              │      │
+│   └─────────────────────────────────────────────────────────────────────────────┘      │
+│                                                                                         │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Quick Start
+## 📋 Graph Schema Definition
 
-### Prerequisites
+The heart of the platform is the **Graph Schema** — a human-readable, AI-generated, and fully editable specification that drives everything.
 
-1. **Azure PostgreSQL Flexible Server** with extensions:
-   ```sql
-   CREATE EXTENSION vector;        -- pgvector for semantic search
-   CREATE EXTENSION age;           -- Apache AGE for graph queries
-   CREATE EXTENSION pg_trgm;       -- Full-text search
-   ```
+### Schema Structure (YAML Format)
 
-2. **Azure OpenAI** deployments:
-   - `gpt-5.1` or `gpt-4` (reasoning)
-   - `text-embedding-3-small` (embeddings)
+```yaml
+# content_intelligence_schema.yaml
 
-3. **Python 3.11+** and **Node.js 20+**
+metadata:
+  name: "Contract Intelligence"
+  version: "1.0.0"
+  domain: "Legal/Contracts"
+  description: "Schema for analyzing enterprise contract portfolios"
 
-### Installation
+# Ontology: High-level conceptual model
+ontology:
+  core_concepts:
+    - name: "Contract"
+      description: "Legal agreement between parties"
+      is_document: true  # This is a primary document type
+      
+    - name: "Party"
+      description: "Organization or individual in a contract"
+      is_document: false  # Extracted entity
+      
+    - name: "Obligation"
+      description: "Duty or requirement imposed by a contract"
+      is_document: false
 
-1. **Clone and configure:**
-   ```bash
-   git clone <repository>
-   cd contract_intelligence
-   cp .env.example .env
-   # Edit .env with your Azure credentials
-   ```
+  relationships:
+    - name: "IS_PARTY_TO"
+      from: "Party"
+      to: "Contract"
+      cardinality: "many-to-many"
+      
+    - name: "CONTAINS"
+      from: "Contract"
+      to: "Clause"
+      cardinality: "one-to-many"
 
-2. **Install dependencies:**
-   ```bash
-   # Backend
-   pip install -r backend/requirements.txt
-   
-   # Frontend
-   cd frontend
-   npm install
-   ```
+# Entity Definitions: Detailed specifications
+entities:
+  Contract:
+    description: "A legal agreement document"
+    table_name: "contracts"
+    properties:
+      - name: "identifier"
+        type: "string"
+        required: true
+        unique: true
+        description: "Unique contract identifier (e.g., MSA-2024-001)"
+        extraction_hint: "Look for contract number, reference, or ID"
+        
+      - name: "title"
+        type: "string"
+        required: true
+        max_length: 500
+        
+      - name: "contract_type"
+        type: "enum"
+        values: ["Master Services Agreement", "Statement of Work", "Amendment", "NDA"]
+        
+      - name: "effective_date"
+        type: "date"
+        extraction_hint: "The date the contract becomes effective"
+        
+      - name: "total_value"
+        type: "decimal"
+        
+      - name: "full_text"
+        type: "text"
+        embed: true  # Generate vector embedding
+        
+    extraction_prompt: |
+      Extract the following contract metadata from the document:
+      - Contract identifier/reference number
+      - Title of the agreement
+      - Type of contract (MSA, SOW, Amendment, etc.)
+      - Effective and expiration dates
+      - Total contract value if specified
+      - Governing law/jurisdiction
+      
+  Party:
+    description: "An organization or individual"
+    table_name: "parties"
+    properties:
+      - name: "name"
+        type: "string"
+        required: true
+        
+      - name: "canonical_name"
+        type: "string"
+        derived: true
+        normalization: "entity_name"  # Apply standard normalization
+        
+      - name: "party_type"
+        type: "enum"
+        values: ["Corporation", "Individual", "Government", "Non-Profit"]
+        
+    entity_resolution:
+      enabled: true
+      method: "fuzzy"
+      threshold: 0.8
+      index_type: "trigram"
 
-3. **Use pre-generated sample data:**
-   
-   Sample contract data is already provided in `data/input/` (700+ contracts). If you want to regenerate it:
-   ```bash
-   # Note: This is a long-running operation (can take hours)
-   python scripts/generate_seed_data.py
-   ```
+# Relationship Definitions
+relationships:
+  IS_PARTY_TO:
+    from_entity: "Party"
+    to_entity: "Contract"
+    properties:
+      - name: "role"
+        type: "enum"
+        values: ["Client", "Vendor", "Licensor", "Licensee"]
+    extraction_prompt: |
+      Identify all parties mentioned in this contract and their roles.
+      
+  AMENDS:
+    from_entity: "Contract"
+    to_entity: "Contract"
+    properties:
+      - name: "amendment_date"
+        type: "date"
+    extraction_hint: "Look for 'amends', 'modifies', or references to parent agreements"
 
-4. **Ingest data into PostgreSQL:**
-   
-   GraphRAG data is pre-ingested in `data/output/`. You only need to ingest into PostgreSQL:
-   ```bash
-   python data_ingestion/postgres_ingestion.py
-   ```
-   
-   This will automatically:
-   - Create the PostgreSQL schema with all tables
-   - Extract and ingest contract data using LLM
-   - Build the Apache AGE graph with nodes and relationships
-   - Generate a data exploration report
-   
-   Or to re-run full dual ingestion pipeline:
-   ```bash
-   python data_ingestion/ingestion_pipeline.py
-   ```
-   
-   **Note:** The graph build step is integrated into the ingestion pipeline. If you need to rebuild only the graph (after data updates):
-   ```bash
-   python data_ingestion/build_graph.py
-   ```
+# Extraction Configuration
+extraction:
+  llm_model: "gpt-4.1"
+  embedding_model: "text-embedding-3-small"
+  embedding_dimensions: 1536
+  chunk_size: 4000
+  overlap: 200
 
-### Run the Application
-
-**Backend (Terminal 1):**
-```bash
-start_backend.bat  # or: uvicorn backend.app.main:app --reload
+# Query Agent Context
+query_context:
+  domain_description: |
+    This is a contract intelligence system for analyzing enterprise legal agreements.
+    Users will ask questions about contract terms, party relationships, obligations,
+    financial terms, and risk exposure across the portfolio.
+    
+  sample_questions:
+    - "What are our highest risk clauses across all vendor contracts?"
+    - "Show the contract family tree for Acme Corp MSA"
+    - "Which contracts expire in Q2 2025?"
+    - "Total contract value by vendor"
+    
+  query_patterns:
+    aggregation: ["total", "count", "average", "sum by"]
+    graph_traversal: ["connected to", "related to", "hierarchy", "family tree"]
+    semantic: ["similar to", "like", "about", "themed"]
 ```
-
-**Frontend (Terminal 2):**
-```bash
-cd frontend
-npm run dev
-```
-
-**Open:** http://localhost:5173
 
 ---
 
-## 📊 Database Schema
+## 🤖 Schema Generation AI
 
-### PostgreSQL Relational Schema
+The platform includes an AI assistant that helps generate optimal graph schemas:
 
-```mermaid
-erDiagram
-    CONTRACTS ||--o{ CONTRACT_RELATIONSHIPS : "parent/child"
-    CONTRACTS ||--o{ CLAUSES : contains
-    CONTRACTS ||--o{ PARTIES_CONTRACTS : involves
-    CONTRACTS ||--o{ MONETARY_VALUES : specifies
-    CONTRACTS ||--o{ RISKS : identifies
-    
-    CLAUSES ||--o{ OBLIGATIONS : defines
-    CLAUSES ||--o{ RIGHTS : grants
-    CLAUSES ||--o{ TERMS : defines_terms
-    CLAUSES ||--o{ MONETARY_VALUES : clause_values
-    CLAUSES ||--o{ RISKS : clause_risks
-    CLAUSES ||--o{ CONDITIONS : has_conditions
-    
-    PARTIES ||--o{ PARTIES_CONTRACTS : participates
-    PARTIES ||--o{ OBLIGATIONS : responsible
-    PARTIES ||--o{ RIGHTS : holds
-    
-    CONTRACTS {
-        uuid id PK
-        string reference_number UK
-        string title
-        string contract_type
-        date effective_date
-        string status
-    }
-    
-    CLAUSES {
-        uuid id PK
-        uuid contract_id FK
-        string section_label
-        text text_content
-        string risk_level
-        vector embedding
-    }
-    
-    OBLIGATIONS {
-        uuid id PK
-        uuid clause_id FK
-        text description
-        uuid responsible_party_id FK
-        date due_date
-        boolean is_high_impact
-    }
-    
-    RIGHTS {
-        uuid id PK
-        uuid clause_id FK
-        text description
-        uuid holder_party_id FK
-        date expiration_date
-    }
-    
-    TERMS {
-        uuid id PK
-        uuid clause_id FK
-        string term_name
-        text definition
-    }
-    
-    MONETARY_VALUES {
-        uuid id PK
-        uuid contract_id FK
-        uuid clause_id FK
-        decimal amount
-        string currency
-        string value_type
-    }
-    
-    RISKS {
-        uuid id PK
-        uuid contract_id FK
-        uuid clause_id FK
-        string risk_type
-        string risk_level
-        text rationale
-    }
-    
-    CONDITIONS {
-        uuid id PK
-        uuid clause_id FK
-        string condition_type
-        text description
-    }
+### Input Requirements
+
+| Input | Description | Example |
+|-------|-------------|---------|
+| **Sample Documents** | 5-10 representative documents | Contract PDFs, research papers |
+| **Business Goals** | What insights do you need? | "Understand vendor risk exposure" |
+| **Sample Questions** | Questions users will ask | "Which contracts have unlimited liability?" |
+| **Domain Context** | Industry/domain knowledge | "Enterprise legal department" |
+
+### Generation Process
+
 ```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  SCHEMA GENERATION WORKFLOW                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-### Apache AGE Graph Schema
-
-The graph layer provides multi-hop relationship traversal across the contract intelligence domain:
-
-```mermaid
-graph LR
-    subgraph "Core Entities"
-        Contract["📋 Contract<br/>reference_number<br/>title<br/>contract_type<br/>status"]
-        Party["👤 Party<br/>name<br/>party_type"]
-        Clause["📄 Clause<br/>section_label<br/>title<br/>risk_level"]
-    end
-    
-    subgraph "Obligations & Rights"
-        Obligation["⚖️ Obligation<br/>description<br/>due_date<br/>is_high_impact"]
-        Right["✅ Right<br/>description<br/>expiration_date"]
-    end
-    
-    subgraph "Terms & Definitions"
-        Term["📖 Term<br/>term_name<br/>definition"]
-    end
-    
-    subgraph "Financial & Risk"
-        MonetaryValue["💰 MonetaryValue<br/>amount<br/>currency<br/>value_type"]
-        Risk["⚠️ Risk<br/>risk_type<br/>risk_level<br/>rationale"]
-        Condition["🔒 Condition<br/>condition_type<br/>description"]
-    end
-    
-    Party -->|IS_PARTY_TO| Contract
-    Contract -->|CONTAINS_CLAUSE| Clause
-    Clause -->|IMPOSES_OBLIGATION| Obligation
-    Party -->|RESPONSIBLE_FOR| Obligation
-    Clause -->|GRANTS_RIGHT| Right
-    Party -->|HOLDS_RIGHT| Right
-    Clause -->|DEFINES_TERM| Term
-    Contract -->|HAS_VALUE| MonetaryValue
-    Clause -->|HAS_VALUE| MonetaryValue
-    Contract -->|HAS_RISK| Risk
-    Clause -->|HAS_RISK| Risk
-    Contract -->|AMENDS<br/>SOW_OF<br/>ADDENDUM_TO<br/>WORK_ORDER_OF| Contract
-    Clause -->|HAS_CONDITION| Condition
-    
-    style Contract fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
-    style Party fill:#fff4e6,stroke:#ff9800,stroke-width:2px
-    style Clause fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
-    style Obligation fill:#ffebee,stroke:#c62828,stroke-width:2px
-    style Right fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    style Term fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style MonetaryValue fill:#e0f2f1,stroke:#00695c,stroke-width:2px
-    style Risk fill:#fce4ec,stroke:#880e4f,stroke-width:2px
-    style Condition fill:#f1f8e9,stroke:#558b2f,stroke-width:2px
+  1. DOCUMENT ANALYSIS
+     ┌─────────────────────────────────────────────────────────────────────┐
+     │  AI analyzes sample documents to identify:                          │
+     │  • Document types and structures                                    │
+     │  • Recurring entities (people, orgs, concepts)                      │
+     │  • Implicit relationships between entities                          │
+     │  • Key properties and attributes                                    │
+     │  • Tables, lists, and structured data                               │
+     └─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+  2. QUESTION ANALYSIS
+     ┌─────────────────────────────────────────────────────────────────────┐
+     │  AI analyzes sample questions to determine:                         │
+     │  • Required entities to answer questions                            │
+     │  • Necessary relationships for traversal                            │
+     │  • Aggregation and filtering needs                                  │
+     │  • Semantic search requirements                                     │
+     └─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+  3. ONTOLOGY SYNTHESIS
+     ┌─────────────────────────────────────────────────────────────────────┐
+     │  AI synthesizes a coherent ontology:                                │
+     │  • Core concepts and their hierarchy                                │
+     │  • Relationship types with cardinality                              │
+     │  • Property schemas with types and constraints                      │
+     │  • Entity resolution strategies                                     │
+     └─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+  4. PROMPT GENERATION
+     ┌─────────────────────────────────────────────────────────────────────┐
+     │  AI generates extraction prompts:                                   │
+     │  • Entity-specific extraction instructions                          │
+     │  • Relationship identification prompts                              │
+     │  • Validation and normalization rules                               │
+     │  • Few-shot examples from sample documents                          │
+     └─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+  5. HUMAN REVIEW & REFINEMENT
+     ┌─────────────────────────────────────────────────────────────────────┐
+     │  Domain expert reviews and refines:                                 │
+     │  • Adjusts entity definitions                                       │
+     │  • Adds missing relationships                                       │
+     │  • Refines extraction prompts                                       │
+     │  • Validates against business requirements                          │
+     └─────────────────────────────────────────────────────────────────────┘
 ```
-
-**Graph Capabilities:**
-
-🔗 **Multi-Hop Traversal Examples:**
-
-Each example shows both **Cypher** (graph traversal) and **SQL** (traditional JOINs) to compare approaches.
-
-```cypher
-// 1. Identify critical obligations requiring immediate attention for key business partners
-MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
-WHERE p.name = 'Quantum Labs' AND o.is_high_impact = true
-RETURN p.name, c.identifier, cl.section, o.description
-LIMIT 20
-```
-
-```sql
--- SQL equivalent using JOINs
-SELECT p.name, c.contract_identifier, cl.section_label, o.description
-FROM parties p
-JOIN parties_contracts pc ON p.id = pc.party_id
-JOIN contracts c ON pc.contract_id = c.id
-JOIN clauses cl ON c.id = cl.contract_id
-JOIN obligations o ON cl.id = o.clause_id
-WHERE p.name = 'Quantum Labs' AND o.is_high_impact = true
-LIMIT 20;
-
-// 2. Map all subsidiary agreements under a Master Services Agreement to understand scope of engagement
-MATCH (parent:Contract {identifier: 'contract_197'})<--(child:Contract)
-WITH DISTINCT parent.title as parent_title, child.identifier as child_id, child.type as child_type
-RETURN parent_title, child_id, child_type
-ORDER BY child_id
-LIMIT 10
-
-// 3. Find all parties connected to Phoenix Industries through shared contracts
-MATCH (p1:Party {name: 'Phoenix Industries'})-[:IS_PARTY_TO]->(c:Contract)<-[:IS_PARTY_TO]-(p2:Party)
-WHERE p1 <> p2
-RETURN p1.name, p2.name, count(c) as shared_contracts, 
-       collect(c.identifier)[0..5] as sample_contracts
-ORDER BY shared_contracts DESC
-LIMIT 10
-
-// 4. Discover high-risk clauses and their responsible parties in active contracts
-MATCH (c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:IMPOSES_OBLIGATION]->(o:Obligation)
-MATCH (p:Party)-[:RESPONSIBLE_FOR]->(o)
-WHERE cl.risk_level = 'high'
-WITH c.identifier as contract_id, c.title as title, cl.section as section, cl.type as clause_type,
-     p.name as responsible_party, o.description as description, o.is_high_impact as is_high_impact
-RETURN contract_id, title, section, clause_type, responsible_party, description, is_high_impact
-ORDER BY contract_id, responsible_party
-LIMIT 20
-
-// 5. Find all payment terms and monetary values for Contoso Enterprises contracts
-MATCH (p:Party {name: 'Contoso Enterprises'})-[:IS_PARTY_TO]->(c:Contract)
-MATCH (c)-[:CONTAINS_CLAUSE]->(cl:Clause)
-MATCH (cl)-[:HAS_VALUE]->(mv:MonetaryValue)
-WHERE cl.type = 'Payment Terms'
-WITH c.identifier as contract_id, c.type as contract_type, cl.section as clause_section,
-     mv.amount as amount, mv.currency as currency, mv.value_type as value_type
-RETURN contract_id, contract_type, clause_section, amount, currency, value_type
-ORDER BY amount DESC
-LIMIT 20
-
-// 6. Assess complexity of data processing relationships by analyzing agreement hierarchy levels
-MATCH path = (root:Contract {identifier: 'contract_324'})<--(descendant:Contract)
-WITH root.title as root_title, descendant.identifier as desc_id, descendant.type as desc_type,
-     length(path) as hierarchy_depth, [rel in relationships(path) | type(rel)] as relationship_chain
-RETURN root_title, desc_id, desc_type, hierarchy_depth, relationship_chain
-ORDER BY desc_id
-LIMIT 10
-
-// 7. Find rights granted to Atlas Ventures and their expiration dates
-MATCH (p:Party {name: 'Atlas Ventures'})-[:IS_PARTY_TO]->(c:Contract)
-MATCH (c)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:GRANTS_RIGHT]->(r:Right)
-MATCH (p)-[:HOLDS_RIGHT]->(r)
-RETURN c.identifier, c.type, cl.section, r.description
-ORDER BY r.description
-LIMIT 20
-
-// 8. Map all vendors with California governing law and their risk exposure
-// Note: Traverse through clauses since risks are clause-level, not contract-level
-MATCH (p:Party)-[:IS_PARTY_TO]->(c:Contract)-[:CONTAINS_CLAUSE]->(cl:Clause)-[:HAS_RISK]->(r:Risk)
-WHERE c.governing_law = 'California' AND r.risk_level = 'high'
-WITH p.name as party_name, p.type as party_type, count(DISTINCT c) as contract_count,
-     count(r) as high_risk_count, collect(DISTINCT r.risk_type)[0..3] as risk_types
-RETURN party_name, party_type, contract_count, high_risk_count, risk_types
-ORDER BY high_risk_count DESC
-LIMIT 10
-
-// 9. Find all defined terms in Intellectual Property clauses across portfolio
-// Note: Terms are at contract level, not clause level
-MATCH (c:Contract)-[:DEFINES_TERM]->(t:Term)
-MATCH (c)-[:CONTAINS_CLAUSE]->(cl:Clause)
-WHERE cl.type = 'Intellectual Property'
-WITH DISTINCT c.identifier as contract_id, c.type as contract_type, t.name as term_name, t.definition as definition
-RETURN contract_id, contract_type, term_name, definition
-ORDER BY contract_id, term_name
-LIMIT 20
-
-// 10. Identify amendment chains for any Master Services Agreement
-MATCH path = (msa:Contract {type: 'Master Services Agreement'})<-[:AMENDS]-(amd:Contract)
-RETURN msa.identifier, msa.title,
-       length(path) as amendment_depth,
-       collect(amd.identifier) as amendment_chain
-ORDER BY amendment_depth DESC
-LIMIT 10
-```
-
-**Node Types (9):** Contract, Party, Clause, Obligation, Right, Term, MonetaryValue, Risk, Condition
-
-**Edge Types (15):** IS_PARTY_TO, CONTAINS_CLAUSE, IMPOSES_OBLIGATION, RESPONSIBLE_FOR, GRANTS_RIGHT, HOLDS_RIGHT, DEFINES_TERM, HAS_VALUE, HAS_RISK, HAS_CONDITION, AMENDS, SOW_OF, ADDENDUM_TO, WORK_ORDER_OF, RELATED_TO
-
-**Key Graph Features:**
-- ✅ All nodes have `db_id` property linking back to PostgreSQL primary keys
-- ✅ Bidirectional queries: Start from any entity and traverse relationships
-- ✅ Flexible patterns: Find paths, count hops, filter by properties
-- ✅ Contract families: AMENDS, SOW_OF, ADDENDUM_TO relationships preserve hierarchy
-
-**Property Name Mapping (Graph vs SQL):**
-- Contract: `identifier` (graph) = `contract_identifier` (SQL), `type` (graph) = `contract_type` (SQL)
-- Clause: `section` (graph) = `section_label` (SQL), `type` (graph) = clause_types.name (SQL JOIN)
-- Party: `type` (graph) = `party_type` (SQL)
-- Risk: `risk_type` (graph) = risk_types.name (SQL JOIN)
-- MonetaryValue, Obligation, Right, Term, Condition: Same property names in both
 
 ---
 
-## 🔧 Technology Stack
+## 💼 Business Scenarios
+
+The Content Intelligence Platform can be applied across many domains:
+
+### 1. 📜 Contract Intelligence (Reference Implementation)
+
+**Domain:** Legal/Procurement
+
+**Use Cases:**
+- Cross-contract risk analysis
+- Vendor relationship mapping
+- Obligation tracking and compliance
+- Contract family tree visualization
+- Financial term aggregation
+
+**Key Entities:** Contract, Party, Clause, Obligation, Right, Risk, Monetary Value
+
+**Sample Questions:**
+- "What are our highest risk clauses across all vendor contracts?"
+- "Show all contracts with unlimited liability exposure"
+- "Which vendors have the most favorable payment terms?"
+
+---
+
+### 2. 📚 Research & Academic Intelligence
+
+**Domain:** Research/Academia
+
+**Use Cases:**
+- Literature review automation
+- Citation network analysis
+- Methodology pattern discovery
+- Research gap identification
+- Author collaboration mapping
+
+**Key Entities:** Paper, Author, Institution, Methodology, Finding, Citation, Dataset
+
+**Sample Questions:**
+- "What methodologies are most commonly used for NLP evaluation?"
+- "Show the citation network around transformer architecture papers"
+- "Which institutions are leading in quantum computing research?"
+- "Find research gaps in federated learning literature"
+
+---
+
+### 3. 🏥 Clinical & Healthcare Intelligence
+
+**Domain:** Healthcare
+
+**Use Cases:**
+- Patient journey analysis
+- Treatment outcome correlation
+- Drug interaction discovery
+- Clinical protocol compliance
+- Care pathway optimization
+
+**Key Entities:** Patient, Provider, Diagnosis, Treatment, Medication, Outcome, Protocol
+
+**Sample Questions:**
+- "What treatments show best outcomes for Type 2 diabetes patients over 65?"
+- "Show all patients with potential drug interaction risks"
+- "Which care protocols have highest compliance rates?"
+- "Identify patterns in readmission cases"
+
+---
+
+### 4. 👥 HR & Talent Intelligence
+
+**Domain:** Human Resources
+
+**Use Cases:**
+- Skills gap analysis
+- Career path optimization
+- Team composition insights
+- Attrition pattern detection
+- Training effectiveness measurement
+
+**Key Entities:** Employee, Role, Skill, Project, Team, Certification, Performance Review
+
+**Sample Questions:**
+- "Which skills are most correlated with promotion to senior engineer?"
+- "Show the career paths of our top performers"
+- "What teams have the most diverse skill coverage?"
+- "Identify flight risks based on performance and tenure patterns"
+
+---
+
+### 5. 🔗 Supply Chain Intelligence
+
+**Domain:** Logistics/Procurement
+
+**Use Cases:**
+- Supplier risk assessment
+- Dependency chain analysis
+- Alternative supplier discovery
+- Cost optimization pathways
+- Compliance tracking
+
+**Key Entities:** Supplier, Product, Component, Facility, Shipment, Contract, Risk Event
+
+**Sample Questions:**
+- "What's our exposure if Supplier X experiences disruption?"
+- "Show all single-source dependencies in our supply chain"
+- "Which alternative suppliers can provide Component Y?"
+- "Trace the origin of all components in Product Z"
+
+---
+
+### 6. 📋 Regulatory & Compliance Intelligence
+
+**Domain:** Compliance/Legal
+
+**Use Cases:**
+- Regulation mapping to controls
+- Compliance gap analysis
+- Audit evidence management
+- Policy change impact assessment
+- Cross-regulation overlap detection
+
+**Key Entities:** Regulation, Requirement, Control, Evidence, Audit, Policy, Risk
+
+**Sample Questions:**
+- "Which controls satisfy both SOX and GDPR requirements?"
+- "Show all gaps in our ISO 27001 compliance"
+- "What evidence do we have for PCI-DSS Requirement 3?"
+- "Impact analysis: What controls are affected by the new privacy law?"
+
+---
+
+### 7. 🎫 Customer Support Intelligence
+
+**Domain:** Customer Service
+
+**Use Cases:**
+- Issue pattern recognition
+- Knowledge base optimization
+- Resolution path analysis
+- Customer journey mapping
+- Escalation prediction
+
+**Key Entities:** Ticket, Customer, Product, Issue, Solution, Agent, Knowledge Article
+
+**Sample Questions:**
+- "What are the most common issues for Product X this quarter?"
+- "Show the resolution paths for billing disputes"
+- "Which knowledge articles need updating based on ticket patterns?"
+- "Identify customers at risk of churn based on support history"
+
+---
+
+### 8. 💰 Financial Document Intelligence
+
+**Domain:** Finance
+
+**Use Cases:**
+- Cross-filing analysis
+- Entity relationship mapping
+- Risk factor tracking
+- Financial metric extraction
+- Regulatory filing compliance
+
+**Key Entities:** Filing, Company, Executive, Financial Metric, Risk Factor, Business Segment
+
+**Sample Questions:**
+- "Track revenue growth across all portfolio companies"
+- "What risk factors are most commonly cited in our industry?"
+- "Show executive turnover patterns correlated with stock performance"
+- "Compare gross margins across competitors over 5 years"
+
+---
+
+### 9. 🔬 Patent & IP Intelligence
+
+**Domain:** Intellectual Property
+
+**Use Cases:**
+- Prior art discovery
+- Patent landscape mapping
+- Innovation trend analysis
+- Competitor IP monitoring
+- Licensing opportunity identification
+
+**Key Entities:** Patent, Claim, Inventor, Assignee, Citation, Technology Class
+
+**Sample Questions:**
+- "Find all patents related to our core technology that expire in 2025"
+- "Show the citation network around our key patents"
+- "What technology areas are seeing the most patent activity?"
+- "Identify potential licensing targets in battery technology"
+
+---
+
+### 10. 🏢 M&A Due Diligence Intelligence
+
+**Domain:** Corporate Development
+
+**Use Cases:**
+- Target company analysis
+- Risk factor aggregation
+- Synergy identification
+- Integration planning
+- Competitive landscape mapping
+
+**Key Entities:** Company, Deal, Risk, Synergy, Financials, Contract, Employee
+
+**Sample Questions:**
+- "Aggregate all identified risks across the 500 documents in the data room"
+- "What contracts require change of control consent?"
+- "Show potential revenue synergies with our existing customer base"
+- "Identify key personnel with non-compete agreements"
+
+---
+
+## 🛠️ Technology Stack
 
 | Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Frontend** | React + TypeScript | Modern UI |
-| **Visualization** | Mermaid.js | Auto-generated charts |
-| **Backend** | FastAPI + Python | Async API |
-| **AI Agents** | Microsoft Agent Framework | Orchestration |
-| **Database** | PostgreSQL 16 | Structured data |
-| **Vector Search** | pgvector | Semantic matching |
-| **Graph Queries** | Apache AGE | Relationship traversal |
-| **Knowledge Graph** | Microsoft GraphRAG | Pattern discovery |
-| **LLM** | Azure OpenAI gpt-5.1 | Natural language |
-| **Embeddings** | text-embedding-3-small | Vectors |
-| **Deployment** | Azure Container Apps | Hosting |
+|-------|------------|---------|
+| **Database** | PostgreSQL 16 | Relational storage, full-text search |
+| **Graph** | Apache AGE | Cypher queries, relationship traversal |
+| **Vector** | pgvector | Semantic similarity search |
+| **Fuzzy Match** | pg_trgm | Entity resolution |
+| **LLM** | Azure OpenAI | Extraction, schema generation, query agents |
+| **Embeddings** | text-embedding-3-small | 1536-dimension vectors |
+| **Backend** | FastAPI (Python) | API layer, agent orchestration |
+| **Frontend** | React + TypeScript | User interface |
+| **Infrastructure** | Azure Container Apps | Deployment |
 
 ---
 
-## 📁 Project Structure
+## 📁 Repository Structure
 
 ```
-contract_intelligence/
-├── backend/
-│   ├── agents/              # PostgreSQL, GraphRAG, Router agents
-│   ├── app/                 # FastAPI application
-│   └── utils/               # Mermaid corrector, helpers
-├── frontend/
-│   └── src/
-│       └── components/      # Query interface, results
-├── data_ingestion/          # Dual ingestion pipeline (see [Data Ingestion README](data_ingestion/README.md))
-├── data/
-│   ├── input/              # Raw contract markdown
-│   └── output/             # GraphRAG artifacts
-├── graphrag_config/        # GraphRAG settings
-├── scripts/                # Deployment, seed data
-└── Dockerfile              # Multi-stage build
-```
-
----
-
-## 📚 Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Data Ingestion Pipeline](contract_intelligence/data_ingestion/README.md) | Comprehensive guide to PostgreSQL ingestion, entity resolution, schema, and graph construction |
-| [GraphRAG Configuration](contract_intelligence/graphrag_config/README.md) | Microsoft GraphRAG setup and indexing |
-| [Backend API](contract_intelligence/backend/README.md) | FastAPI endpoints and agent architecture |
-
----
-
-## 🎓 Sample Queries
-
-### PostgreSQL Graph Engine
-
-**Contract Hierarchies:**
-```
-Show the complete contract family tree for MSA-ZEN-202403-197
-List all SOWs under the Phoenix Industries Master Agreement
-Find all amendments to Data Processing Agreement DPA-SUM-202502-324
-```
-
-**Party & Obligations:**
-```
-What obligations does Acme Corp have?
-Show all high-risk obligations for Phoenix Industries
-```
-
-**Financial Analysis:**
-```
-What are the payment terms with Atlas Ventures?
-List all contracts with values over $1M
-```
-
-**Semantic Search:**
-```
-Find clauses about data breach notification
-Show limitation of liability clauses similar to Acme Corp
-```
-
-### Microsoft GraphRAG Engine
-
-**Pattern Discovery:**
-```
-What are the most common themes in high-risk clauses?
-How do termination clauses vary across vendor types?
-```
-
-**Strategic Insights:**
-```
-Compare our indemnification terms to industry best practices
-Identify common vendor subcontractor patterns
+content-intelligence/
+├── README.md                      # This file
+├── core/                          # Core platform (domain-agnostic)
+│   ├── schema/                    # Schema definition & generation
+│   │   ├── generator.py           # AI-assisted schema generator
+│   │   ├── validator.py           # Schema validation
+│   │   ├── models.py              # Pydantic schema models
+│   │   └── templates/             # Base schema templates
+│   ├── database/                  # Database generation
+│   │   ├── postgres_generator.py  # Generate DDL from schema
+│   │   ├── age_generator.py       # Generate graph schema
+│   │   └── migration.py           # Schema migrations
+│   ├── ingestion/                 # Ingestion pipeline
+│   │   ├── pipeline.py            # Orchestration
+│   │   ├── extractors/            # Entity extractors
+│   │   ├── resolvers/             # Entity resolution
+│   │   └── loaders/               # Database loaders
+│   ├── agents/                    # Query agents
+│   │   ├── router.py              # Query routing
+│   │   ├── sql_agent.py           # SQL generation
+│   │   ├── graph_agent.py         # Cypher generation
+│   │   └── semantic_agent.py      # Vector search
+│   └── api/                       # FastAPI endpoints
+│       └── main.py
+├── domains/                       # Domain-specific implementations
+│   ├── contract_intelligence/     # Legal contracts (reference)
+│   ├── research_intelligence/     # Academic papers
+│   └── [your_domain]/             # Your custom domain
+└── frontend/                      # React UI
 ```
 
 ---
 
-## 🚢 Deployment
+## 🚀 Getting Started
 
-### Azure Container Apps
+### 1. Define Your Domain
+
+Start by answering these questions:
+
+- What documents will you analyze?
+- What questions do users need to answer?
+- What entities and relationships matter?
+- What integrations are needed?
+
+### 2. Generate Schema
 
 ```bash
-.\scripts\deploy-containerapp.ps1 -UseLocalDockerBuild -SubscriptionId YOUR_SUBSCRIPTION_ID
+# Interactive schema generation
+python -m core.schema.generator \
+  --samples ./my_documents/ \
+  --questions ./sample_questions.txt \
+  --context "Enterprise procurement department"
 ```
 
-### Local Development
+### 3. Review & Refine
+
+Edit the generated `schema.yaml` to:
+- Add missing entities
+- Refine extraction prompts
+- Adjust relationship definitions
+- Configure entity resolution
+
+### 4. Initialize Infrastructure
 
 ```bash
-uvicorn backend.app.main:app --reload
+# Generate PostgreSQL schema and initialize
+python -m core.database.postgres_generator --schema schema.yaml
+python -m core.database.age_generator --schema schema.yaml
+```
 
-# Frontend
-cd frontend
-npm run dev
+### 5. Ingest Content
+
+```bash
+# Run ingestion pipeline
+python -m core.ingestion.pipeline \
+  --schema schema.yaml \
+  --input ./documents/
+```
+
+### 6. Query
+
+```bash
+# Start the API
+uvicorn core.api.main:app --reload
+
+# Or use the UI
+cd frontend && npm run dev
 ```
 
 ---
 
-## 🎯 Why This Matters
+## 🎯 Roadmap
 
-**Traditional systems require:**
-- ❌ Manual review (slow, error-prone)
-- ❌ SQL expertise (technical users only)
-- ❌ Separate tools (fragmented insights)
-- ❌ No cross-document understanding
+### Phase 1: Foundation ✅
+- [x] Contract Intelligence reference implementation
+- [x] PostgreSQL + Apache AGE infrastructure
+- [x] Entity resolution with fuzzy matching
+- [x] Query agent layer
 
-**This platform delivers:**
-- ✅ Natural language queries
-- ✅ Automatic relationship discovery
-- ✅ Visual intelligence
-- ✅ Dual-engine approach
-- ✅ Enterprise-ready
+### Phase 2: Schema Framework (In Progress)
+- [ ] YAML schema specification
+- [ ] AI-assisted schema generator
+- [ ] Schema-to-DDL compiler
+- [ ] Schema-to-prompt compiler
 
-**The result:** Legal teams get answers in seconds, finance sees patterns instantly, executives gain strategic insights.
+### Phase 3: Multi-Domain Support
+- [ ] Domain template library
+- [ ] Custom entity types
+- [ ] Pluggable extractors
+- [ ] Domain-specific agents
+
+### Phase 4: Enterprise Features
+- [ ] Multi-tenant support
+- [ ] Schema versioning & migration
+- [ ] Incremental re-indexing
+- [ ] Audit logging
 
 ---
 
-**Built with 💙**
+## 📚 Implementations
+
+| Domain | Status | Description |
+|--------|--------|-------------|
+| [Contract Intelligence](./contract_intelligence/) | ✅ Reference | Legal contract analysis with dual-graph (PostgreSQL + GraphRAG) |
+| Research Intelligence | 🔜 Planned | Academic paper and citation analysis |
+| Healthcare Intelligence | 🔜 Planned | Clinical document analysis |
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a domain implementation in `domains/`
+3. Share your schema templates
+4. Submit a pull request
+
+---
+
+## 📄 License
+
+MIT License - See [LICENSE](./LICENSE) for details
