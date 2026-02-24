@@ -151,18 +151,26 @@ The ingestion process follows this sequence:
                                          │
                                          ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  STEP 6: APACHE AGE GRAPH CONSTRUCTION (build_graph.py)                     │
+│  STEP 6: APACHE AGE 1.6.0 GRAPH CONSTRUCTION (build_graph.py)               │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│   NODE TYPES                              EDGE TYPES                        │
+│  9 NODE TYPES                            15 EDGE TYPES                      │
 │  ┌────────────────┐                      ┌─────────────────────────────┐   │
 │  │ :Contract      │──IS_PARTY_TO───────►│ :Party                      │   │
-│  │ :Clause        │──CONTAINS_CLAUSE───►│ :Clause                     │   │
-│  │ :Obligation    │──IMPOSES_OBLIGATION►│ :Obligation                 │   │
+│  │ :Party         │──CONTAINS_CLAUSE───►│ :Clause                     │   │
+│  │ :Clause        │──IMPOSES_OBLIGATION►│ :Obligation                 │   │
+│  │ :Obligation    │──RESPONSIBLE_FOR───►│ Party → Obligation          │   │
 │  │ :Right         │──GRANTS_RIGHT──────►│ :Right                      │   │
-│  │ :Term          │──AMENDS────────────►│ :Contract (parent)          │   │
-│  │ :Risk          │──DEFINES_TERM──────►│ :Term                       │   │
-│  └────────────────┘                      └─────────────────────────────┘   │
+│  │ :Term          │──HOLDS_RIGHT───────►│ Party → Right               │   │
+│  │ :MonetaryValue │──DEFINES_TERM──────►│ :Term                       │   │
+│  │ :Risk          │──HAS_VALUE─────────►│ :MonetaryValue              │   │
+│  │ :Condition     │──HAS_RISK──────────►│ :Risk                       │   │
+│  └────────────────┘  HAS_CONDITION──────►│ :Condition                 │   │
+│                      AMENDS / SOW_OF ───►│ :Contract (parent)         │   │
+│                      ADDENDUM_TO ───────►│ :Contract (parent)         │   │
+│                      WORK_ORDER_OF ─────►│ :Contract (parent)         │   │
+│                      RELATED_TO ────────►│ :Contract (sibling)        │   │
+│                                          └─────────────────────────────┘   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -173,10 +181,11 @@ The ingestion process follows this sequence:
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| **postgres_ingestion.py** | Main ingestion entry point | `python postgres_ingestion.py` |
-| **ingestion_pipeline.py** | Unified pipeline (PostgreSQL + GraphRAG) | `python ingestion_pipeline.py` |
+| **postgres_ingestion.py** | Main PostgreSQL ingestion entry point | `python postgres_ingestion.py` |
+| **ingestion_pipeline.py** | Unified pipeline with 4 modes (postgres/graphrag/both/byog) | `python ingestion_pipeline.py` |
+| **graphrag_ingestion.py** | GraphRAG v3 indexing (LiteLLM, optional PgVectorStore) | `python graphrag_ingestion.py` |
 | **contract_extractor.py** | LLM extraction logic (metadata, clauses) | Imported by postgres_ingestion |
-| **build_graph.py** | Apache AGE graph construction | `python build_graph.py` |
+| **build_graph.py** | Apache AGE graph construction (9 node types, 15 edge types) | `python build_graph.py` |
 | **schema.sql** | Database schema definition | Executed by initialize_schema() |
 | **explore_data.py** | Data exploration and reporting | `python explore_data.py` |
 | **check_relationships.py** | Diagnostic: verify graph relationships | `python check_relationships.py` |
@@ -257,10 +266,15 @@ contracts                 # Contract metadata and full text
 
 ### Extensions Required
 
+These extensions must be enabled on your Azure PostgreSQL Flexible Server. The `pg_trgm` extension is created by `schema.sql`; the others must be **pre-provisioned** on the server:
+
 ```sql
+-- Pre-provision on server (requires server parameter changes on Azure)
 CREATE EXTENSION IF NOT EXISTS vector;    -- pgvector for embeddings
-CREATE EXTENSION IF NOT EXISTS age;       -- Apache AGE for graph
-CREATE EXTENSION IF NOT EXISTS pg_trgm;   -- Trigram similarity
+CREATE EXTENSION IF NOT EXISTS age;       -- Apache AGE 1.6.0 for Cypher graph queries
+
+-- Created automatically by schema.sql
+CREATE EXTENSION IF NOT EXISTS pg_trgm;   -- Trigram similarity for entity resolution
 ```
 
 ### Key Indexes
@@ -305,15 +319,44 @@ run_postgres_ingestion(
 )
 ```
 
-### Unified Pipeline (PostgreSQL + GraphRAG)
+### Unified Pipeline (4 Modes)
 
-```bash
-python ingestion_pipeline.py
+The pipeline supports four ingestion modes:
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| **both** (default) | `python ingestion_pipeline.py` | Full PostgreSQL + GraphRAG ingestion |
+| **postgres** | `python ingestion_pipeline.py --mode postgres` | PostgreSQL + Apache AGE only |
+| **graphrag** | `python ingestion_pipeline.py --mode graphrag` | GraphRAG indexing only (LanceDB vectors) |
+| **byog** | `python ingestion_pipeline.py --mode byog` | "Bring Your Own Graph" — PostgreSQL first, then export graph for GraphRAG community summarization |
+
+The interactive menu (`python ingestion_pipeline.py`) offers 8 options:
+
+```
+1. Process 1 contract  (both)
+2. Process 2 contracts (both)
+3. Process 5 contracts (both)
+4. Process all contracts (both)
+5. GraphRAG only (2 contracts)
+6. PostgreSQL only (2 contracts)
+7. PostgreSQL only (all contracts)
+8. BYOG: Postgres → GraphRAG community detection
 ```
 
-This runs both:
-1. PostgreSQL ingestion with Apache AGE graph
-2. GraphRAG knowledge graph indexing
+Programmatic usage with mode selection:
+
+```python
+from ingestion_pipeline import run_full_pipeline
+
+# Default: both engines
+run_full_pipeline(num_contracts=None, mode="both")
+
+# PostgreSQL only with 5 parallel workers
+run_full_pipeline(num_contracts=50, n_parallel=5, mode="postgres")
+
+# BYOG: leverage existing PostgreSQL graph for GraphRAG community reports
+run_full_pipeline(mode="byog")
+```
 
 ---
 
@@ -345,6 +388,8 @@ EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-small
 | `n_parallel` | run_postgres_ingestion() | 8 | Parallel worker count |
 | `LLM_MODEL` | contract_extractor.py | gpt-4.1 | Model for extraction |
 | `EMBEDDING_MODEL` | contract_extractor.py | text-embedding-3-small | Model for embeddings |
+| `mode` | ingestion_pipeline.py | `"both"` | Pipeline mode: postgres / graphrag / both / byog |
+| `GRAPHRAG_VECTOR_STORE` | graphrag_ingestion.py | (unset → LanceDB) | Set to `pgvector` to use PgVectorStore |
 
 ---
 
