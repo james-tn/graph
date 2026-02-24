@@ -33,15 +33,20 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and install compatible setuptools for Python 3.12
-RUN pip install --no-cache-dir --upgrade pip setuptools>=70.0.0 wheel
+# Install uv for fast package installation (10-50x faster than pip)
+RUN pip install --no-cache-dir uv
 
-# Copy and install Python dependencies
+# Copy and install Python dependencies using uv
 COPY backend/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN uv pip install --system --no-cache --prerelease=allow -r requirements.txt \
+    && uv pip install --system --no-cache "opentelemetry-semantic-conventions-ai==0.4.1"
 
 # Copy backend application code
 COPY backend/ ./backend/
+
+# Copy the otel_patch (agent-framework rc1 compat)
+# and vector_stores (PgVectorStore for shared PostgreSQL)
+# These are part of the backend/ directory already
 
 
 # Copy GraphRAG configuration

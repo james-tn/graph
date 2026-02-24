@@ -4,16 +4,17 @@ pydantic
 python-dotenv
 asyncpg
 pgvector
-openai==2.8.1
+openai>=1.50.0
 azure-identity
 psycopg2-binary>=2.9
-graphrag
+graphrag>=3.0.2
+numpy
 
 # Authentication
 PyJWT[crypto]>=2.8.0
 
 # Agent Framework
-agent-framework==1.0.0b251120
+agent-framework>=1.0.0rc1
 PyPDF2
 pdf2image
 pytesseract

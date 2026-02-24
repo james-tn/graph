@@ -20,7 +20,7 @@ export const UploadSection: React.FC = () => {
 
   // Poll for status updates when indexing is in progress
   useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
     
     if (indexStatus.status === 'queued' || indexStatus.status === 'running') {
       if (indexStatus.taskId) {

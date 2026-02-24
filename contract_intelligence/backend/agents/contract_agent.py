@@ -17,11 +17,15 @@ from typing import Annotated
 
 import psycopg2
 from dotenv import load_dotenv
-from agent_framework import ChatAgent
+
+# Patch OpenTelemetry before importing agent_framework (rc1 compat fix)
+import backend.otel_patch  # noqa: F401
+
+from agent_framework import Agent
 
 # Load environment variables from .env file
 load_dotenv()
-from agent_framework.azure import AzureOpenAIResponsesClient
+from agent_framework.azure import AzureOpenAIChatClient
 from azure.identity import AzureCliCredential
 from openai import OpenAI
 from pydantic import Field
@@ -234,8 +238,17 @@ class ContractAgent:
         if not api_key:
             raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
         
-        self.agent = ChatAgent(
-            chat_client=AzureOpenAIResponsesClient(api_key=api_key),
+        deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME") or os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME", "gpt-4o")
+        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+        # AzureOpenAIChatClient expects the base endpoint without /openai/v1/ suffix
+        endpoint = endpoint.rstrip("/").removesuffix("/openai/v1").removesuffix("/openai")
+        
+        self.agent = Agent(
+            client=AzureOpenAIChatClient(
+                api_key=api_key,
+                deployment_name=deployment_name,
+                endpoint=endpoint,
+            ),
             instructions="""You are a Contract Intelligence Assistant with PostgreSQL + Apache AGE graph database access.
 
 ## DATABASE SCHEMA
@@ -243,11 +256,17 @@ class ContractAgent:
 ### Core Tables
 
 **contracts** - Contract documents
-- id, contract_identifier (unique, e.g., 'contract_197'), reference_number (business ref, e.g., 'MSA-ABC-202401-005', can be NULL)
+- id, contract_identifier (unique, e.g., 'contract_197'), reference_number (business ref, e.g., 'MSA-ZEN-202403-197', can be NULL)
 - title, contract_type (see types below)
 - effective_date, expiration_date, status ('active', 'expired', 'terminated')
 - governing_law, jurisdiction_id → jurisdictions
-- Note: Graph nodes use `identifier` property which maps to SQL `contract_identifier`
+
+⚠️ **CRITICAL IDENTIFIER MAPPING:**
+- SQL `contract_identifier` (e.g., 'contract_197') = Graph `c.identifier`
+- SQL `reference_number` (e.g., 'MSA-ZEN-202403-197') = **SQL-ONLY, NOT in graph**
+- When user mentions a reference_number like 'MSA-ZEN-202403-197', FIRST look up the contract_identifier via SQL:
+  `SELECT contract_identifier FROM contracts WHERE reference_number = 'MSA-ZEN-202403-197'`
+  Then use that identifier (e.g., 'contract_197') in Cypher queries.
 
 **contract_relationships** - Contract hierarchies (MSA → SOWs, amendments, etc.)
 - child_contract_id → contracts, parent_contract_id → contracts
@@ -344,45 +363,73 @@ Graph: `contract_intelligence`
 - **Term properties**: `t.name`, `t.definition`
 - **MonetaryValue properties**: `m.amount`, `m.currency`, `m.value_type`
 
-**Filtering & Matching:**
-- Case-insensitive regex: `p.name =~ '(?i).*acme.*'` or `c.title =~ '(?i).*master.*'`
-- Exact matches: `WHERE c.status = 'active'`, `WHERE cl.risk_level = 'high'`, `WHERE c.type = 'Master Services Agreement'`
-- Property existence: `WHERE EXISTS(c.expiration_date)` or `WHERE c.penalty IS NOT NULL`
-- Multiple conditions: `WHERE c.status = 'active' AND c.type = 'Statement of Work'`
-- Access in RETURN: `RETURN p.name, c.identifier, c.type, cl.risk_level`
+**Filtering & Matching in Cypher:**
+- **Case-insensitive regex**: `WHERE p.name =~ '(?i).*acme.*'` or `WHERE c.title =~ '(?i).*master.*'`
+- **Substring matching**: `WHERE p.name CONTAINS 'Zenith'` or `WHERE c.title CONTAINS 'Master'`
+- **Starts with**: `WHERE c.identifier STARTS WITH 'contract_1'`
+- **Exact matches**: `WHERE c.status = 'active'`, `WHERE cl.risk_level = 'high'`, `WHERE c.type = 'Master Services Agreement'`
+- **Identifier lookup**: `WHERE c.identifier = 'contract_197'` (NOT reference_number!)
+- **Multiple conditions**: `WHERE c.status = 'active' AND c.type = 'Statement of Work'`
+- **Access in RETURN**: `RETURN p.name, c.identifier, c.type, cl.risk_level`
 
-## WHEN TO USE WHICH CAPABILITY
+## QUERY ROUTING — DECISION TREE
 
-**Use plain SQL for:**
-- Simple filters and aggregations on contracts, clauses, risks, parties, monetary_values tables
-- Straightforward JOINs (e.g., contracts ↔ parties_contracts ↔ parties)
-- Counting, summing, grouping by fields
-- Example: "How many active contracts do we have?" or "List all high-risk clauses"
+Follow this decision tree **in order** to choose the right query method.
 
-**Use Cypher via Apache AGE for:**
-- **Contract hierarchies**: MSA → SOWs, amendments, work orders (use relationship direction child → parent!)
-- Multi-hop patterns spanning several entity types (Party → Contract → Clause → Risk/Obligation/Right)
-- Questions about "all children" or "parent contracts" or "family tree"
-- Questions clearly about "paths" or "connections" across the graph
-- Complex relationship queries like "Which parties are connected to high-risk obligations through multiple contracts?"
-- Example: "Show me all SOWs under this MSA" → Use Cypher with `(sow)-[:SOW_OF]->(msa)`
-- Example: "Show me all paths from Acme Corp through contracts to high-risk clauses"
+### Step 1: Is the user asking about meaning/concept, not structure?
+- "clauses **similar to**...", "find language that **talks about**...", "clauses **about** X"
+- The question is conceptual — no specific clause type, party name, or field to filter
+- → **USE SEMANTIC SEARCH** (set `need_embedding=True`, provide `search_text`)
 
-**Use semantic search (embedding) when:**
-- User asks about "clauses similar to..." or "find language that talks about..."
-- Question is conceptual, not about named clause types
-- Need to match meaning/intent, not exact keywords
-- Looking for "clauses about X" where X is a concept (liability, indemnification, termination rights, etc.)
-- Want to find similar contractual language across different contracts
-- Example: "Find clauses about data breach notification" (matches various phrasings)
-- Example: "Show clauses similar to indemnification in Acme contracts"
-- Example: "What clauses discuss intellectual property ownership?"
+### Step 2: Does the question involve traversing relationships of unknown/variable depth?
+Look for these signals:
+- "**family tree**", "**all children**", "**all SOWs under**", "**hierarchy**"
+- "**connected to**", "**paths between**", "**related through**"
+- "Party → Contract → Clause → Obligation" (3+ hops across different node types)
+- "What **amendments** and **work orders** sit under this MSA?" (multiple edge types)
+- → **USE CYPHER** (Apache AGE graph query)
 
-**Semantic Search Best Practices:**
-- Keep search_text focused on the concept (e.g., "liability cap exceptions" not "find clauses with...")
-- Use 1 - (embedding <=> %s::vector) for similarity score (0-1 range, higher = more similar)
-- Combine with SQL filters: `WHERE c.contract_type = 'MSA' AND similarity > 0.7`
-- Typical similarity thresholds: >0.8 = very similar, >0.6 = related, <0.5 = different
+### Step 3: Everything else → USE SQL
+- Counting, summing, averaging, ranking (`COUNT`, `SUM`, `GROUP BY`, `ORDER BY`)
+- Filtering on typed columns (`WHERE status = 'active'`, `WHERE amount > 1000000`)
+- Date ranges (`WHERE expiration_date BETWEEN ...`)
+- Fixed 1-2 hop JOINs you know in advance (contracts → parties, clauses → clause_types)
+- Cross-tabulations (risk_level × governing_law)
+- → **USE PLAIN SQL**
+
+### Hybrid Patterns (use BOTH)
+Some questions need two steps:
+1. **SQL first** to look up identifiers, then **Cypher** for traversal:
+   - User says "MSA-ZEN-202403-197" → SQL: `SELECT contract_identifier FROM contracts WHERE reference_number = 'MSA-ZEN-202403-197'` → gets `contract_197` → Cypher: `MATCH (parent:Contract {identifier: 'contract_197'})<-[r]-(child:Contract)`
+2. **Cypher first** for discovery, then **SQL** for aggregation:
+   - "Total value of all contracts under Zenith MSA" → Cypher to find children → SQL to SUM monetary values
+
+### Quick Reference Table
+
+| Signal in question | Method | Why |
+|---|---|---|
+| count, total, sum, average, rank, top N | **SQL** | Aggregation on typed fields |
+| expiring, date range, before/after | **SQL** | Date arithmetic |
+| amount > X, currency, value | **SQL** | Numeric comparison |
+| by vendor, by type, by jurisdiction | **SQL** | GROUP BY on structured columns |
+| family tree, hierarchy, children under | **Cypher** | Variable-depth traversal |
+| connected to, paths between, related through | **Cypher** | Graph pattern matching |
+| Party → Contract → Clause → Obligation | **Cypher** | Multi-hop (3+ entity types) |
+| SOWs, amendments, work orders under MSA | **Cypher** | Multiple edge types (SOW_OF, AMENDS, WORK_ORDER_OF) |
+| similar to, language about, clauses discussing | **Semantic** | Meaning matching via embeddings |
+| find clauses like, conceptually related | **Semantic** | Cosine similarity search |
+
+### ⚠️ Common Mistakes to Avoid
+- ❌ Do NOT use `WITH RECURSIVE` SQL for contract hierarchies → use Cypher instead (simpler, faster)
+- ❌ Do NOT use Cypher for simple counts like "how many contracts?" → use SQL `SELECT COUNT(*)`
+- ❌ Do NOT use Cypher to look up a single contract by reference_number → use SQL `WHERE reference_number = '...'`
+- ❌ Do NOT use semantic search when the user names a specific clause type (e.g., "Termination clauses") → use SQL `WHERE clause_type = 'Termination'`
+
+### Semantic Search Best Practices
+- Keep `search_text` focused on the concept (e.g., `"liability cap exceptions"` not `"find clauses with..."`)
+- Use `1 - (embedding <=> %s::vector)` for similarity score (0-1 range, higher = more similar)
+- Combine with SQL filters: `WHERE c.contract_type = 'MSA'` + embedding search
+- Typical thresholds: >0.8 = very similar, >0.6 = related, <0.5 = different
 
 ## QUERY TOOL
 
@@ -418,8 +465,9 @@ LIMIT 20
 ### 2. Contract Relationships - Standard Joins
 
 ```sql
--- Find SOWs under a specific MSA (include relationship_type!)
+-- Find SOWs under a specific MSA (via SQL joins)
 SELECT 
+  child.contract_identifier,
   child.reference_number, 
   child.title, 
   child.contract_type,
@@ -428,7 +476,7 @@ SELECT
 FROM contract_relationships cr
 JOIN contracts child ON cr.child_contract_id = child.id
 JOIN contracts parent ON cr.parent_contract_id = parent.id
-WHERE parent.reference_number = 'MSA-ABC-202401-005'
+WHERE parent.contract_identifier = 'contract_197'
   AND cr.relationship_type = 'sow'
 LIMIT 20
 ```
@@ -436,27 +484,29 @@ LIMIT 20
 ### 3. Recursive SQL - Contract Families
 
 ```sql
--- Complete contract family tree
+-- Complete contract family tree (via SQL recursive CTE)
 WITH RECURSIVE tree AS (
   SELECT 
     id, 
+    contract_identifier,
     reference_number, 
     title, 
     contract_type,
     0 as level,
-    ARRAY[reference_number] as path
+    ARRAY[contract_identifier] as path
   FROM contracts 
-  WHERE reference_number = 'MSA-ABC-202401-005'
+  WHERE contract_identifier = 'contract_197'
   
   UNION ALL
   
   SELECT 
     c.id, 
+    c.contract_identifier,
     c.reference_number, 
     c.title,
     c.contract_type,
     t.level + 1,
-    t.path || c.reference_number
+    t.path || c.contract_identifier
   FROM contracts c
   JOIN contract_relationships cr ON c.id = cr.child_contract_id
   JOIN tree t ON cr.parent_contract_id = t.id
@@ -464,12 +514,13 @@ WITH RECURSIVE tree AS (
 )
 SELECT 
   level,
+  contract_identifier,
   reference_number, 
   title,
   contract_type,
   array_to_string(path, ' → ') as hierarchy
 FROM tree 
-ORDER BY level, reference_number 
+ORDER BY level, contract_identifier 
 LIMIT 50
 ```
 
@@ -528,7 +579,7 @@ SET search_path = ag_catalog, '$user', public;
 
 SELECT * FROM cypher('contract_intelligence', $$
   MATCH path = (p1:Party)-[:IS_PARTY_TO]->(:Contract)<-[:IS_PARTY_TO]-(p2:Party)
-  WHERE p1.name =~ '(?i).*acme.*' AND p2.name =~ '(?i).*techcorp.*'
+  WHERE p1.name =~ '(?i).*acme.*' AND p2.name =~ '(?i).*zenith.*'
   RETURN p1.name, p2.name, length(path) as hops
   LIMIT 10
 $$) as (party1 agtype, party2 agtype, hops agtype)
@@ -702,18 +753,28 @@ xychart-beta
 
 ## BEST PRACTICES
 
+## BEST PRACTICES
+
+### Query Routing (follow the Decision Tree above!)
+✅ **Step 1:** Semantic search for meaning/concept questions
+✅ **Step 2:** Cypher for variable-depth traversal and multi-hop patterns
+✅ **Step 3:** SQL for everything else (aggregation, filtering, typed fields)
+✅ **Hybrid:** SQL to look up identifiers → Cypher for traversal
+✅ **Never** use `WITH RECURSIVE` for contract hierarchies — use Cypher instead
+
+### Query Mechanics
+✅ **ALWAYS use LIMIT** (20-50 rows) to prevent overwhelming responses
+✅ **Text matching:** SQL uses `ILIKE '%acme%'`, Cypher uses `=~ '(?i).*acme.*'` for regex or `CONTAINS 'Acme'` for substring
+✅ **For Cypher:** SET search_path first, wrap in cypher(), declare ALL columns with agtype
+✅ **Contract hierarchies:** ALWAYS use child → parent direction: `(sow)-[:SOW_OF]->(msa)` NOT the reverse
+✅ **Identifier mapping:** reference_number is SQL-only. For Cypher, first look up contract_identifier via SQL
+✅ **Complex questions:** Break into multiple focused queries, combine results
+
+### Output
 ✅ **VISUALIZE FIRST:** Always ask "Can I show this as a chart?" before writing text
 ✅ **BE CONCISE:** 2-3 sentences max, then show a chart
-✅ **ALWAYS use LIMIT** (20-50 rows) to prevent overwhelming responses
-✅ **Use ILIKE or regex** for case-insensitive matching: SQL `ILIKE '%acme%'`, Cypher `=~ '(?i).*acme.*'`
-✅ **Include relationship_type** when querying contract_relationships table
-✅ **For Cypher:** SET search_path first, wrap in cypher(), declare ALL columns with agtype
-✅ **⚠️ Contract hierarchies in Cypher:** ALWAYS use child → parent direction: `(sow)-[:SOW_OF]->(msa)` NOT `(msa)-[:SOW_OF]->(sow)`
-✅ **Complex questions:** Break into multiple focused queries, combine results
-✅ **Choose the right tool:** SQL for simple queries, recursive SQL for hierarchies, Cypher for multi-hop patterns and contract families
-✅ **Verify queries:** For contract hierarchies, double-check relationship direction matches child → parent
-✅ **Filter by status:** Remember to add `WHERE c.status = 'active'` when counting active contracts
 
+### Don'ts
 ❌ **READ-ONLY:** No INSERT/UPDATE/DELETE queries allowed
 ❌ **Don't compute embeddings:** Use need_embedding=True parameter instead
 ❌ **Don't forget LIMIT:** Always constrain result size
@@ -724,11 +785,11 @@ xychart-beta
                 # get_contract_family,
             ],
         )
-        self.thread = self.agent.get_new_thread()
+        self.thread = self.agent.create_session()
     
     async def query_async(self, query_text: str) -> dict:
         """Execute a query asynchronously."""
-        result = await self.agent.run(query_text, thread=self.thread)
+        result = await self.agent.run(query_text, session=self.thread)
         
         # Extract SQL queries and their reasoning from tool calls in the conversation
         tool_calls = []
@@ -741,7 +802,7 @@ xychart-beta
             
             for content in message.contents:
                 # Handle text content
-                if hasattr(content, 'text'):
+                if hasattr(content, 'text') and content.text is not None:
                     reasoning += content.text
                 
                 # Check if this is a function call to execute_sql_query
@@ -803,15 +864,15 @@ async def main():
     
     # Example queries - agent will write SQL/Cypher dynamically
     queries = [
-        "Show me statistics about our contract portfolio including relationship counts",
-        "Analyze the complete contract family tree for Zenith Technologies Master Services Agreement MSA-ZEN-202403-197",
-        "What are all the obligations and rights for Acme Corp in their contracts?",
-        "Find all high-risk liability clauses in contracts with Phoenix Industries",
-        "Show me all amendments to the Data Processing Agreement DPA-SUM-202502-324",
-        "List all Statement of Work contracts under the Phoenix Industries Master Agreement MSA-PHO-202508-344",
-        "Find data processing and confidentiality clauses similar to Nova Systems contracts using semantic search",
-        "What contracts with Atlas Ventures have auto-renewal clauses and what are the notice periods?",
-        "Show the contract hierarchy for the Pinnacle Services Data Processing Agreement DPA-PIN-202411-069"
+        "How many active contracts do we have, broken down by contract type?",
+        "Show the complete contract family tree for Zenith Technologies MSA-ZEN-202403-197",
+        "What are all the high-impact obligations for Quantum Labs LLC?",
+        "Find all high-risk Termination and Payment Terms clauses with the contract and vendor for each",
+        "Show the amendment history for Pinnacle Services DPA-PIN-202411-069",
+        "How many active SOWs and work orders sit under each Master Services Agreement?",
+        "Find clauses about limitations on liability for indirect or consequential damages using semantic search",
+        "Which contracts are expiring in 2026? Show reference number, expiration date, and vendor",
+        "What are our largest monetary exposures? Show top 10 by value with vendor name",
     ]
     
     for query in queries:
@@ -819,7 +880,7 @@ async def main():
         print(f"User: {query}")
         print(f"{'─' * 70}")
         
-        result = await agent.run(query, thread=thread)
+        result = await agent.run(query, session=thread)
         print(f"Agent: {result.text}\n")
     
     print("\n" + "=" * 70)

@@ -1,61 +1,74 @@
+### GraphRAG v3 Configuration ###
+### Migrated from v2 on 2026-02-23 ###
+### Uses LiteLLM + pgvector (shared PostgreSQL instance) ###
+
 encoding_model: cl100k_base
 skip_workflows: []
 
-models:
-  default_chat_model:
+# --- Language Models (v3: separate completion + embedding sections) ---
+completion_models:
+  default_completion_model:
     api_key: ${AZURE_OPENAI_API_KEY}
-    type: chat
+    type: litellm
     model_provider: azure
     model: gpt-4o
-    max_completion_tokens: 4000
-    model_supports_json: true
-    api_base: https://eastus2oai.openai.azure.com
+    call_args:
+      max_completion_tokens: 4000
+    api_base: https://eastus2oai.openai.azure.com/
     api_version: 2024-12-01-preview
-    deployment_name: gpt-5.1
+    azure_deployment_name: gpt-5.1
+    retry:
+      type: exponential_backoff
+      max_retries: 5
+    rate_limit:
+      type: sliding_window
+      requests_per_period: 60
+      tokens_per_period: 80000
+
+embedding_models:
   default_embedding_model:
     api_key: ${AZURE_OPENAI_API_KEY}
-    type: embedding
+    type: litellm
     model_provider: azure
     model: text-embedding-3-small
-    api_base: https://eastus2oai.openai.azure.com
+    api_base: https://eastus2oai.openai.azure.com/
     api_version: 2024-12-01-preview
-    deployment_name: ${EMBEDDING_DEPLOYMENT_NAME}
+    azure_deployment_name: ${EMBEDDING_DEPLOYMENT_NAME}
 
-parallelization:
-  stagger: 0.5
-  num_threads: 4
-
-async_mode: threaded
-
-chunks:
+# --- Chunking (v3: group_by_columns removed) ---
+chunking:
+  type: tokens
   size: 1200
   overlap: 100
-  group_by_columns: [id]
 
+# --- Input ---
 input:
-  file_type: text
+  type: text
   file_pattern: ".*\\.md$$"
   storage:
     type: file
-    base_dir: "../data/input"
+    base_dir: "data/input"
 
-cache:
-  type: file
-  base_dir: "../cache"
-
+# --- Output Storage ---
 output:
   type: file
-  base_dir: "../data/output"
+  base_dir: "data/output"
 
+# --- Cache ---
+cache:
+  type: json
+  storage:
+    type: file
+    base_dir: "cache"
+
+# --- Reporting ---
 reporting:
   type: file
-  base_dir: "../logs"
+  base_dir: "logs"
 
+# --- Graph Extraction ---
 extract_graph:
   prompt: "prompts/entity_extraction.txt"
-  tuple_delimiter: " | "
-  record_delimiter: "##"
-  completion_delimiter: "<|COMPLETE|>"
   entity_types: [
     "Contract",
     "Party",
@@ -70,52 +83,82 @@ extract_graph:
   ]
   max_gleanings: 1
 
+# --- Description Summarization ---
 summarize_descriptions:
   prompt: "prompts/summarize_descriptions.txt"
   max_length: 500
 
+# --- Claim Extraction ---
 extract_claims:
   enabled: true
   prompt: "prompts/claim_extraction.txt"
   description: "Extract contractual obligations, rights, and key terms."
   max_gleanings: 1
 
+# --- Community Reports ---
 community_reports:
   prompt: "prompts/community_report.txt"
   max_length: 2000
   max_input_length: 8000
 
+# --- Graph Clustering ---
 cluster_graph:
   max_cluster_size: 10
 
-embed_graph:
-  enabled: false
-
-umap:
-  enabled: false
-
+# --- Snapshots ---
 snapshots:
   graphml: false
-  raw_entities: true
-  top_level_nodes: true
+  raw_graph: true
 
+# --- Vector Store (v3: flattened, custom pgvector support) ---
+# NOTE: By default uses lancedb for CLI indexing.
+# Our custom PgVectorStore is registered at runtime by graphrag_agent.py
+# To use pgvector, run indexing via our Python API (graphrag_ingestion.py)
 vector_store:
-  default_vector_store:
-    type: lancedb
-    db_uri: ../data/output/lancedb
-    overwrite: true
+  type: lancedb
+  db_uri: data/output/lancedb
+  vector_size: 1536
+  index_schema:
+    entity_description:
+      index_name: "entity_description"
+      vector_size: 1536
+    text_unit_text:
+      index_name: "text_unit_text"
+      vector_size: 1536
+    community_full_content:
+      index_name: "community_full_content"
+      vector_size: 1536
 
+# --- Text Embedding ---
+embed_text:
+  names:
+    - entity_description
+    - text_unit_text
+    - community_full_content
+
+# --- Local Search ---
 local_search:
   text_unit_prop: 0.5
   community_prop: 0.1
   conversation_history_max_turns: 5
-  top_k_mapped_entities: 10
+  top_k_entities: 10
   top_k_relationships: 10
-  max_tokens: 12000
+  max_context_tokens: 12000
 
+# --- Global Search ---
 global_search:
-  max_tokens: 12000
   data_max_tokens: 12000
-  map_max_tokens: 1000
-  reduce_max_tokens: 2000
+  map_max_length: 1000
+  reduce_max_length: 2000
+
+# --- DRIFT Search (new in v2+) ---
+drift_search:
+  drift_k_followups: 3
+  primer_folds: 3
+  n_depth: 2
+
+# --- Basic Search (new in v3) ---
+basic_search:
+  k: 20
+  max_context_tokens: 8000
   concurrency: 32

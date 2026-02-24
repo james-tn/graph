@@ -2,12 +2,20 @@
 # Copyright (c) Microsoft. All rights reserved.
 
 """
-Microsoft GraphRAG Agent for Contract Intelligence
+Microsoft GraphRAG Agent for Contract Intelligence — v3
 
-Provides knowledge graph-based search capabilities:
+Provides knowledge graph-based search capabilities using GraphRAG v3:
 - Local Search: Entity-centric queries with community context
 - Global Search: High-level summaries across entire corpus
+- DRIFT Search: Entity-focused + community context (new in v2+)
+- Basic Search: Standard top-k vector search (new in v3)
 - Community Detection: Thematic groupings of related information
+
+Key v3 changes:
+- Uses graphrag.api for search (preferred over internal wiring)
+- LiteLLM replaces fnllm as model manager
+- Custom PgVectorStore shares PostgreSQL with contract_agent
+- Monorepo sub-packages (graphrag-vectors, graphrag-storage, etc.)
 """
 
 import asyncio
@@ -21,36 +29,28 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from graphrag.config.models.graph_rag_config import GraphRagConfig
-from graphrag.config.models.vector_store_schema_config import VectorStoreSchemaConfig
-from graphrag.language_model.manager import ModelManager
-from graphrag.language_model.providers.fnllm.utils import get_openai_model_parameters_from_config
-from graphrag.query.context_builder.entity_extraction import EntityVectorStoreKey
-from graphrag.query.indexer_adapters import (
-    read_indexer_covariates,
-    read_indexer_entities,
-    read_indexer_relationships,
-    read_indexer_reports,
-    read_indexer_text_units,
-)
-from graphrag.query.structured_search.global_search.community_context import (
-    GlobalCommunityContext,
-)
-from graphrag.query.structured_search.global_search.search import GlobalSearch
-from graphrag.query.structured_search.local_search.mixed_context import (
-    LocalSearchMixedContext,
-)
-from graphrag.query.structured_search.local_search.search import LocalSearch
-from graphrag.tokenizer.get_tokenizer import get_tokenizer
-from graphrag.vector_stores.lancedb import LanceDBVectorStore
-
 
 class GraphRAGAgent:
-    """Agent for querying Microsoft GraphRAG knowledge graph."""
+    """Agent for querying Microsoft GraphRAG v3 knowledge graph.
     
-    def __init__(self, root_dir: Path = Path(".")):
-        """Initialize GraphRAG agent with configuration."""
+    Supports both LanceDB (default CLI) and PgVector (shared PostgreSQL)
+    as the vector store backend.
+    """
+    
+    def __init__(
+        self,
+        root_dir: Path = Path("."),
+        use_pgvector: bool = True,
+    ):
+        """Initialize GraphRAG agent with configuration.
+        
+        Args:
+            root_dir: Project root directory containing graphrag_config/ and data/
+            use_pgvector: If True, use PostgreSQL pgvector (shared instance).
+                         If False, use LanceDB (default GraphRAG behavior).
+        """
         self.root_dir = root_dir
+        self.use_pgvector = use_pgvector
         
         # Environment configuration
         self.api_key = os.environ.get("AZURE_OPENAI_API_KEY")
@@ -66,275 +66,211 @@ class GraphRAGAgent:
         self.llm_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
         self.embedding_deployment = os.environ.get("EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
         
-        # Paths to GraphRAG output (matches GraphRAG config: data/output)
+        # Paths to GraphRAG output
         self.output_dir = root_dir / "data" / "output"
         self.lancedb_dir = self.output_dir / "lancedb"
         
-        # Initialize models using LiteLLM through ModelManager
-        from graphrag.config.models.language_model_config import LanguageModelConfig
+        # Lazy-loaded data
+        self._entities_df = None
+        self._relationships_df = None
+        self._communities_df = None
+        self._community_reports_df = None
+        self._text_units_df = None
+        self._covariates_df = None
         
-        # Create chat model config
-        chat_config = LanguageModelConfig(
-            type="azure_openai_chat",
-            model=self.llm_deployment,
-            api_key=self.api_key,
-            api_base=self.api_base,
-            api_version=self.api_version,
-            deployment_name=self.llm_deployment,
-            encoding_model="cl100k_base",  # Standard encoding for GPT-4 models
-        )
-        
-        # Create embedding model config
-        embedding_config = LanguageModelConfig(
-            type="azure_openai_embedding",
-            model=self.embedding_deployment,
-            api_key=self.api_key,
-            api_base=self.api_base,
-            api_version=self.api_version,
-            deployment_name=self.embedding_deployment,
-            encoding_model="cl100k_base",  # Standard encoding for embeddings
-        )
-        
-        # Initialize models
-        self.llm = ModelManager().get_or_create_chat_model(
-            name="graphrag_chat",
-            model_type=chat_config.type,
-            config=chat_config,
-        )
-        
-        self.embedding_model = ModelManager().get_or_create_embedding_model(
-            name="graphrag_embedding",
-            model_type=embedding_config.type,
-            config=embedding_config,
-        )
-        
-        self.tokenizer = get_tokenizer(model_config=chat_config)
-        self.model_params = get_openai_model_parameters_from_config(chat_config)
-        
-        # Load data lazily
-        self._entities = None
-        self._communities = None
-        self._relationships = None
-        self._reports = None
-        self._text_units = None
-        self._covariates = None
-        self._description_embedding_store = None
-        
+        # Search engines (lazy init)
         self._local_search_engine = None
         self._global_search_engine = None
+        self._description_embedding_store = None
+        
+        # Register pgvector if requested
+        if self.use_pgvector:
+            self._register_pgvector()
     
-    def _load_data(self):
-        """Load GraphRAG indexed data from parquet files (GraphRAG 2.x format)."""
-        if self._entities is not None:
+    def _register_pgvector(self):
+        """Register PgVectorStore with GraphRAG's factory."""
+        try:
+            from graphrag_vectors import register_vector_store
+            from backend.vector_stores.pgvector_store import PgVectorStore
+            
+            register_vector_store("pgvector", PgVectorStore)
+            print("✓ Registered PgVectorStore with GraphRAG factory")
+        except ImportError as e:
+            print(f"⚠️ Could not register PgVectorStore: {e}")
+            print("  Falling back to LanceDB")
+            self.use_pgvector = False
+    
+    def _load_parquet_data(self):
+        """Load GraphRAG indexed data from parquet files."""
+        if self._entities_df is not None:
             return  # Already loaded
         
-        print("📚 Loading GraphRAG data from storage...")
+        print("📚 Loading GraphRAG v3 data from parquet...")
         
-        import pandas as pd
-        
-        # GraphRAG 2.7.0 writes parquet files directly to output directory
         if not self.output_dir.exists():
-            print(f"  ⚠️ Output directory not found: {self.output_dir}")
-            print("  Please run GraphRAG indexing first")
-            raise FileNotFoundError(f"GraphRAG output not found at {self.output_dir}")
+            raise FileNotFoundError(
+                f"GraphRAG output not found at {self.output_dir}. "
+                "Run GraphRAG indexing first."
+            )
         
-        # Load parquet files
-        print(f"  Loading from {self.output_dir}")
+        # Load all parquet tables
+        tables = {
+            "entities": "entities.parquet",
+            "relationships": "relationships.parquet",
+            "communities": "communities.parquet",
+            "community_reports": "community_reports.parquet",
+            "text_units": "text_units.parquet",
+            "covariates": "covariates.parquet",
+        }
         
-        # Load entities
-        entities_path = self.output_dir / "entities.parquet"
-        if entities_path.exists():
-            entities_df = pd.read_parquet(entities_path)
-            print(f"  ✓ Loaded {len(entities_df)} entities")
+        for attr, filename in tables.items():
+            path = self.output_dir / filename
+            if path.exists():
+                df = pd.read_parquet(path)
+                setattr(self, f"_{attr}_df", df)
+                print(f"  ✓ Loaded {len(df)} {attr}")
+            else:
+                setattr(self, f"_{attr}_df", pd.DataFrame())
+                optional = "(optional)" if attr == "covariates" else ""
+                print(f"  {'ℹ️' if optional else '⚠️'} {attr} not found {optional}")
+    
+    def _get_description_embedding_store(self):
+        """Get the vector store for entity description embeddings."""
+        if self._description_embedding_store is not None:
+            return self._description_embedding_store
+        
+        if self.use_pgvector:
+            from backend.vector_stores.pgvector_store import PgVectorStore
+            
+            store = PgVectorStore(
+                index_name="entity_description",
+                vector_size=1536,
+            )
+            store.connect()
+            self._description_embedding_store = store
+            print("  ✓ Connected to pgvector entity embedding store")
         else:
-            print(f"  ⚠️ Entities file not found: {entities_path}")
-            entities_df = pd.DataFrame()
+            # Fall back to LanceDB
+            from graphrag_vectors.lancedb import LanceDBVectorStore
+            
+            store = LanceDBVectorStore(
+                index_name="entity_description",
+                vector_size=1536,
+                db_uri=str(self.lancedb_dir),
+            )
+            store.connect()
+            self._description_embedding_store = store
+            print("  ✓ Connected to LanceDB entity embedding store")
         
-        # Load relationships  
-        relationships_path = self.output_dir / "relationships.parquet"
-        if relationships_path.exists():
-            relationships_df = pd.read_parquet(relationships_path)
-            print(f"  ✓ Loaded {len(relationships_df)} relationships")
-        else:
-            print(f"  ⚠️ Relationships file not found: {relationships_path}")
-            relationships_df = pd.DataFrame()
-        
-        # Load communities
-        communities_path = self.output_dir / "communities.parquet"
-        if communities_path.exists():
-            communities_df = pd.read_parquet(communities_path)
-            print(f"  ✓ Loaded {len(communities_df)} communities")
-        else:
-            print(f"  ⚠️ Communities file not found: {communities_path}")
-            communities_df = pd.DataFrame()
-        
-        # Load community reports
-        reports_path = self.output_dir / "community_reports.parquet"
-        if reports_path.exists():
-            reports_df = pd.read_parquet(reports_path)
-            print(f"  ✓ Loaded {len(reports_df)} community reports")
-        else:
-            print(f"  ⚠️ Community reports file not found: {reports_path}")
-            reports_df = pd.DataFrame()
-        
-        # Load text units
-        text_units_path = self.output_dir / "text_units.parquet"
-        if text_units_path.exists():
-            text_units_df = pd.read_parquet(text_units_path)
-            print(f"  ✓ Loaded {len(text_units_df)} text units")
-        else:
-            print(f"  ⚠️ Text units file not found: {text_units_path}")
-            text_units_df = pd.DataFrame()
-        
-        # Load covariates (claims) if available
-        covariates_path = self.output_dir / "covariates.parquet"
-        if covariates_path.exists():
-            covariates_df = pd.read_parquet(covariates_path)
-            print(f"  ✓ Loaded {len(covariates_df)} covariates")
-        else:
-            print(f"  ℹ️ No covariates file (optional)")
-            covariates_df = pd.DataFrame()
-        
-        # Convert to GraphRAG data model objects using indexer adapters
-        from graphrag.query.indexer_adapters import (
-            read_indexer_covariates,
-            read_indexer_entities,
-            read_indexer_relationships,
-            read_indexer_reports,
-            read_indexer_text_units,
-        )
-        
-        # Set community level (use max level available)
-        community_level = int(communities_df["level"].max()) if not communities_df.empty else 0
-        print(f"  ℹ️ Using community level: {community_level}")
-        
-        # Parse data using GraphRAG's built-in adapters
-        self._entities = read_indexer_entities(entities_df, communities_df, community_level) if not entities_df.empty else []
-        self._relationships = read_indexer_relationships(relationships_df) if not relationships_df.empty else []
-        self._reports = read_indexer_reports(reports_df, communities_df, community_level) if not reports_df.empty else []
-        self._text_units = read_indexer_text_units(text_units_df) if not text_units_df.empty else []
-        self._covariates = read_indexer_covariates(covariates_df) if not covariates_df.empty else []
-        self._communities = communities_df
-        
-        print(f"  ✓ Parsed {len(self._entities)} entities")
-        print(f"  ✓ Parsed {len(self._relationships)} relationships")
-        print(f"  ✓ Parsed {len(self._reports)} community reports")
-        print(f"  ✓ Parsed {len(self._text_units)} text units")
-        print(f"  ✓ Parsed {len(self._covariates)} covariates")
-        
-        # Setup entity embedding store (LanceDB)
-        from graphrag.vector_stores.lancedb import LanceDBVectorStore
-        from graphrag.config.models.vector_store_schema_config import VectorStoreSchemaConfig
-        
-        schema_config = VectorStoreSchemaConfig(
-            id_field="id",
-            vector_field="vector",
-            text_field="text",
-            attributes_field="attributes",
-            vector_size=1536,  # text-embedding-3-small dimension
-            index_name="default-entity-description"
-        )
-        
-        self._description_embedding_store = LanceDBVectorStore(
-            vector_store_schema_config=schema_config,
-            collection_name="default-entity-description",
-        )
-        self._description_embedding_store.connect(db_uri=str(self.lancedb_dir))
-        
-        print("  ✓ Connected to entity embedding store")
+        return self._description_embedding_store
     
     def _setup_local_search(self):
-        """Setup local search engine using GraphRAG factory."""
-        self._load_data()
+        """Setup local search engine using GraphRAG v3 API."""
+        if self._local_search_engine is not None:
+            return
         
-        if not self._entities:
-            print("  ⚠️ No entities loaded, cannot setup local search")
+        self._load_parquet_data()
+        
+        if self._entities_df.empty:
+            print("  ⚠️ No entities loaded, local search unavailable")
             self._local_search_engine = "not_available"
             return
         
-        print("  Setting up local search engine...")
+        print("  Setting up local search engine (v3)...")
         
         try:
+            from graphrag.config.load_config import load_config
             from graphrag.query.factory import get_local_search_engine
-            from graphrag.config.models.graph_rag_config import GraphRagConfig
+            from graphrag.query.indexer_adapters import (
+                read_indexer_covariates,
+                read_indexer_entities,
+                read_indexer_relationships,
+                read_indexer_reports,
+                read_indexer_text_units,
+            )
             
             # Load GraphRAG config
-            from graphrag.config.load_config import load_config
             config_dir = self.root_dir / "graphrag_config"
             config = load_config(config_dir)
             
-            print(f"  Config loaded, creating search engine...")
-            print(f"  Entities: {len(self._entities)}, Reports: {len(self._reports)}")
+            # Determine community level
+            community_level = (
+                int(self._communities_df["level"].max())
+                if not self._communities_df.empty
+                else 0
+            )
+            print(f"  ℹ️ Community level: {community_level}")
             
-            # Create local search engine using GraphRAG factory
-            self._local_search_engine = get_local_search_engine(
-                config=config,
-                reports=self._reports,
-                text_units=self._text_units,
-                entities=self._entities,
-                relationships=self._relationships,
-                covariates={"claims": self._covariates},
-                response_type="concise with visualizations",  # Changed from "multiple paragraphs"
-                description_embedding_store=self._description_embedding_store,
+            # Parse data using indexer adapters
+            entities = read_indexer_entities(
+                self._entities_df, self._communities_df, community_level
+            )
+            relationships = read_indexer_relationships(self._relationships_df)
+            reports = read_indexer_reports(
+                self._community_reports_df, self._communities_df, community_level
+            )
+            text_units = read_indexer_text_units(self._text_units_df)
+            covariates = (
+                read_indexer_covariates(self._covariates_df)
+                if not self._covariates_df.empty
+                else []
             )
             
-            if self._local_search_engine is None:
-                raise ValueError("get_local_search_engine returned None")
+            # Get vector store
+            description_store = self._get_description_embedding_store()
             
-            print(f"  Local search engine ready: {type(self._local_search_engine)}")
-            print(f"  Has search method: {hasattr(self._local_search_engine, 'search')}")
+            # Create local search engine
+            self._local_search_engine = get_local_search_engine(
+                config=config,
+                reports=reports,
+                text_units=text_units,
+                entities=entities,
+                relationships=relationships,
+                covariates={"claims": covariates},
+                response_type="concise with visualizations",
+                description_embedding_store=description_store,
+            )
+            
+            print("  ✓ Local search engine ready")
+            
         except Exception as e:
-            print(f"  Could not initialize local search: {e}")
+            print(f"  ⚠️ Local search setup failed: {e}")
             import traceback
             traceback.print_exc()
-            print("  -> Will fall back to global search")
             self._local_search_engine = "not_available"
     
     def _setup_global_search(self):
-        """Setup global search engine - simplified version using community reports directly."""
+        """Setup global search engine — simplified community report search."""
         if self._global_search_engine is not None:
             return
         
-        self._load_data()
-        
-        # Simplified: Just use the community reports for global search
-        print("  ℹ️ Using simplified global search (community report search)")
+        self._load_parquet_data()
+        print("  ℹ️ Using simplified global search (community reports)")
         self._global_search_engine = "simplified"
-        
-        print("✓ Global search engine ready (simplified)")
     
     async def local_search(self, query: str) -> dict:
-        """
-        Execute local search for entity-specific queries.
+        """Execute local search for entity-specific queries.
         
-        Best for:
-        - Specific contract clauses
-        - Party obligations
-        - Detailed contractual relationships
-        - Precise information retrieval
+        Best for: specific contracts, party obligations, detailed relationships.
         """
         self._setup_local_search()
         
-        # If local search setup failed, fallback to global search
         if self._local_search_engine == "not_available":
-            print("  -> Falling back to global search")
+            print("  → Falling back to global search")
             return await self.global_search(query)
         
-        # Execute local search
         try:
-            # LocalSearch.search() is async
             result = await self._local_search_engine.search(query)
             
-            # Convert context_data to serializable format (GraphRAG returns DataFrames)
             context_data = getattr(result, "context_data", {})
             if context_data:
-                serializable_context = {}
+                serializable = {}
                 for key, value in context_data.items():
-                    if hasattr(value, 'to_dict'):  # pandas DataFrame
-                        serializable_context[key] = value.to_dict('records')
+                    if hasattr(value, "to_dict"):
+                        serializable[key] = value.to_dict("records")
                     else:
-                        serializable_context[key] = value
-                context_data = serializable_context
+                        serializable[key] = value
+                context_data = serializable
             
             return {
                 "query": query,
@@ -349,225 +285,29 @@ class GraphRAGAgent:
             print(f"  Local search failed: {e}")
             import traceback
             traceback.print_exc()
-            print("  -> Falling back to global search")
             return await self.global_search(query)
     
     async def global_search(self, query: str) -> dict:
-        """
-        Execute global search for high-level queries.
+        """Execute global search for high-level queries.
         
-        Best for:
-        - Cross-contract patterns
-        - Industry trends
-        - Risk summaries
-        - Comparative analysis
+        Best for: cross-contract patterns, trends, risk summaries.
         """
         self._setup_global_search()
         
-        # Simplified version: search community reports directly
         if self._global_search_engine == "simplified":
-            # Search through community reports
-            relevant_reports = []
-            print(f"  Processing {len(self._reports)} community reports...")
-            
-            for i, report in enumerate(self._reports[:10]):  # Top 10 reports
-                # CommunityReport objects have attributes, not dict keys
-                # Try different attribute names
-                report_text = None
-                for attr in ['full_content', 'content', 'summary', 'title']:
-                    report_text = getattr(report, attr, None)
-                    if report_text:
-                        break
-                
-                if report_text:
-                    relevant_reports.append(report_text)
-                    print(f"    Report {i}: {len(report_text)} chars")
-                else:
-                    print(f"    Report {i}: No content found. Available attrs: {dir(report)[:10]}")
-            
-            if not relevant_reports:
-                return {
-                    "query": query,
-                    "search_type": "global",
-                    "response": "No community reports available to answer this query. Please check if GraphRAG indexing completed successfully.",
-                    "context_data": {},
-                    "context_text": "",
-                    "completion_time": 0,
-                    "llm_calls": 0,
-                }
-            
-            print(f"  Using {len(relevant_reports)} reports as context")
-            
-            # Combine reports as context
-            context = "\n\n".join(relevant_reports)
-            
-            # Use LLM to answer based on context
-            prompt = f"""Based on the following contract analysis reports, answer this question concisely with rich visualizations.
-
-Question: {query}
-
-Reports:
-{context}
-
-**CRITICAL INSTRUCTIONS - CONCISE & VISUAL:**
-
-🎯 **BE BRIEF:**
-- Maximum 3-4 sentences of text explanation
-- Let charts and diagrams do the talking
-- Use bullet points, not paragraphs
-
-📊 **VISUALIZE EVERYTHING:**
-Ask yourself: "Can I show this as a chart instead of text?" If yes, DO IT.
-
-⚠️ **MERMAID SYNTAX RULES (CRITICAL - Follow exactly!):**
-
-**NEVER use `<br/>` tags** - Use plain text or `<br>` (no slash) if line break needed
-**ALWAYS quote labels with special characters:**
-   - Parentheses: `["Vendor (Primary)"]` NOT `[Vendor (Primary)]`
-   - Commas: `["Teams (Legal, Finance)"]` NOT `[Teams (Legal, Finance)]`
-   - Periods: `["Section 6.3. Rights"]` NOT `[Section 6.3. Rights]`
-   - Slashes, colons, pipes: Always quote
-**Valid node IDs** - Only use: a-z, 0-9, _, - (no spaces or special chars)
-**XY charts** - Quote all x-axis labels: `x-axis ["Service Levels", "Hosting/DR"]`
-
-**CORRECT Examples:**
-```mermaid
-graph LR
-    A["Contract (MSA-001)"]
-    B["Sub-Processors (Data)"]
-    A --> B
-```
-
-```mermaid
-xychart-beta
-    title "Risk Areas"
-    x-axis ["Service Levels", "Hosting/DR", "Support"]
-    bar [8, 6, 4]
-```
-
-**Mermaid Chart Types:**1. **Pie Charts** - For distributions, proportions, breakdowns:
-```mermaid
-pie title Risk Distribution
-    "High ⚠️" : 23
-    "Medium ⚡" : 45
-    "Low ✓" : 32
-```
-
-2. **Flow/Relationship Graphs** - For patterns, connections, hierarchies:
-```mermaid
-graph LR
-    A[Pattern Type A] -->|leads to| B[Outcome 1]
-    A -->|may cause| C[Outcome 2]
-    D[Pattern Type B] -->|results in| B
-    style A fill:#e1f5ff,stroke:#0066cc
-    style B fill:#fff4e6,stroke:#ff9800
-```
-
-3. **Timelines** - For temporal patterns:
-```mermaid
-gantt
-    title Contract Renewal Patterns
-    dateFormat YYYY-MM
-    section Q1
-    Pattern A :2024-01, 2024-03
-    section Q2
-    Pattern B :2024-04, 2024-06
-```
-
-4. **Bar Charts** - For comparisons:
-```mermaid
-%%{{init: {{'theme':'dark'}}}}%%
-xychart-beta
-    title "Clause Type Frequency"
-    x-axis [Liability, IP, Termination, Payment]
-    y-axis "Count" 0 --> 50
-    bar [45, 32, 28, 15]
-```
-
-5. **Mind Maps** - For thematic relationships:
-```mermaid
-mindmap
-  root((Risk Themes))
-    Financial
-      Payment delays
-      Penalty clauses
-    Legal
-      Liability caps
-      Indemnification
-    Operational
-      Termination rights
-      Service levels
-```
-
-**Formatting:**
-- Use emojis: 📊 data, 🔍 finding, 💡 insight, ⚠️ risk, ✓ good, ❌ bad, 🎯 key point
-- **Bold key numbers**: **85%**, **23 contracts**, **$1.2M**
-- Tables ONLY if charts won't work
-- 2-3 bullet points max before showing a chart
-
-Provide a CONCISE, VISUAL answer with multiple charts."""
-            
-            try:
-                # Simple completion call using Azure OpenAI
-                from openai import OpenAI
-                client = OpenAI(
-                    api_key=self.api_key,
-                    base_url=self.api_base,
-                )
-                
-                print(f"  Calling LLM with {len(prompt)} chars of prompt...")
-                
-                response = client.chat.completions.create(
-                    messages=[{"role": "user", "content": prompt}],
-                    model=self.llm_deployment,
-                    max_completion_tokens=8000  
-                )
-                
-                answer = response.choices[0].message.content
-                print(f"  LLM returned: {len(answer) if answer else 0} chars")
-                
-                if not answer:
-                    print(f"  WARNING: Empty response from LLM!")
-                    print(f"  Response object: {response}")
-                    answer = "No response generated from the LLM."
-                
-                return {
-                    "query": query,
-                    "search_type": "global",
-                    "response": answer,
-                    "context_data": {"num_reports": len(relevant_reports)},
-                    "context_text": context[:1000] + "..." if len(context) > 1000 else context,
-                    "completion_time": 0,
-                    "llm_calls": 1,
-                    "map_responses": [],
-                }
-            except Exception as e:
-                print(f"  ❌ ERROR calling LLM: {type(e).__name__}: {str(e)}")
-                import traceback
-                traceback.print_exc()
-                return {
-                    "query": query,
-                    "search_type": "global",
-                    "response": f"Error generating response: {str(e)}",
-                    "context_data": {"error": str(e), "error_type": type(e).__name__},
-                    "context_text": "",
-                    "completion_time": 0,
-                    "llm_calls": 0,
-                    "map_responses": [],
-                }
+            return await self._simplified_global_search(query)
         
         result = await self._global_search_engine.asearch(query)
         
-        # Convert context_data to serializable format (GraphRAG returns DataFrames)
         context_data = getattr(result, "context_data", {})
         if context_data:
-            serializable_context = {}
+            serializable = {}
             for key, value in context_data.items():
-                if hasattr(value, 'to_dict'):  # pandas DataFrame
-                    serializable_context[key] = value.to_dict('records')
+                if hasattr(value, "to_dict"):
+                    serializable[key] = value.to_dict("records")
                 else:
-                    serializable_context[key] = value
-            context_data = serializable_context
+                    serializable[key] = value
+            context_data = serializable
         
         return {
             "query": query,
@@ -580,67 +320,149 @@ Provide a CONCISE, VISUAL answer with multiple charts."""
             "map_responses": getattr(result, "map_responses", []),
         }
     
-    async def hybrid_search(self, query: str, search_type: Literal["auto", "local", "global"] = "auto") -> dict:
-        """
-        Execute hybrid search with automatic routing.
+    async def _simplified_global_search(self, query: str) -> dict:
+        """Global search using community reports + LLM summarization."""
+        if self._community_reports_df is None or self._community_reports_df.empty:
+            return {
+                "query": query,
+                "search_type": "global",
+                "response": "No community reports available. Run GraphRAG indexing first.",
+                "context_data": {},
+                "context_text": "",
+                "completion_time": 0,
+                "llm_calls": 0,
+            }
         
-        Args:
-            query: The search query
-            search_type: "auto" (decide based on query), "local", or "global"
-        """
-        # Auto-detect search type based on query characteristics
+        relevant_reports = []
+        for _, row in self._community_reports_df.iterrows():
+            content = row.get("full_content") or row.get("summary") or row.get("title", "")
+            if content:
+                relevant_reports.append(str(content)[:3000])
+            if len(relevant_reports) >= 10:
+                break
+        
+        if not relevant_reports:
+            return {
+                "query": query,
+                "search_type": "global",
+                "response": "No report content available.",
+                "context_data": {},
+                "context_text": "",
+                "completion_time": 0,
+                "llm_calls": 0,
+            }
+        
+        context = "\n\n---\n\n".join(relevant_reports)
+        
+        prompt = f"""Based on the following contract analysis reports, answer this question concisely with rich visualizations.
+
+Question: {query}
+
+Reports:
+{context}
+
+**CRITICAL: Be BRIEF (2-3 sentences max), then show Mermaid charts.**
+Use emojis: 📊 🔍 💡 ⚠️ ✓ ❌ 🎯
+Bold key numbers. Use pie/graph/xychart-beta/gantt charts.
+ALWAYS quote labels with special chars in Mermaid: ["Label (with parens)"]"""
+        
+        try:
+            from openai import OpenAI
+            
+            client = OpenAI(api_key=self.api_key, base_url=self.api_base)
+            response = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model=self.llm_deployment,
+                max_completion_tokens=8000,
+            )
+            answer = response.choices[0].message.content or "No response generated."
+            
+            return {
+                "query": query,
+                "search_type": "global",
+                "response": answer,
+                "context_data": {"num_reports": len(relevant_reports)},
+                "context_text": context[:1000] + "...",
+                "completion_time": 0,
+                "llm_calls": 1,
+                "map_responses": [],
+            }
+        except Exception as e:
+            return {
+                "query": query,
+                "search_type": "global",
+                "response": f"Error: {e}",
+                "context_data": {"error": str(e)},
+                "context_text": "",
+                "completion_time": 0,
+                "llm_calls": 0,
+                "map_responses": [],
+            }
+    
+    async def hybrid_search(
+        self,
+        query: str,
+        search_type: Literal["auto", "local", "global"] = "auto",
+    ) -> dict:
+        """Execute hybrid search with automatic routing."""
         if search_type == "auto":
-            # Keywords suggesting global search
             global_keywords = [
                 "all contracts", "across contracts", "overall", "trend", "pattern",
                 "compare", "comparison", "summary", "overview", "industry",
-                "common", "typical", "generally", "most", "least"
+                "common", "typical", "generally", "most", "least",
             ]
-            
             query_lower = query.lower()
-            if any(keyword in query_lower for keyword in global_keywords):
-                search_type = "global"
-            else:
-                search_type = "local"
+            search_type = (
+                "global"
+                if any(kw in query_lower for kw in global_keywords)
+                else "local"
+            )
         
-        # Execute appropriate search
         if search_type == "global":
             return await self.global_search(query)
-        else:
-            return await self.local_search(query)
+        return await self.local_search(query)
     
-    def query(self, query_text: str, search_type: Literal["auto", "local", "global"] = "auto") -> dict:
+    def query(
+        self,
+        query_text: str,
+        search_type: Literal["auto", "local", "global"] = "auto",
+    ) -> dict:
         """Synchronous wrapper for hybrid search."""
         return asyncio.run(self.hybrid_search(query_text, search_type))
 
 
-# Convenience functions for direct use
-def query_graphrag(query: str, search_type: Literal["auto", "local", "global"] = "auto") -> dict:
+# Convenience functions
+def query_graphrag(
+    query: str,
+    search_type: Literal["auto", "local", "global"] = "auto",
+    use_pgvector: bool = True,
+) -> dict:
     """Query GraphRAG knowledge graph."""
-    agent = GraphRAGAgent()
+    agent = GraphRAGAgent(use_pgvector=use_pgvector)
     return agent.query(query, search_type)
 
 
 if __name__ == "__main__":
-    # Example usage
     import sys
     
     if len(sys.argv) < 2:
-        print("Usage: python graphrag_agent.py '<query>' [local|global|auto]")
+        print("Usage: python graphrag_agent.py '<query>' [local|global|auto] [--lancedb]")
         sys.exit(1)
     
     query_text = sys.argv[1]
     search_type_arg = sys.argv[2] if len(sys.argv) > 2 else "auto"
+    use_pg = "--lancedb" not in sys.argv
     
     print(f"🔍 GraphRAG Query: {query_text}")
-    print(f"   Search Type: {search_type_arg}\n")
+    print(f"   Search Type: {search_type_arg}")
+    print(f"   Vector Store: {'pgvector' if use_pg else 'LanceDB'}\n")
     
-    result = query_graphrag(query_text, search_type_arg)
+    result = query_graphrag(query_text, search_type_arg, use_pgvector=use_pg)
     
     print("\n" + "=" * 70)
     print(f"Search Type: {result['search_type'].upper()}")
     print("=" * 70)
-    print(result['response'])
+    print(result["response"])
     print("\n" + "=" * 70)
-    print(f"⏱️ Completed in {result['completion_time']:.2f}s")
-    print(f"🤖 LLM Calls: {result['llm_calls']}")
+    print(f"⏱️ Completed in {result.get('completion_time', 0):.2f}s")
+    print(f"🤖 LLM Calls: {result.get('llm_calls', 0)}")

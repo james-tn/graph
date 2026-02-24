@@ -46,3 +46,6 @@ Thumbs.db
 
 # Project specific
 test_graphrag/
+graphrag_config/output/
+graphrag_config/cache/
+graphrag_config/logs/

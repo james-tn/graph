@@ -93,7 +93,12 @@ test/
 data/*
 !data/output/
 data_ingestion/
-graphrag_config/# Lock files (dependencies are already installed)
+
+# GraphRAG config (copy only what's needed in Dockerfile explicitly)
+graphrag_config/cache/
+graphrag_config/logs/
+
+# Lock files (dependencies are already installed)
 uv.lock
 package-lock.json
 yarn.lock
@@ -104,4 +109,3 @@ pnpm-lock.yaml
 *.temp
 *.bak
 *.swp
-backend/utils/node_modules/

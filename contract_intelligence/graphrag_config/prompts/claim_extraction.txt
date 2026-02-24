@@ -1,43 +1,45 @@
+
 -Target activity-
-You are a legal expert analyzing contracts.
+You are a legal expert analyzing contracts to extract contractual obligations, rights, risks, and key terms.
 
 -Goal-
-Extract all contractual obligations, rights, key terms, and risks as "claims".
+Given a contract text, an entity specification, and a claim description, extract all contractual claims — obligations, rights, liabilities, risks, termination provisions, indemnities, and financial terms — that match the claim description.
 
 -Steps-
-1. Read the text and identify specific statements that impose a duty (Obligation), grant a permission (Right), define a financial term (MonetaryValue), or identify a potential issue (Risk).
-2. For each identified item, extract:
-    - Subject: The party or entity responsible or affected (e.g., "Vendor", "Customer").
-    - Object: The party or entity receiving the benefit or the target of the action.
-    - Claim Type: The category (e.g., "Payment Obligation", "Indemnity", "Termination Right", "Liability Cap").
-    - Claim Status: "Active", "Conditional", "Expired", or "Potential".
-    - Claim Date: Any specific dates, deadlines, or durations mentioned (e.g., "Net 30", "expires on 2025-12-31").
-    - Claim Description: A detailed summary of the obligation, right, or term.
+1. Extract all named entities that match the predefined entity specification. Entity specification can either be a list of entity names or a list of entity types.
+2. For each entity identified in step 1, extract all contractual claims associated with the entity. Claims need to match the specified claim description, and the entity should be the subject of the claim.
+For each claim, extract the following information:
+- Subject: name of the entity that is subject of the claim, capitalized. The subject entity is the one with the obligation, right, or risk. Subject needs to be one of the named entities identified in step 1.
+- Object: name of the entity that is the counterparty or beneficiary of the claim, capitalized. If unknown, use **NONE**.
+- Claim Type: overall category of the claim, capitalized. Use categories like: PAYMENT OBLIGATION, INDEMNIFICATION, LIABILITY CAP, TERMINATION RIGHT, CONFIDENTIALITY, DATA PROTECTION, INSURANCE REQUIREMENT, SERVICE LEVEL, INTELLECTUAL PROPERTY, WARRANTY, PENALTY, AUTO-RENEWAL, FORCE MAJEURE, NON-COMPETE.
+- Claim Status: **TRUE**, **FALSE**, or **SUSPECTED**. TRUE means the claim is confirmed in the contract text, FALSE means the claim is explicitly negated, SUSPECTED means the claim is implied but not explicitly stated.
+- Claim Description: Detailed description of the contractual obligation, right, or risk, including specific amounts, dates, and conditions.
+- Claim Date: Period (start_date, end_date) when the claim is effective. Both should be in ISO-8601 format. If dates are unknown, return **NONE**.
+- Claim Source Text: List of **all** quotes from the original contract text that support this claim.
 
--Format-
-Return the output as a list of claims.
+Format each claim as (<subject_entity><|><object_entity><|><claim_type><|><claim_status><|><claim_start_date><|><claim_end_date><|><claim_description><|><claim_source>)
+
+3. Return output in English as a single list of all the claims identified in steps 1 and 2. Use **##** as the list delimiter.
+
+4. When finished, output <|COMPLETE|>
 
 -Examples-
-Text: "Vendor shall pay Customer a penalty of $500 for each day of delay."
+Example 1:
+Entity specification: Party, Contract
+Claim description: Extract contractual obligations, rights, and key terms.
+Text: Section 5. Payment Terms. Customer shall pay Provider within 30 days of receipt of invoice. Late payments shall accrue interest at 1.5% per month. Provider shall maintain professional liability insurance of not less than $5,000,000.
 Output:
-Subject: Vendor
-Object: Customer
-Type: Penalty
-Status: Conditional
-Date: Daily
-Description: Vendor must pay $500 per day for delays.
 
-Text: "This Agreement expires on December 31, 2025."
-Output:
-Subject: Agreement
-Object: None
-Type: Expiration
-Status: Active
-Date: 2025-12-31
-Description: The agreement has a fixed expiration date.
+(CUSTOMER<|>PROVIDER<|>PAYMENT OBLIGATION<|>TRUE<|>NONE<|>NONE<|>Customer must pay Provider within 30 days of receipt of invoice (Net 30 payment terms)<|>Customer shall pay Provider within 30 days of receipt of invoice.)
+##
+(CUSTOMER<|>PROVIDER<|>PENALTY<|>TRUE<|>NONE<|>NONE<|>Late payments by Customer accrue interest at 1.5% per month<|>Late payments shall accrue interest at 1.5% per month.)
+##
+(PROVIDER<|>NONE<|>INSURANCE REQUIREMENT<|>TRUE<|>NONE<|>NONE<|>Provider is required to maintain professional liability insurance coverage of at least $5,000,000<|>Provider shall maintain professional liability insurance of not less than $5,000,000.)
+<|COMPLETE|>
 
 -Real Data-
-######################
-{input_text}
-######################
+Use the following input for your answer.
+Entity specification: {entity_specs}
+Claim description: {claim_description}
+Text: {input_text}
 Output:

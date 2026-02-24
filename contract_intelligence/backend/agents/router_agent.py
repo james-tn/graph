@@ -79,7 +79,7 @@ class RouterAgent:
         
         # Initialize specialized agents
         self.postgres_agent = ContractAgent()
-        self.graphrag_agent = GraphRAGAgent(root_dir=project_root)
+        self.graphrag_agent = GraphRAGAgent(root_dir=project_root, use_pgvector=True)
     
     def analyze_query(self, query: str) -> dict:
         """

@@ -37,9 +37,11 @@ $ErrorActionPreference = 'Stop'
 
 function Invoke-AzCli {
     param([string[]]$Arguments)
-    $result = az @Arguments 2>&1
+    # Redirect stderr to $null so that az CLI warnings (e.g. "Preview versions
+    # allowed") are silently discarded and don't trigger terminating errors.
+    $result = $(az @Arguments 2>$null)
     if ($LASTEXITCODE -ne 0) {
-        throw "Azure CLI command failed: az $($Arguments -join ' ')`n$result"
+        throw "Azure CLI command failed (exit $LASTEXITCODE): az $($Arguments -join ' ')"
     }
     return $result
 }
@@ -66,9 +68,9 @@ function Invoke-LocalCommand {
         [Parameter(Mandatory = $true)][string]$Executable,
         [Parameter()][string[]]$Arguments
     )
-    $output = & $Executable @Arguments 2>&1
+    $output = $(& $Executable @Arguments 2>$null)
     if ($LASTEXITCODE -ne 0) {
-        throw "Command failed: $Executable $($Arguments -join ' ')`n$output"
+        throw "Command failed (exit $LASTEXITCODE): $Executable $($Arguments -join ' ')"
     }
     return $output
 }
@@ -135,7 +137,7 @@ $imageTag = "$acrLoginServer/${ImageRepository}:$timestamp"
 if ($UseLocalDockerBuild) {
     Write-Host "Building image '$imageTag' locally with Docker..."
     Invoke-AzCli @('acr', 'login', '--name', $AcrName) | Out-Null
-    Invoke-LocalCommand -Executable 'docker' -Arguments @('build', '--no-cache', '--file', 'Dockerfile', '--tag', $imageTag, '.') | Out-Null
+    Invoke-LocalCommand -Executable 'docker' -Arguments @('build', '--file', 'Dockerfile', '--tag', $imageTag, '.') | Out-Null
     Write-Host "Pushing '$imageTag' to $acrLoginServer via docker push..."
     Invoke-LocalCommand -Executable 'docker' -Arguments @('push', $imageTag) | Out-Null
 } else {
@@ -174,6 +176,15 @@ $envVarArgs = @(
 )
 
 if ($envMap.ContainsKey('AZURE_OPENAI_RESPONSES_DEPLOYMENT_NAME')) { $envVarArgs += "AZURE_OPENAI_RESPONSES_DEPLOYMENT_NAME=$($envMap['AZURE_OPENAI_RESPONSES_DEPLOYMENT_NAME'])" }
+# agent-framework rc1 looks for AZURE_OPENAI_CHAT_DEPLOYMENT_NAME
+if ($envMap.ContainsKey('AZURE_OPENAI_DEPLOYMENT_NAME')) { $envVarArgs += "AZURE_OPENAI_CHAT_DEPLOYMENT_NAME=$($envMap['AZURE_OPENAI_DEPLOYMENT_NAME'])" }
+# Auth settings (pass through if present)
+if ($envMap.ContainsKey('DISABLE_AUTH')) { $envVarArgs += "DISABLE_AUTH=$($envMap['DISABLE_AUTH'])" }
+if ($envMap.ContainsKey('AAD_API_APP_ID')) { $envVarArgs += "AAD_API_APP_ID=$($envMap['AAD_API_APP_ID'])" }
+if ($envMap.ContainsKey('AAD_API_AUDIENCE')) { $envVarArgs += "AAD_API_AUDIENCE=$($envMap['AAD_API_AUDIENCE'])" }
+if ($envMap.ContainsKey('AAD_API_TENANT_ID')) { $envVarArgs += "AAD_API_TENANT_ID=$($envMap['AAD_API_TENANT_ID'])" }
+if ($envMap.ContainsKey('AAD_FRONTEND_CLIENT_ID')) { $envVarArgs += "AAD_FRONTEND_CLIENT_ID=$($envMap['AAD_FRONTEND_CLIENT_ID'])" }
+if ($envMap.ContainsKey('AAD_FRONTEND_TENANT_ID')) { $envVarArgs += "AAD_FRONTEND_TENANT_ID=$($envMap['AAD_FRONTEND_TENANT_ID'])" }
 
 function Set-ContainerApp {
     param([bool]$IsCreate)

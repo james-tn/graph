@@ -68,7 +68,7 @@ def run_graphrag_indexing(
         True if all workflows succeeded
     """
     print("=" * 70)
-    print("GraphRAG Knowledge Graph Indexing")
+    print("GraphRAG v3 Knowledge Graph Indexing")
     print("=" * 70)
     
     try:
@@ -86,10 +86,25 @@ def run_graphrag_indexing(
         print(f"    Root: {root_dir}")
         print(f"    Config: {config_dir}")
         
-        # Load config
+        # Load config (v3 uses LiteLLM, flattened vector_store, etc.)
         config = load_config(config_dir)
         
-        print("\n[*] Starting indexing pipeline...")
+        # Optionally register pgvector for vector storage
+        use_pgvector = os.environ.get("GRAPHRAG_VECTOR_STORE", "").lower() == "pgvector"
+        if use_pgvector:
+            try:
+                from graphrag_vectors import register_vector_store
+                # Add parent dir to path for backend imports
+                import sys
+                sys.path.insert(0, str(Path(__file__).parent.parent))
+                from backend.vector_stores.pgvector_store import PgVectorStore
+                register_vector_store("pgvector", PgVectorStore)
+                print("    ✓ Registered PgVectorStore for indexing")
+            except ImportError as e:
+                print(f"    ⚠️ Could not register PgVectorStore: {e}")
+                print("    Using default LanceDB vector store")
+        
+        print("\n[*] Starting v3 indexing pipeline...")
         
         # Run indexing (async)
         async def run():
@@ -104,11 +119,14 @@ def run_graphrag_indexing(
         # Show results
         workflows_with_errors = []
         for result in results:
-            status = "ERROR" if result.errors else "SUCCESS"
+            # v3: attribute is 'error' (singular), not 'errors'
+            has_error = getattr(result, 'error', None) or getattr(result, 'errors', None)
+            status = "ERROR" if has_error else "SUCCESS"
             print(f"  {status:8} {result.workflow}")
-            if result.errors:
+            if has_error:
                 workflows_with_errors.append(result.workflow)
-                for error in result.errors[:2]:  # Show first 2 errors
+                error_list = has_error if isinstance(has_error, list) else [has_error]
+                for error in error_list[:2]:  # Show first 2 errors
                     print(f"           {error}")
         
         # Check output

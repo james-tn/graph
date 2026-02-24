@@ -89,7 +89,7 @@ graph TB
 
 **Capabilities:**
 - 📋 **Contract Hierarchies**: MSAs → SOWs → Amendments → Work Orders with full lineage tracking
-- 🔗 **Apache AGE Graph**: Multi-hop relationship traversal (Party → Contract → Clause → Obligation)
+- 🔗 **Apache AGE 1.6.0 Graph**: Multi-hop relationship traversal with Cypher, `=~` regex, `CONTAINS`
 - 🔍 **Semantic Search**: pgvector embeddings (1536d) for conceptual clause matching
 - 💰 **Financial Analytics**: Aggregate spend, payment terms, currency analysis
 - ⚖️ **Risk Tracking**: High/medium/low risk clauses with rationale
@@ -158,6 +158,8 @@ graph TD
 - 📊 **Trend Analysis**: "What are common themes in high-risk clauses?"
 - 🔄 **Cross-Contract Intelligence**: Relationships not explicit in any single document
 - 📈 **Strategic Insights**: Industry practice, vendor comparison, risk exposure
+- 🧭 **DRIFT Search**: Follow-up exploration with adaptive depth (new in v3)
+- 📋 **Basic Search**: Fast keyword-style retrieval with concurrency (new in v3)
 
 **Example Query:**
 ```
@@ -284,12 +286,12 @@ graph TB
     end
     
     subgraph "GraphRAG Data Layer"
-        GR_Data["Knowledge Graph<br/>12,750 entities<br/>30,788 relationships"]
-        GR_Vec["LanceDB<br/>Vector store"]
+        GR_Data["Knowledge Graph<br/>12,750+ entities<br/>30,788+ relationships"]
+        GR_Vec["PgVectorStore / LanceDB<br/>Shared PostgreSQL vectors"]
     end
     
     subgraph "AI Services"
-        Azure["Azure OpenAI<br/>gpt-5.1 + Embeddings"]
+        Azure["Azure OpenAI<br/>gpt-4o / gpt-5.1 + Embeddings"]
     end
     
     UI --> Router
@@ -324,15 +326,15 @@ graph TB
 1. **Azure PostgreSQL Flexible Server** with extensions:
    ```sql
    CREATE EXTENSION vector;        -- pgvector for semantic search
-   CREATE EXTENSION age;           -- Apache AGE for graph queries
+   CREATE EXTENSION age;           -- Apache AGE 1.6.0+ for Cypher graph queries
    CREATE EXTENSION pg_trgm;       -- Full-text search
    ```
 
 2. **Azure OpenAI** deployments:
-   - `gpt-5.1` or `gpt-4` (reasoning)
-   - `text-embedding-3-small` (embeddings)
+   - `gpt-4o` or `gpt-5.1` (reasoning / chat completion)
+   - `text-embedding-3-small` (1536-dimension embeddings)
 
-3. **Python 3.11+** and **Node.js 20+**
+3. **Python 3.12+** and **Node.js 20+**
 
 ### Installation
 
@@ -341,13 +343,20 @@ graph TB
    git clone <repository>
    cd contract_intelligence
    cp .env.example .env
-   # Edit .env with your Azure credentials
+   # Edit .env with your Azure credentials:
+   #   AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT,
+   #   AZURE_OPENAI_DEPLOYMENT_NAME, EMBEDDING_DEPLOYMENT_NAME,
+   #   POSTGRES_HOST, POSTGRES_DATABASE, POSTGRES_USER, POSTGRES_ADMIN_PASSWORD
    ```
 
 2. **Install dependencies:**
    ```bash
-   # Backend
-   pip install -r backend/requirements.txt
+   # Backend (using uv for fast installs — recommended)
+   pip install uv
+   uv pip install --prerelease=allow -r backend/requirements.txt
+   
+   # Or with standard pip
+   pip install --pre -r backend/requirements.txt
    
    # Frontend
    cd frontend
@@ -375,12 +384,19 @@ graph TB
    - Build the Apache AGE graph with nodes and relationships
    - Generate a data exploration report
    
-   Or to re-run full dual ingestion pipeline:
+   Or to re-run the full dual ingestion pipeline:
    ```bash
+   # Default mode: both PostgreSQL and GraphRAG
    python data_ingestion/ingestion_pipeline.py
+   
+   # Specific modes:
+   python data_ingestion/ingestion_pipeline.py --mode postgres   # PostgreSQL + AGE only
+   python data_ingestion/ingestion_pipeline.py --mode graphrag   # GraphRAG indexing only
+   python data_ingestion/ingestion_pipeline.py --mode both       # Run both (default)
+   python data_ingestion/ingestion_pipeline.py --mode byog       # PostgreSQL first, then export graph for GraphRAG community summarization
    ```
    
-   **Note:** The graph build step is integrated into the ingestion pipeline. If you need to rebuild only the graph (after data updates):
+   **Note:** The graph build step is integrated into the ingestion pipeline. If you need to rebuild only the Apache AGE graph (after data updates):
    ```bash
    python data_ingestion/build_graph.py
    ```
@@ -674,17 +690,19 @@ LIMIT 10
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| **Frontend** | React + TypeScript | Modern UI |
+| **Frontend** | React 18 + TypeScript + Vite | Modern UI with Tailwind CSS |
 | **Visualization** | Mermaid.js | Auto-generated charts |
-| **Backend** | FastAPI + Python | Async API |
-| **AI Agents** | Microsoft Agent Framework | Orchestration |
+| **Backend** | FastAPI + Python 3.12 | Async API |
+| **AI Agents** | Microsoft Agent Framework 1.0.0rc1 | Agent orchestration (`Agent`, `AzureOpenAIChatClient`) |
 | **Database** | PostgreSQL 16 | Structured data |
-| **Vector Search** | pgvector | Semantic matching |
-| **Graph Queries** | Apache AGE | Relationship traversal |
-| **Knowledge Graph** | Microsoft GraphRAG | Pattern discovery |
-| **LLM** | Azure OpenAI gpt-5.1 | Natural language |
-| **Embeddings** | text-embedding-3-small | Vectors |
-| **Deployment** | Azure Container Apps | Hosting |
+| **Vector Search** | pgvector 0.8+ | Semantic matching (1536d HNSW indexes) |
+| **Graph Queries** | Apache AGE 1.6.0 | Cypher traversal with `=~` regex support |
+| **Knowledge Graph** | Microsoft GraphRAG 3.0.2 | Pattern discovery via LiteLLM |
+| **Shared Vectors** | PgVectorStore (custom) | GraphRAG vectors on shared PostgreSQL |
+| **LLM** | Azure OpenAI gpt-4o / gpt-5.1 | Natural language |
+| **Embeddings** | text-embedding-3-small | 1536-dimension vectors |
+| **Package Manager** | uv | Fast Python dependency installation |
+| **Deployment** | Azure Container Apps | Hosting via Azure CLI |
 
 ---
 
@@ -694,18 +712,34 @@ LIMIT 10
 contract_intelligence/
 ├── backend/
 │   ├── agents/              # PostgreSQL, GraphRAG, Router agents
+│   │   ├── contract_agent.py   # SQL + Cypher + pgvector semantic search
+│   │   ├── graphrag_agent.py   # GraphRAG v3 local/global/drift search
+│   │   └── router_agent.py     # Intelligent query routing
 │   ├── app/                 # FastAPI application
+│   │   ├── main.py             # API endpoints, CORS, static files
+│   │   ├── core/auth.py        # AAD authentication
+│   │   └── models/             # Pydantic request/response models
+│   ├── vector_stores/       # Custom GraphRAG vector store
+│   │   └── pgvector_store.py   # PgVectorStore — shared PostgreSQL vectors
+│   ├── otel_patch.py        # OpenTelemetry compat shim for agent-framework rc1
 │   └── utils/               # Mermaid corrector, helpers
 ├── frontend/
 │   └── src/
-│       └── components/      # Query interface, results
-├── data_ingestion/          # Dual ingestion pipeline (see [Data Ingestion README](data_ingestion/README.md))
+│       └── components/      # Query interface, results, visualizations
+├── data_ingestion/          # Dual ingestion pipeline (see data_ingestion/README.md)
+│   ├── ingestion_pipeline.py   # Unified orchestrator (4 modes)
+│   ├── postgres_ingestion.py   # PostgreSQL + AGE ingestion
+│   ├── graphrag_ingestion.py   # GraphRAG v3 indexing
+│   └── build_graph.py         # Apache AGE graph builder
 ├── data/
-│   ├── input/              # Raw contract markdown
-│   └── output/             # GraphRAG artifacts
-├── graphrag_config/        # GraphRAG settings
+│   ├── input/              # Raw contract markdown (700+ files)
+│   └── output/             # GraphRAG artifacts (parquet, lancedb)
+├── graphrag_config/        # GraphRAG v3 settings + custom prompts
+│   ├── settings.yaml          # LiteLLM config, entity types, search params
+│   └── prompts/               # Domain-specific extraction prompts
 ├── scripts/                # Deployment, seed data
-└── Dockerfile              # Multi-stage build
+│   └── deploy-containerapp.ps1 # Azure Container Apps deployment
+└── Dockerfile              # Multi-stage build (Node frontend + Python backend)
 ```
 
 ---
@@ -769,19 +803,48 @@ Identify common vendor subcontractor patterns
 
 ### Azure Container Apps
 
+The deployment script reads from a `.env` file and handles everything via Azure CLI (no `azd` required):
+
 ```bash
-.\scripts\deploy-containerapp.ps1 -UseLocalDockerBuild -SubscriptionId YOUR_SUBSCRIPTION_ID
+# Ensure .env has required variables:
+# AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT_NAME,
+# EMBEDDING_DEPLOYMENT_NAME, POSTGRES_HOST, POSTGRES_DATABASE,
+# POSTGRES_USER, POSTGRES_ADMIN_PASSWORD
+
+# Build locally with Docker and deploy
+pwsh ./scripts/deploy-containerapp.ps1 \
+  -UseLocalDockerBuild \
+  -ResourceGroup "ci-ci-dev" \
+  -ContainerAppName "ci-app" \
+  -ContainerAppEnvironment "ci-app-env" \
+  -AcrName "myacr" \
+  -Location "eastus2"
+
+# Or build remotely via ACR Build (no local Docker needed)
+pwsh ./scripts/deploy-containerapp.ps1 \
+  -ResourceGroup "ci-ci-dev" \
+  -ContainerAppName "ci-app" \
+  -AcrName "myacr"
 ```
+
+The script automatically:
+- Creates the resource group, ACR, and Container Apps environment if they don't exist
+- Builds a multi-stage Docker image (React frontend + Python backend with `uv`)
+- Pushes to ACR and creates/updates the Container App
+- Configures secrets (API keys) and environment variables from `.env`
 
 ### Local Development
 
 ```bash
-uvicorn backend.app.main:app --reload
+# Backend
+uvicorn backend.app.main:app --reload --port 8000
 
-# Frontend
+# Frontend (separate terminal)
 cd frontend
 npm run dev
 ```
+
+**Open:** http://localhost:5173 (frontend) / http://localhost:8000/health (backend)
 
 ---
 
@@ -801,6 +864,60 @@ npm run dev
 - ✅ Enterprise-ready
 
 **The result:** Legal teams get answers in seconds, finance sees patterns instantly, executives gain strategic insights.
+
+---
+
+## ⚙️ Key Technical Details
+
+### GraphRAG v3 Migration
+
+This platform uses **Microsoft GraphRAG 3.0.2**, which introduced significant changes from v2:
+
+| Feature | v2 | v3 |
+|---------|----|----|
+| **LLM Backend** | fnllm | LiteLLM (unified interface) |
+| **Config Format** | `models:` (single section) | `completion_models:` + `embedding_models:` |
+| **Custom Prompts** | `{record_delimiter}`, `|` separator | `##` record delimiter, `<\|>` separator, `<\|COMPLETE\|>` marker |
+| **Vector Store** | LanceDB only | Pluggable via `register_vector_store()` factory |
+| **Search Modes** | Local, Global | Local, Global, DRIFT, Basic |
+| **Package Structure** | Monolith | Monorepo sub-packages (`graphrag-vectors`, `graphrag-storage`, etc.) |
+
+### PgVectorStore: Shared PostgreSQL
+
+Instead of running a separate LanceDB instance, this platform uses a **custom `PgVectorStore`** that stores GraphRAG entity embeddings directly in PostgreSQL alongside the contract data:
+
+```
+┌─────────────────────────────────────────────────┐
+│           PostgreSQL Flexible Server             │
+│                                                  │
+│  ┌──────────────┐  ┌──────────────────────────┐  │
+│  │ Contract Data │  │ graphrag_vectors_*       │  │
+│  │ (SQL tables)  │  │ (PgVectorStore tables)   │  │
+│  │ + Apache AGE  │  │ entity_description       │  │
+│  │   graph       │  │ text_unit_text           │  │
+│  │ + pgvector    │  │ community_full_content   │  │
+│  │   embeddings  │  │                          │  │
+│  └──────────────┘  └──────────────────────────┘  │
+└─────────────────────────────────────────────────┘
+```
+
+**Benefits:** Single database to manage, shared connection pool, no additional infrastructure.
+
+### Agent Framework 1.0.0rc1
+
+The AI agents use **Microsoft Agent Framework 1.0.0rc1** with:
+- `Agent` class (renamed from `ChatAgent`)
+- `AzureOpenAIChatClient` (renamed from `AzureOpenAIResponsesClient`)
+- Session-based conversations via `create_session()` (renamed from `get_new_thread()`)
+- OpenTelemetry compatibility shim (`otel_patch.py`) for semconv-ai changes
+
+### Apache AGE 1.6.0
+
+Graph queries use **Apache AGE 1.6.0** on Azure PostgreSQL Flexible Server:
+- Full Cypher query support with `=~` regex operator
+- `CONTAINS` and `STARTS WITH` string operators
+- 9 node types, 15 edge types across 92,000+ nodes and 72,000+ edges
+- Bidirectional traversal with multi-hop relationship queries
 
 ---
 

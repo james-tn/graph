@@ -7,203 +7,169 @@ interface HybridQuerySectionProps {
 }
 
 const SAMPLE_QUERIES = [
-  // A. Vendor Risk and Exposure
+  // A. Vendor Risk and Exposure (PostgreSQL: SQL joins + aggregations)
   {
-    text: "For vendors like Acme Corp and Phoenix Industries, how does their risk profile compare? I'd like to see: how many contracts we have with each, how many high-risk clauses they have, and which types of risk show up most often for each vendor.",
+    text: "Compare the risk profiles of Phoenix Industries and Zenith Technologies — how many contracts do we have with each, how many high-risk clauses, and which clause types are most often flagged?",
     type: "postgres",
-    desc: "Multi-vendor risk comparison + risk type analysis",
+    desc: "SQL aggregation: multi-vendor risk comparison with GROUP BY",
     category: "vendor-risk"
   },
   {
-    text: "Which vendors do we owe the largest number of high-impact obligations to? Please rank our vendors by how many high-impact obligations we have in their contracts.",
+    text: "Rank our vendors by the number of high-impact obligations we owe them.",
     type: "postgres",
-    desc: "Vendor obligation ranking + high-impact filtering",
+    desc: "SQL join + ranking: obligations → parties → contracts",
     category: "vendor-risk"
   },
   {
-    text: "For Atlas Ventures, show me all of our high-impact obligations to them, grouped by contract, with a short description of each obligation.",
+    text: "For Quantum Labs LLC, show all high-impact obligations grouped by contract, with a description of each.",
     type: "postgres",
-    desc: "Vendor-specific obligation analysis + contract grouping",
+    desc: "SQL filtering: vendor-specific obligation drill-down",
     category: "vendor-risk"
   },
   
-  // B. Contract Families and Relationship Complexity
+  // B. Contract Families and Hierarchies (PostgreSQL: Cypher/AGE graph traversal)
   {
-    text: "Show the complete contract family tree for Zenith Technologies Master Services Agreement MSA-ZEN-202403-197",
+    text: "Show the complete contract family tree for the Zenith Technologies Master Services Agreement MSA-ZEN-202403-197 — all SOWs, amendments, and work orders beneath it.",
     type: "postgres",
-    desc: "Master agreement → SOWs → Amendments hierarchy",
+    desc: "Apache AGE Cypher: multi-hop hierarchy traversal (SOW_OF, AMENDS, WORK_ORDER_OF)",
     category: "families"
   },
   {
-    text: "How many active SOWs do we have under each MSA?",
+    text: "How many active SOWs and work orders sit under each Master Services Agreement? Show me which MSAs have become the most complex.",
     type: "postgres",
-    desc: "Portfolio management - active engagement tracking",
+    desc: "Cypher: aggregate child counts per MSA using typed edges",
     category: "families"
   },
   {
-    text: "Show contract family tree for our largest vendor relationship",
+    text: "Show the amendment history for our Pinnacle Services Data Processing Agreement DPA-PIN-202411-069.",
     type: "postgres",
-    desc: "Visual hierarchy for strategic vendor analysis",
+    desc: "Cypher: AMENDS/ADDENDUM_TO edges on a specific contract",
     category: "families"
   },
   {
-    text: "Show all amendments to our Data Processing Agreements",
+    text: "Which contract families have the highest concentration of high-risk clauses when you sum across the MSA and all its children?",
     type: "postgres",
-    desc: "Track DPA modifications and compliance changes",
-    category: "families"
-  },
-  {
-    text: "Among our larger vendor relationships, which contract families (for example, an MSA and its SOWs, work orders, amendments, and addenda) have the highest number of high-risk clauses overall?",
-    type: "postgres",
-    desc: "Contract family risk aggregation + hierarchical analysis",
-    category: "families"
-  },
-  {
-    text: "Which Master Services Agreements have an unusually large number of related documents (SOWs, work orders, amendments, addenda)? I want to see where the relationship has become complex and potentially harder to manage.",
-    type: "postgres",
-    desc: "Relationship complexity detection + document counting",
+    desc: "Cypher + SQL: traverse family tree, aggregate risk across hierarchy",
     category: "families"
   },
   
-  // C. Clause-Level Risk Patterns
+  // C. Clause-Level Risk Analysis (PostgreSQL: SQL filtering + aggregation)
   {
-    text: "What are our highest risk liability clauses?",
+    text: "Which clause types have the most high-risk flags across our portfolio? Show the breakdown by clause type.",
     type: "postgres",
-    desc: "Legal risk assessment - liability exposure",
+    desc: "SQL GROUP BY: clause_types × risk_level distribution",
     category: "clause-risk"
   },
   {
-    text: "Across our entire contract portfolio, which types of clauses are most often marked as high risk? For example, is it more often limitation of liability, termination, payment terms, or service levels?",
+    text: "Show me all high-risk Termination and Payment Terms clauses, with the contract and vendor for each.",
     type: "postgres",
-    desc: "Portfolio-wide clause type risk distribution",
+    desc: "SQL join: clauses → contracts → parties, filtered by risk + type",
     category: "clause-risk"
   },
   {
-    text: "Which vendors have the highest number of high-risk 'Data Protection' or 'Confidentiality' clauses in their contracts?",
+    text: "Which vendors have the highest number of high-risk Confidentiality or Data Protection clauses?",
     type: "postgres",
-    desc: "Vendor risk ranking by specific clause types",
+    desc: "SQL aggregation: vendor risk ranking by specific clause types",
     category: "clause-risk"
   },
   
-  // D. Monetary Exposure vs Risk
+  // D. Monetary Exposure (PostgreSQL: SQL aggregation on typed numeric fields)
   {
-    text: "Total contract value by vendor",
+    text: "What are our largest monetary exposures? Show the top 10 contracts by value with the vendor name and value type.",
     type: "postgres",
-    desc: "Financial portfolio overview",
+    desc: "SQL ORDER BY amount DESC: monetary_values → contracts → parties",
     category: "monetary"
   },
   {
-    text: "What are our payment terms with Acme Corp?",
+    text: "What is the total contract value by vendor, ranked from highest to lowest?",
     type: "postgres",
-    desc: "Vendor-specific financial terms analysis",
+    desc: "SQL SUM + GROUP BY: financial portfolio overview",
     category: "monetary"
   },
   {
-    text: "Which contracts have penalty clauses and what are the amounts?",
+    text: "Which contracts combine a large monetary value (over $5M) with high-risk clauses? Show the vendor, amount, and risk summary.",
     type: "postgres",
-    desc: "Financial risk exposure - penalty identification",
-    category: "monetary"
-  },
-  {
-    text: "Which individual contracts combine a large contract value with high-risk clauses? Show me the top set by contract value, along with the vendor and a brief risk summary for each.",
-    type: "postgres",
-    desc: "Financial exposure + risk correlation analysis",
-    category: "monetary"
-  },
-  {
-    text: "By vendor, how much total contract value is tied to contracts that contain at least one high-risk clause? I'd like a ranking of vendors by 'high-risk contract value'.",
-    type: "postgres",
-    desc: "Vendor financial risk exposure aggregation",
+    desc: "SQL join: monetary_values + clauses + risk filtering",
     category: "monetary"
   },
   
-  // E. Obligations and Rights
+  // E. Obligations, Rights & Expirations (PostgreSQL: date filtering + relationship joins)
   {
-    text: "Find all contracts with auto-renewal clauses and notice periods",
+    text: "Which contracts are expiring in 2026? Show the reference number, expiration date, and vendor.",
     type: "postgres",
-    desc: "Contract discovery - renewal management",
+    desc: "SQL date range filter: active contracts approaching expiration",
     category: "obligations"
   },
   {
-    text: "Which contracts expire in Q2 2025?",
+    text: "Find all contracts with auto-renewal clauses — which vendors are they with and what are the notice periods?",
     type: "postgres",
-    desc: "Expiration tracking for proactive management",
+    desc: "SQL text search: auto-renewal detection in clause content",
     category: "obligations"
   },
   {
-    text: "Which vendors are associated with the largest number of high-impact obligations across all of their contracts with us?",
+    text: "Who are the parties responsible for the most high-impact obligations? Rank by count and show their top contract.",
     type: "postgres",
-    desc: "Vendor obligation burden analysis",
-    category: "obligations"
-  },
-  {
-    text: "Which contracts grant us important rights that are due to expire in the next six months, and which vendors are those contracts with?",
-    type: "postgres",
-    desc: "Rights expiration tracking + vendor identification",
+    desc: "SQL aggregation: obligations → responsible_party + is_high_impact",
     category: "obligations"
   },
   
-  // F. Governing Law and Regional Risk
+  // F. Jurisdiction & Governing Law (PostgreSQL: SQL GROUP BY on structured fields)
   {
-    text: "How does our overall risk profile differ by governing law? For example, compare contracts governed by England and Wales, Delaware, and California in terms of how many high-, medium-, and low-risk clauses they contain.",
+    text: "How does our risk profile differ by governing law? Compare contracts governed by England and Wales, California, and Delaware — how many high, medium, and low-risk clauses does each have?",
     type: "postgres",
-    desc: "Jurisdictional risk comparison + distribution analysis",
+    desc: "SQL cross-tab: governing_law × risk_level pivot",
     category: "regional"
   },
   {
-    text: "For contracts governed by England and Wales, which vendors do we have the most high-risk clauses with?",
+    text: "Which vendors do we have the most contracts with under Singapore governing law?",
     type: "postgres",
-    desc: "Jurisdiction-specific vendor risk ranking",
+    desc: "SQL filter + GROUP BY: jurisdiction-specific vendor analysis",
     category: "regional"
   },
   
-  // G. Strategic Insights & Thematic Analysis (GraphRAG - Abstractive/Qualitative)
+  // G. Semantic Search (PostgreSQL: pgvector embedding similarity)
   {
-    text: "What are the most common themes and patterns in our high-risk clauses across all contracts?",
+    text: "Find clauses that discuss limitations on liability for indirect or consequential damages.",
+    type: "postgres",
+    desc: "pgvector semantic search: conceptual clause matching by meaning, not keywords",
+    category: "semantic"
+  },
+  {
+    text: "Search for clauses related to data breach notification requirements and timelines.",
+    type: "postgres",
+    desc: "pgvector semantic search: find similar language across contracts",
+    category: "semantic"
+  },
+  
+  // H. Strategic Insights & Portfolio-Wide Patterns (GraphRAG: community summarization)
+  {
+    text: "What are the common risk themes and patterns that emerge across our entire contract portfolio?",
     type: "graphrag",
-    desc: "Thematic pattern discovery across portfolio",
+    desc: "GraphRAG global search: community-level risk pattern synthesis across 700+ contracts",
     category: "portfolio"
   },
   {
-    text: "How do our IP terms compare to industry standards?",
+    text: "How do our vendor contracts typically structure liability and indemnification obligations? What patterns emerge across different vendor types?",
     type: "graphrag",
-    desc: "Industry benchmarking - intellectual property",
+    desc: "GraphRAG global search: cross-community thematic analysis of liability language",
     category: "portfolio"
   },
   {
-    text: "Which vendors have similar service level obligations?",
+    text: "Provide a high-level narrative summary of how intellectual property ownership and work product rights are handled across our technology vendor contracts.",
     type: "graphrag",
-    desc: "SLA pattern analysis across vendors",
+    desc: "GraphRAG global search: abstractive synthesis from community reports — not a keyword search",
     category: "portfolio"
   },
   {
-    text: "Show all parties connected to high-risk obligations",
+    text: "What are the strategic implications of our data protection and confidentiality obligations across different vendor relationships? Where are the biggest gaps?",
     type: "graphrag",
-    desc: "Risk network mapping - party relationships",
+    desc: "GraphRAG global search: strategic narrative synthesis across data protection communities",
     category: "portfolio"
   },
   {
-    text: "Which contracts share similar confidentiality terms?",
+    text: "Looking across all our contracts, what thematic differences exist between our IT services agreements and our consulting agreements?",
     type: "graphrag",
-    desc: "Confidentiality pattern clustering",
-    category: "portfolio"
-  },
-  {
-    text: "How do our vendor contracts typically structure liability and indemnification language? What patterns emerge?",
-    type: "graphrag",
-    desc: "Qualitative language pattern analysis",
-    category: "portfolio"
-  },
-  {
-    text: "What are the strategic implications of our data protection and confidentiality obligations across different vendor relationships?",
-    type: "graphrag",
-    desc: "Strategic narrative synthesis",
-    category: "portfolio"
-  },
-  {
-    text: "Provide a narrative overview of how intellectual property rights are typically addressed across our technology vendor contracts.",
-    type: "graphrag",
-    desc: "Abstractive IP strategy summary",
+    desc: "GraphRAG global search: cross-community comparison — qualitative, not quantitative",
     category: "portfolio"
   }
 ];
@@ -226,13 +192,14 @@ export const HybridQuerySection: React.FC<HybridQuerySectionProps> = ({ onResult
   };
 
   const categories = [
-    { id: 'vendor-risk', name: 'A. Vendor Risk and Exposure', icon: Database, color: 'red', count: SAMPLE_QUERIES.filter(q => q.category === 'vendor-risk').length },
-    { id: 'families', name: 'B. Contract Families and Relationship Complexity', icon: GitBranch, color: 'blue', count: SAMPLE_QUERIES.filter(q => q.category === 'families').length },
-    { id: 'clause-risk', name: 'C. Clause-Level Risk Patterns', icon: Database, color: 'orange', count: SAMPLE_QUERIES.filter(q => q.category === 'clause-risk').length },
-    { id: 'monetary', name: 'D. Monetary Exposure vs Risk', icon: Database, color: 'yellow', count: SAMPLE_QUERIES.filter(q => q.category === 'monetary').length },
-    { id: 'obligations', name: 'E. Obligations and Rights', icon: Database, color: 'green', count: SAMPLE_QUERIES.filter(q => q.category === 'obligations').length },
-    { id: 'regional', name: 'F. Governing Law and Regional Risk', icon: Database, color: 'cyan', count: SAMPLE_QUERIES.filter(q => q.category === 'regional').length },
-    { id: 'portfolio', name: 'G. Strategic Insights & Thematic Analysis', icon: Sparkles, color: 'purple', count: SAMPLE_QUERIES.filter(q => q.category === 'portfolio').length }
+    { id: 'vendor-risk', name: 'A. Vendor Risk & Exposure', icon: Database, color: 'red', count: SAMPLE_QUERIES.filter(q => q.category === 'vendor-risk').length },
+    { id: 'families', name: 'B. Contract Families & Hierarchies', icon: GitBranch, color: 'blue', count: SAMPLE_QUERIES.filter(q => q.category === 'families').length },
+    { id: 'clause-risk', name: 'C. Clause-Level Risk Analysis', icon: Database, color: 'orange', count: SAMPLE_QUERIES.filter(q => q.category === 'clause-risk').length },
+    { id: 'monetary', name: 'D. Monetary Exposure', icon: Database, color: 'yellow', count: SAMPLE_QUERIES.filter(q => q.category === 'monetary').length },
+    { id: 'obligations', name: 'E. Obligations, Rights & Expirations', icon: Database, color: 'green', count: SAMPLE_QUERIES.filter(q => q.category === 'obligations').length },
+    { id: 'regional', name: 'F. Governing Law & Jurisdiction', icon: Database, color: 'cyan', count: SAMPLE_QUERIES.filter(q => q.category === 'regional').length },
+    { id: 'semantic', name: 'G. Semantic Clause Search', icon: Brain, color: 'teal', count: SAMPLE_QUERIES.filter(q => q.category === 'semantic').length },
+    { id: 'portfolio', name: 'H. Strategic Insights (GraphRAG)', icon: Sparkles, color: 'purple', count: SAMPLE_QUERIES.filter(q => q.category === 'portfolio').length }
   ];
 
   // Filter queries based on selected strategy
@@ -240,10 +207,10 @@ export const HybridQuerySection: React.FC<HybridQuerySectionProps> = ({ onResult
     const allQueries = SAMPLE_QUERIES.filter(q => q.category === categoryId);
     
     if (strategy === 'postgres') {
-      // PostgreSQL: Show A-F (exclude G which is graphrag-focused)
+      // PostgreSQL: Show A-G (exclude H which is graphrag-focused)
       return categoryId === 'portfolio' ? [] : allQueries;
     } else if (strategy === 'graphrag') {
-      // GraphRAG: Show only G (portfolio/strategic insights)
+      // GraphRAG: Show only H (portfolio/strategic insights)
       return categoryId === 'portfolio' ? allQueries : [];
     } else {
       // Auto/Hybrid: Show all categories
