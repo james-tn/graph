@@ -56,3 +56,85 @@ export const runIngestion = async (runPostgres: boolean = true, runGraphrag: boo
   });
   return response.data;
 };
+
+// ---------------------------------------------------------------------------
+// ML hierarchy linker review queue
+// ---------------------------------------------------------------------------
+
+export interface ContractSummary {
+  id: number;
+  contract_identifier?: string | null;
+  reference_number?: string | null;
+  title?: string | null;
+  contract_type?: string | null;
+  effective_date?: string | null;
+  expiration_date?: string | null;
+}
+
+export interface FeatureContribution {
+  feature: string;
+  contribution: number;
+}
+
+export interface ReviewItem {
+  id: number;
+  status: string;
+  confidence_score?: number | null;
+  model_version?: string | null;
+  relationship_type?: string | null;
+  extracted_parent_reference?: string | null;
+  created_at?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_notes?: string | null;
+  child: ContractSummary;
+  candidate_parent?: ContractSummary | null;
+  top_features: FeatureContribution[];
+}
+
+export interface ReviewListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  items: ReviewItem[];
+}
+
+export interface ReviewStatsResponse {
+  pending: number;
+  confirmed: number;
+  rejected: number;
+  relinked: number;
+  total: number;
+}
+
+export const getReviewStats = async (): Promise<ReviewStatsResponse> => {
+  const response = await api.get('/review-queue/stats');
+  return response.data;
+};
+
+export const listReviewItems = async (params?: {
+  status?: string;
+  limit?: number;
+  offset?: number;
+  sort?: 'confidence_desc' | 'confidence_asc' | 'newest' | 'oldest';
+}): Promise<ReviewListResponse> => {
+  const response = await api.get('/review-queue', { params });
+  return response.data;
+};
+
+export const getReviewItem = async (reviewId: number): Promise<ReviewItem> => {
+  const response = await api.get(`/review-queue/${reviewId}`);
+  return response.data;
+};
+
+export const decideReviewItem = async (
+  reviewId: number,
+  body: {
+    action: 'confirm' | 'reject' | 'relink';
+    new_parent_contract_id?: number;
+    notes?: string;
+  }
+) => {
+  const response = await api.post(`/review-queue/${reviewId}/decide`, body);
+  return response.data;
+};
