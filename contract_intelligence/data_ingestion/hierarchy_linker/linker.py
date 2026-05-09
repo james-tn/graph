@@ -31,6 +31,7 @@ from typing import Iterable, Optional
 import numpy as np
 
 from .candidate_generator import fetch_candidate_parents, fetch_child_contract_dict
+from .calibration import Calibrator
 from .feature_extractor import (
     FEATURE_NAMES,
     build_idf_cache,
@@ -66,6 +67,7 @@ class CandidateScore:
     parent_id: int
     confidence: float
     features: dict[str, float]
+    raw_score: Optional[float] = None  # uncalibrated booster output, if calibration applied
 
 
 @dataclass
@@ -77,6 +79,7 @@ class LinkResult:
     model_version: Optional[str] = None
     top_candidates: list[CandidateScore] = field(default_factory=list)
     top_features: list[tuple[str, float]] = field(default_factory=list)
+    calibration_method: str = "none"
 
 
 class HierarchyLinker:
@@ -99,6 +102,7 @@ class HierarchyLinker:
             row["feature"]: float(row.get("gain", 0.0)) for row in importances
         }
         self.model_version = meta.get("model_version") or meta.get("version") or "v1"
+        self.calibrator = Calibrator.from_meta(meta)
 
     # ----- loaders -----------------------------------------------------------
 
@@ -135,11 +139,18 @@ class HierarchyLinker:
         feats = extract_features(child, parent, idf_cache)
         x = features_to_array(feats).reshape(1, -1)
         dmat = xgb.DMatrix(x, feature_names=FEATURE_NAMES)
-        score = float(self.booster.predict(dmat)[0])
+        raw = float(self.booster.predict(dmat)[0])
+        if self.calibrator.method == "none":
+            calibrated = raw
+            raw_for_log: Optional[float] = None
+        else:
+            calibrated = self.calibrator.transform_one(raw)
+            raw_for_log = raw
         return CandidateScore(
             parent_id=int(parent.get("id")),
-            confidence=score,
+            confidence=calibrated,
             features=feats,
+            raw_score=raw_for_log,
         )
 
     def predict_parent(
@@ -165,6 +176,7 @@ class HierarchyLinker:
                 confidence=0.0,
                 method="none",
                 model_version=self.model_version,
+                calibration_method=self.calibrator.method,
             )
 
         scored = [self.score_pair(child, p, idf_cache) for p in candidates]
@@ -199,6 +211,7 @@ class HierarchyLinker:
             model_version=self.model_version,
             top_candidates=scored[:top_k],
             top_features=active[:5],
+            calibration_method=self.calibrator.method,
         )
 
 

@@ -758,12 +758,42 @@ psql -f data_ingestion/migrations/0001_add_ml_link_columns.sql
 # 2. Install ML deps
 pip install -e ".[hierarchy-linker]"
 
-# 3. Train initial model on synthetic corpus
+# 3. Train initial model on synthetic corpus (Platt-calibrated by default)
 python scripts/train_hierarchy_linker.py --bootstrap
 
 # 4. Once you have ≥ 200 confirmed parent links in the DB, retrain on real data
-python scripts/train_hierarchy_linker.py --from-db --min-real-positives 200
+python scripts/train_hierarchy_linker.py --from-db --min-real-positives 200 \
+    --calibration platt   # or 'isotonic' once you have ~1000+ labels
 ```
+
+### Probability calibration
+
+XGBoost outputs are biased by `scale_pos_weight` and aren't true probabilities,
+so the trainer fits a **Platt sigmoid** (or optional **isotonic regression**)
+on out-of-fold CV scores and persists the parameters in
+`hierarchy_linker_v1.meta.json`. The serving `HierarchyLinker` loads them
+automatically — meaning the `0.85` and `0.60` threshold gates correspond to
+real precision / recall on validation data, not raw model artifacts. The
+training run logs Brier-score before/after and switching methods is one CLI
+flag away (`--calibration {platt|isotonic|none}`).
+
+### Nightly retraining (production)
+
+A Container Apps Job runs `scripts/retrain_from_reviews.py` on a cron
+schedule (default 03:17 UTC) to incorporate reviewer feedback. Enable it via
+azd parameters:
+
+```bash
+azd env set HIERARCHYLINKERRETRAINJOBENABLED true
+azd env set HIERARCHYLINKERRETRAINCRON "17 3 * * *"
+azd env set HIERARCHYLINKERRETRAINMINPOSITIVES 50
+azd provision
+azd deploy
+```
+
+The job inherits the same managed identity + Postgres credentials as the
+main app, runs in the same Container Apps environment, and skips silently
+when not enough new positives have accumulated.
 
 See [`data_ingestion/hierarchy_linker/`](data_ingestion/hierarchy_linker/) and [`backend/app/api/review_queue.py`](backend/app/api/review_queue.py) for implementation.
 

@@ -138,3 +138,33 @@ export const decideReviewItem = async (
   const response = await api.post(`/review-queue/${reviewId}/decide`, body);
   return response.data;
 };
+
+// ---------------------------------------------------------------------------
+// Contracts search (used by the relink picker)
+// ---------------------------------------------------------------------------
+
+export interface ContractSearchHit {
+  id: number;
+  contract_identifier?: string | null;
+  reference_number?: string | null;
+  title?: string | null;
+  contract_type?: string | null;
+  effective_date?: string | null;
+  expiration_date?: string | null;
+  score: number;
+}
+
+export interface ContractSearchResponse {
+  query: string;
+  total: number;
+  items: ContractSearchHit[];
+}
+
+export const searchContracts = async (params: {
+  q: string;
+  limit?: number;
+  contract_type?: string;
+}): Promise<ContractSearchResponse> => {
+  const response = await api.get('/contracts/search', { params });
+  return response.data;
+};

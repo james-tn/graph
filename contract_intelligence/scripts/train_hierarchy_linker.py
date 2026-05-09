@@ -275,6 +275,7 @@ def train_and_save(
     num_boost_round: int = 500,
     early_stopping_rounds: int = 30,
     min_boost_round: int = 150,
+    calibration: str = "platt",
 ) -> None:
     import xgboost as xgb
     from sklearn.metrics import average_precision_score, roc_auc_score
@@ -303,6 +304,9 @@ def train_and_save(
     gkf = GroupKFold(n_splits=min(5, len(np.unique(groups))))
     aucs, auprs = [], []
     best_iters = []
+    oof_scores = np.zeros(len(y), dtype=float)
+    oof_labels = y.astype(int)
+    oof_mask = np.zeros(len(y), dtype=bool)
     for fold_i, (tr, va) in enumerate(gkf.split(X, y, groups), start=1):
         dtr = xgb.DMatrix(X[tr], label=y[tr], feature_names=FEATURE_NAMES)
         dva = xgb.DMatrix(X[va], label=y[va], feature_names=FEATURE_NAMES)
@@ -314,6 +318,8 @@ def train_and_save(
         )
         bi = booster.best_iteration if booster.best_iteration is not None else (booster.num_boosted_rounds() - 1)
         scores = booster.predict(dva, iteration_range=(0, bi + 1))
+        oof_scores[va] = scores
+        oof_mask[va] = True
         aucs.append(roc_auc_score(y[va], scores))
         auprs.append(average_precision_score(y[va], scores))
         best_iters.append(bi)
@@ -348,6 +354,35 @@ def train_and_save(
         key=lambda kv: kv[1], reverse=True,
     )
 
+    # Probability calibration on out-of-fold scores
+    cal_block: dict | None = None
+    cal_method_used = (calibration or "none").lower()
+    if cal_method_used in ("platt", "isotonic") and oof_mask.any():
+        try:
+            from hierarchy_linker.calibration import fit_calibration  # type: ignore  # noqa: E402
+
+            valid = oof_mask
+            cal_block = fit_calibration(
+                cal_method_used,
+                oof_scores[valid],
+                oof_labels[valid],
+            )
+            summary = cal_block.get("summary", {})
+            print(
+                f"[calibration] method={cal_method_used} "
+                f"n={summary.get('n_samples')} "
+                f"brier_before={summary.get('brier_before'):.4f} "
+                f"brier_after={summary.get('brier_after'):.4f}"
+            )
+        except Exception as exc:  # pragma: no cover - safety net
+            print(f"[calibration] WARNING: failed to fit ({exc}); skipping.")
+            cal_block = None
+    else:
+        if cal_method_used not in ("platt", "isotonic"):
+            print("[calibration] disabled (--calibration none)")
+        else:
+            print("[calibration] skipped (no out-of-fold scores)")
+
     # Save
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     final.save_model(str(MODEL_PATH))
@@ -372,6 +407,8 @@ def train_and_save(
         },
         "feature_importance": [{"feature": n, "gain": g} for n, g in importances],
     }
+    if cal_block is not None:
+        meta_payload["calibration"] = cal_block
     with open(META_PATH, "w") as f:
         json.dump(meta_payload, f, indent=2, default=str)
 
@@ -395,6 +432,11 @@ def main() -> None:
     parser.add_argument("--min-real-positives", type=int, default=200,
                         help="With --from-db, fall back to bootstrap if fewer real positives exist")
     parser.add_argument("--tenant-id", default="default")
+    parser.add_argument(
+        "--calibration", choices=["platt", "isotonic", "none"], default="platt",
+        help="Probability calibration method fit on out-of-fold CV scores. "
+             "Default 'platt' (sigmoid scaling, robust on small data).",
+    )
     args = parser.parse_args()
 
     if not args.bootstrap and not args.from_db:
@@ -424,7 +466,7 @@ def main() -> None:
         else:
             print(f"  pairs: {len(y)}  positives: {n_pos}  "
                   f"negatives: {int((y == 0).sum())}")
-            train_and_save(X, y, groups, source="postgres")
+            train_and_save(X, y, groups, source="postgres", calibration=args.calibration)
             return
 
     if args.bootstrap:
@@ -435,7 +477,7 @@ def main() -> None:
         n_pos = int(y.sum())
         print(f"  pairs: {len(y)}  positives: {n_pos}  "
               f"negatives: {int((y == 0).sum())}")
-        train_and_save(X, y, groups, source="synthetic_bootstrap")
+        train_and_save(X, y, groups, source="synthetic_bootstrap", calibration=args.calibration)
 
 
 if __name__ == "__main__":

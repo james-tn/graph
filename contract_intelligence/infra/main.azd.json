@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.39.26.7824",
-      "templateHash": "3898861618924108256"
+      "templateHash": "2377138047177354459"
     }
   },
   "parameters": {
@@ -194,6 +194,27 @@
       ],
       "metadata": {
         "description": "When true, ML decisions are computed and logged but not persisted"
+      }
+    },
+    "hierarchyLinkerRetrainJobEnabled": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Provision the nightly hierarchy linker retrain Container Apps Job"
+      }
+    },
+    "hierarchyLinkerRetrainCron": {
+      "type": "string",
+      "defaultValue": "17 3 * * *",
+      "metadata": {
+        "description": "Cron schedule (UTC) for the nightly retrain job"
+      }
+    },
+    "hierarchyLinkerRetrainMinPositives": {
+      "type": "string",
+      "defaultValue": "50",
+      "metadata": {
+        "description": "Minimum reviewer-confirmed positives before the retrain job actually retrains"
       }
     },
     "backendImageName": {
@@ -1401,6 +1422,291 @@
         "containerRegistry",
         "managedIdentity",
         "openai",
+        "postgres",
+        "rg"
+      ]
+    },
+    "retrainJob": {
+      "condition": "[parameters('hierarchyLinkerRetrainJobEnabled')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "retrain-job",
+      "resourceGroup": "[format('{0}-rg', variables('prefix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "baseName": {
+            "value": "[variables('prefix')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "containerAppsEnvironmentId": {
+            "value": "[reference('containerAppsEnvironment').outputs.environmentId.value]"
+          },
+          "containerRegistryName": {
+            "value": "[reference('containerRegistry').outputs.name.value]"
+          },
+          "containerImageName": {
+            "value": "[parameters('backendImageName')]"
+          },
+          "userAssignedIdentityResourceId": {
+            "value": "[reference('managedIdentity').outputs.resourceId.value]"
+          },
+          "userAssignedIdentityClientId": {
+            "value": "[reference('managedIdentity').outputs.clientId.value]"
+          },
+          "cronExpression": {
+            "value": "[parameters('hierarchyLinkerRetrainCron')]"
+          },
+          "postgresHost": {
+            "value": "[reference('postgres').outputs.host.value]"
+          },
+          "postgresDatabase": {
+            "value": "[reference('postgres').outputs.databaseName.value]"
+          },
+          "postgresUser": {
+            "value": "[reference('postgres').outputs.username.value]"
+          },
+          "postgresPassword": {
+            "value": "[listOutputsWithSecureValues('postgres', '2025-04-01').password]"
+          },
+          "hierarchyLinkerAutoThreshold": {
+            "value": "[parameters('hierarchyLinkerAutoThreshold')]"
+          },
+          "hierarchyLinkerReviewThreshold": {
+            "value": "[parameters('hierarchyLinkerReviewThreshold')]"
+          },
+          "retrainMinPositives": {
+            "value": "[parameters('hierarchyLinkerRetrainMinPositives')]"
+          },
+          "enabled": {
+            "value": "[parameters('hierarchyLinkerRetrainJobEnabled')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "7373586266909899172"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "baseName": {
+              "type": "string",
+              "metadata": {
+                "description": "Base name prefix used for all resources"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Common tags to apply"
+              }
+            },
+            "containerAppsEnvironmentId": {
+              "type": "string",
+              "metadata": {
+                "description": "Container Apps environment id"
+              }
+            },
+            "containerRegistryName": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure Container Registry name (used for the registry login)"
+              }
+            },
+            "containerImageName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Container image (full path), if empty the job is provisioned but inactive"
+              }
+            },
+            "userAssignedIdentityResourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "User-assigned managed identity resource id (for ACR pull + Postgres AAD)"
+              }
+            },
+            "userAssignedIdentityClientId": {
+              "type": "string",
+              "metadata": {
+                "description": "User-assigned managed identity client id"
+              }
+            },
+            "cronExpression": {
+              "type": "string",
+              "defaultValue": "17 3 * * *",
+              "metadata": {
+                "description": "Cron expression (UTC). Default: 03:17 every day"
+              }
+            },
+            "scheduleEnabled": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Whether the schedule trigger is enabled"
+              }
+            },
+            "postgresHost": {
+              "type": "string"
+            },
+            "postgresDatabase": {
+              "type": "string"
+            },
+            "postgresUser": {
+              "type": "string"
+            },
+            "postgresPassword": {
+              "type": "securestring"
+            },
+            "hierarchyLinkerAutoThreshold": {
+              "type": "string",
+              "defaultValue": "0.85"
+            },
+            "hierarchyLinkerReviewThreshold": {
+              "type": "string",
+              "defaultValue": "0.60"
+            },
+            "retrainMinPositives": {
+              "type": "string",
+              "defaultValue": "50",
+              "metadata": {
+                "description": "Minimum reviewer-confirmed positives required before retraining proceeds"
+              }
+            },
+            "enabled": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Whether to skip the job entirely (e.g. when no model is set up yet)"
+              }
+            }
+          },
+          "variables": {
+            "jobName": "[format('{0}-retrain-job', parameters('baseName'))]"
+          },
+          "resources": [
+            {
+              "condition": "[parameters('enabled')]",
+              "type": "Microsoft.App/jobs",
+              "apiVersion": "2024-03-01",
+              "name": "[variables('jobName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                  "[format('{0}', parameters('userAssignedIdentityResourceId'))]": {}
+                }
+              },
+              "properties": {
+                "environmentId": "[parameters('containerAppsEnvironmentId')]",
+                "configuration": {
+                  "triggerType": "Schedule",
+                  "replicaTimeout": 3600,
+                  "replicaRetryLimit": 1,
+                  "scheduleTriggerConfig": {
+                    "cronExpression": "[parameters('cronExpression')]",
+                    "parallelism": 1,
+                    "replicaCompletionCount": 1
+                  },
+                  "registries": "[if(not(empty(parameters('containerImageName'))), createArray(createObject('server', format('{0}.azurecr.io', parameters('containerRegistryName')), 'identity', parameters('userAssignedIdentityResourceId'))), createArray())]",
+                  "secrets": [
+                    {
+                      "name": "postgres-password",
+                      "value": "[parameters('postgresPassword')]"
+                    }
+                  ]
+                },
+                "template": {
+                  "containers": [
+                    {
+                      "name": "retrain",
+                      "image": "[if(not(empty(parameters('containerImageName'))), parameters('containerImageName'), 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest')]",
+                      "command": "[if(not(empty(parameters('containerImageName'))), createArray('python'), createArray())]",
+                      "args": "[if(not(empty(parameters('containerImageName'))), createArray('scripts/retrain_from_reviews.py', '--min-real-positives', parameters('retrainMinPositives')), createArray())]",
+                      "env": [
+                        {
+                          "name": "POSTGRES_HOST",
+                          "value": "[parameters('postgresHost')]"
+                        },
+                        {
+                          "name": "POSTGRES_DATABASE",
+                          "value": "[parameters('postgresDatabase')]"
+                        },
+                        {
+                          "name": "POSTGRES_USER",
+                          "value": "[parameters('postgresUser')]"
+                        },
+                        {
+                          "name": "POSTGRES_ADMIN_PASSWORD",
+                          "secretRef": "postgres-password"
+                        },
+                        {
+                          "name": "AZURE_CLIENT_ID",
+                          "value": "[parameters('userAssignedIdentityClientId')]"
+                        },
+                        {
+                          "name": "AZURE_USE_MANAGED_IDENTITY",
+                          "value": "true"
+                        },
+                        {
+                          "name": "HIERARCHY_LINKER_AUTO_THRESHOLD",
+                          "value": "[parameters('hierarchyLinkerAutoThreshold')]"
+                        },
+                        {
+                          "name": "HIERARCHY_LINKER_REVIEW_THRESHOLD",
+                          "value": "[parameters('hierarchyLinkerReviewThreshold')]"
+                        },
+                        {
+                          "name": "SCHEDULE_ENABLED",
+                          "value": "[string(parameters('scheduleEnabled'))]"
+                        }
+                      ],
+                      "resources": {
+                        "cpu": "[json('1.0')]",
+                        "memory": "2Gi"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "jobName": {
+              "type": "string",
+              "value": "[if(parameters('enabled'), variables('jobName'), '')]"
+            },
+            "jobId": {
+              "type": "string",
+              "value": "[if(parameters('enabled'), resourceId('Microsoft.App/jobs', variables('jobName')), '')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "containerAppsEnvironment",
+        "containerRegistry",
+        "managedIdentity",
         "postgres",
         "rg"
       ]

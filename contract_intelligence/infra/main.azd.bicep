@@ -95,6 +95,15 @@ param hierarchyLinkerReviewThreshold string = '0.60'
 @description('When true, ML decisions are computed and logged but not persisted')
 param hierarchyLinkerShadowMode string = 'false'
 
+@description('Provision the nightly hierarchy linker retrain Container Apps Job')
+param hierarchyLinkerRetrainJobEnabled bool = false
+
+@description('Cron schedule (UTC) for the nightly retrain job')
+param hierarchyLinkerRetrainCron string = '17 3 * * *'
+
+@description('Minimum reviewer-confirmed positives before the retrain job actually retrains')
+param hierarchyLinkerRetrainMinPositives string = '50'
+
 // Container image name (populated by azd deploy)
 param backendImageName string = ''
 
@@ -255,6 +264,31 @@ module application 'modules/application.bicep' = {
     hierarchyLinkerAutoThreshold: hierarchyLinkerAutoThreshold
     hierarchyLinkerReviewThreshold: hierarchyLinkerReviewThreshold
     hierarchyLinkerShadowMode: hierarchyLinkerShadowMode
+  }
+}
+
+// ==================== HIERARCHY LINKER RETRAIN JOB ====================
+module retrainJob 'modules/retrain-job.bicep' = if (hierarchyLinkerRetrainJobEnabled) {
+  scope: rg
+  name: 'retrain-job'
+  params: {
+    location: location
+    baseName: prefix
+    tags: tags
+    containerAppsEnvironmentId: containerAppsEnvironment.outputs.environmentId
+    containerRegistryName: containerRegistry.outputs.name
+    containerImageName: backendImageName
+    userAssignedIdentityResourceId: managedIdentity.outputs.resourceId
+    userAssignedIdentityClientId: managedIdentity.outputs.clientId
+    cronExpression: hierarchyLinkerRetrainCron
+    postgresHost: postgres.outputs.host
+    postgresDatabase: postgres.outputs.databaseName
+    postgresUser: postgres.outputs.username
+    postgresPassword: postgres.outputs.password
+    hierarchyLinkerAutoThreshold: hierarchyLinkerAutoThreshold
+    hierarchyLinkerReviewThreshold: hierarchyLinkerReviewThreshold
+    retrainMinPositives: hierarchyLinkerRetrainMinPositives
+    enabled: hierarchyLinkerRetrainJobEnabled
   }
 }
 
