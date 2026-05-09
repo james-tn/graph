@@ -5,8 +5,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.38.33.27573",
-      "templateHash": "12190382241789893557"
+      "version": "0.39.26.7824",
+      "templateHash": "3898861618924108256"
     }
   },
   "parameters": {
@@ -20,6 +20,7 @@
     },
     "location": {
       "type": "string",
+      "defaultValue": "eastus2",
       "minLength": 1,
       "metadata": {
         "description": "Primary location for all resources"
@@ -65,6 +66,13 @@
       "defaultValue": "",
       "metadata": {
         "description": "Existing Azure OpenAI embedding deployment name"
+      }
+    },
+    "existingOpenAiResourceId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Existing Azure OpenAI resource ID (required when the account lives in another resource group or subscription)"
       }
     },
     "existingPostgresHost": {
@@ -151,6 +159,43 @@
         "description": "Disable authentication"
       }
     },
+    "hierarchyLinkerEnabled": {
+      "type": "string",
+      "defaultValue": "auto",
+      "allowedValues": [
+        "auto",
+        "on",
+        "off"
+      ],
+      "metadata": {
+        "description": "Hierarchy linker mode: auto (on if model file is present), on (force-enable), off"
+      }
+    },
+    "hierarchyLinkerAutoThreshold": {
+      "type": "string",
+      "defaultValue": "0.85",
+      "metadata": {
+        "description": "Confidence threshold for auto-link (else queued for review)"
+      }
+    },
+    "hierarchyLinkerReviewThreshold": {
+      "type": "string",
+      "defaultValue": "0.60",
+      "metadata": {
+        "description": "Confidence threshold for sending to review queue (below this, no link)"
+      }
+    },
+    "hierarchyLinkerShadowMode": {
+      "type": "string",
+      "defaultValue": "false",
+      "allowedValues": [
+        "true",
+        "false"
+      ],
+      "metadata": {
+        "description": "When true, ML decisions are computed and logged but not persisted"
+      }
+    },
     "backendImageName": {
       "type": "string",
       "defaultValue": ""
@@ -163,8 +208,16 @@
     },
     "resourceToken": "[toLower(uniqueString(subscription().id, parameters('environmentName'), parameters('location')))]",
     "prefix": "[format('{0}-{1}', parameters('baseName'), variables('resourceToken'))]",
+    "managedIdentityName": "[format('{0}-identity', variables('prefix'))]",
     "useExistingOpenAI": "[not(empty(parameters('existingOpenAiEndpoint')))]",
-    "useExistingPostgres": "[not(empty(parameters('existingPostgresHost')))]"
+    "useExistingPostgres": "[not(empty(parameters('existingPostgresHost')))]",
+    "hasExistingOpenAiResourceId": "[not(empty(parameters('existingOpenAiResourceId')))]",
+    "existingOpenAiSegments": "[split(parameters('existingOpenAiResourceId'), '/')]",
+    "existingOpenAiSubscriptionId": "[if(variables('hasExistingOpenAiResourceId'), variables('existingOpenAiSegments')[2], '')]",
+    "existingOpenAiResourceGroupName": "[if(variables('hasExistingOpenAiResourceId'), variables('existingOpenAiSegments')[4], '')]",
+    "existingOpenAiAccountName": "[if(variables('hasExistingOpenAiResourceId'), variables('existingOpenAiSegments')[8], '')]",
+    "deployOpenAiModule": "[or(not(variables('useExistingOpenAI')), not(variables('hasExistingOpenAiResourceId')))]",
+    "cognitiveServicesOpenAIUserRoleId": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
   },
   "resources": {
     "rg": {
@@ -201,8 +254,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.38.33.27573",
-              "templateHash": "6854598642492885877"
+              "version": "0.39.26.7824",
+              "templateHash": "14785688437753109655"
             }
           },
           "parameters": {
@@ -251,6 +304,7 @@
       ]
     },
     "openai": {
+      "condition": "[variables('deployOpenAiModule')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "openai",
@@ -295,8 +349,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.38.33.27573",
-              "templateHash": "18029917059145177431"
+              "version": "0.39.26.7824",
+              "templateHash": "5678711201992081785"
             }
           },
           "parameters": {
@@ -450,6 +504,81 @@
         "rg"
       ]
     },
+    "openaiExternalRole": {
+      "condition": "[and(variables('useExistingOpenAI'), variables('hasExistingOpenAiResourceId'))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "openai-external-role",
+      "subscriptionId": "[variables('existingOpenAiSubscriptionId')]",
+      "resourceGroup": "[variables('existingOpenAiResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "accountName": {
+            "value": "[variables('existingOpenAiAccountName')]"
+          },
+          "cognitiveServicesOpenAIUserRoleId": {
+            "value": "[variables('cognitiveServicesOpenAIUserRoleId')]"
+          },
+          "principalId": {
+            "value": "[reference('managedIdentity').outputs.principalId.value]"
+          },
+          "principalType": {
+            "value": "ServicePrincipal"
+          },
+          "roleAssignmentName": {
+            "value": "[guid(parameters('existingOpenAiResourceId'), variables('managedIdentityName'), variables('cognitiveServicesOpenAIUserRoleId'))]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "5089501352845159231"
+            }
+          },
+          "parameters": {
+            "accountName": {
+              "type": "string"
+            },
+            "cognitiveServicesOpenAIUserRoleId": {
+              "type": "string"
+            },
+            "principalId": {
+              "type": "string"
+            },
+            "principalType": {
+              "type": "string"
+            },
+            "roleAssignmentName": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', parameters('accountName'))]",
+              "name": "[parameters('roleAssignmentName')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('cognitiveServicesOpenAIUserRoleId'))]",
+                "principalId": "[parameters('principalId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "managedIdentity"
+      ]
+    },
     "postgres": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
@@ -505,8 +634,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.38.33.27573",
-              "templateHash": "17728771002138184059"
+              "version": "0.39.26.7824",
+              "templateHash": "6636076152769592595"
             }
           },
           "parameters": {
@@ -689,8 +818,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.38.33.27573",
-              "templateHash": "1812492449351370858"
+              "version": "0.39.26.7824",
+              "templateHash": "13152099758473846517"
             }
           },
           "parameters": {
@@ -785,8 +914,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.38.33.27573",
-              "templateHash": "602550646949490046"
+              "version": "0.39.26.7824",
+              "templateHash": "3627552186252519967"
             }
           },
           "parameters": {
@@ -866,8 +995,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.38.33.27573",
-              "templateHash": "6086323776543918111"
+              "version": "0.39.26.7824",
+              "templateHash": "9296403396516863036"
             }
           },
           "parameters": {
@@ -955,15 +1084,9 @@
           "userAssignedIdentityClientId": {
             "value": "[reference('managedIdentity').outputs.clientId.value]"
           },
-          "openaiEndpoint": {
-            "value": "[reference('openai').outputs.endpoint.value]"
-          },
-          "openaiDeploymentName": {
-            "value": "[reference('openai').outputs.chatDeploymentName.value]"
-          },
-          "openaiEmbeddingDeploymentName": {
-            "value": "[reference('openai').outputs.embeddingDeploymentName.value]"
-          },
+          "openaiEndpoint": "[if(variables('deployOpenAiModule'), createObject('value', reference('openai').outputs.endpoint.value), createObject('value', parameters('existingOpenAiEndpoint')))]",
+          "openaiDeploymentName": "[if(variables('deployOpenAiModule'), createObject('value', reference('openai').outputs.chatDeploymentName.value), createObject('value', parameters('existingOpenAiDeploymentName')))]",
+          "openaiEmbeddingDeploymentName": "[if(variables('deployOpenAiModule'), createObject('value', reference('openai').outputs.embeddingDeploymentName.value), createObject('value', parameters('existingOpenAiEmbeddingDeploymentName')))]",
           "postgresHost": {
             "value": "[reference('postgres').outputs.host.value]"
           },
@@ -993,6 +1116,18 @@
           },
           "disableAuth": {
             "value": "[parameters('disableAuth')]"
+          },
+          "hierarchyLinkerEnabled": {
+            "value": "[parameters('hierarchyLinkerEnabled')]"
+          },
+          "hierarchyLinkerAutoThreshold": {
+            "value": "[parameters('hierarchyLinkerAutoThreshold')]"
+          },
+          "hierarchyLinkerReviewThreshold": {
+            "value": "[parameters('hierarchyLinkerReviewThreshold')]"
+          },
+          "hierarchyLinkerShadowMode": {
+            "value": "[parameters('hierarchyLinkerShadowMode')]"
           }
         },
         "template": {
@@ -1001,8 +1136,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.38.33.27573",
-              "templateHash": "8095328602719759686"
+              "version": "0.39.26.7824",
+              "templateHash": "8788233935196320178"
             }
           },
           "parameters": {
@@ -1070,6 +1205,31 @@
             },
             "disableAuth": {
               "type": "string"
+            },
+            "hierarchyLinkerEnabled": {
+              "type": "string",
+              "defaultValue": "auto",
+              "allowedValues": [
+                "auto",
+                "on",
+                "off"
+              ]
+            },
+            "hierarchyLinkerAutoThreshold": {
+              "type": "string",
+              "defaultValue": "0.85"
+            },
+            "hierarchyLinkerReviewThreshold": {
+              "type": "string",
+              "defaultValue": "0.60"
+            },
+            "hierarchyLinkerShadowMode": {
+              "type": "string",
+              "defaultValue": "false",
+              "allowedValues": [
+                "true",
+                "false"
+              ]
             }
           },
           "variables": {
@@ -1178,6 +1338,22 @@
                         {
                           "name": "DISABLE_AUTH",
                           "value": "[parameters('disableAuth')]"
+                        },
+                        {
+                          "name": "HIERARCHY_LINKER_ENABLED",
+                          "value": "[parameters('hierarchyLinkerEnabled')]"
+                        },
+                        {
+                          "name": "HIERARCHY_LINKER_AUTO_THRESHOLD",
+                          "value": "[parameters('hierarchyLinkerAutoThreshold')]"
+                        },
+                        {
+                          "name": "HIERARCHY_LINKER_REVIEW_THRESHOLD",
+                          "value": "[parameters('hierarchyLinkerReviewThreshold')]"
+                        },
+                        {
+                          "name": "HIERARCHY_LINKER_SHADOW_MODE",
+                          "value": "[parameters('hierarchyLinkerShadowMode')]"
                         }
                       ],
                       "resources": {
@@ -1249,15 +1425,15 @@
     },
     "AZURE_OPENAI_ENDPOINT": {
       "type": "string",
-      "value": "[reference('openai').outputs.endpoint.value]"
+      "value": "[if(variables('deployOpenAiModule'), reference('openai').outputs.endpoint.value, parameters('existingOpenAiEndpoint'))]"
     },
     "AZURE_OPENAI_CHAT_DEPLOYMENT": {
       "type": "string",
-      "value": "[reference('openai').outputs.chatDeploymentName.value]"
+      "value": "[if(variables('deployOpenAiModule'), reference('openai').outputs.chatDeploymentName.value, parameters('existingOpenAiDeploymentName'))]"
     },
     "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": {
       "type": "string",
-      "value": "[reference('openai').outputs.embeddingDeploymentName.value]"
+      "value": "[if(variables('deployOpenAiModule'), reference('openai').outputs.embeddingDeploymentName.value, parameters('existingOpenAiEmbeddingDeploymentName'))]"
     },
     "POSTGRES_HOST": {
       "type": "string",

@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { UploadSection } from './components/UploadSection'
 import { HybridQuerySection } from './components/HybridQuerySection'
 import { HybridResultSection } from './components/HybridResultSection'
-import { Brain, Search, Upload, Database, GitBranch } from 'lucide-react'
+import { ReviewQueueSection } from './components/ReviewQueueSection'
+import { Brain, Search, Upload, Database, GitBranch, ListChecks } from 'lucide-react'
 
 function App() {
   const [result, setResult] = useState(null);
-  const [activeTab, setActiveTab] = useState<'query' | 'upload'>('query');
+  const [activeTab, setActiveTab] = useState<'query' | 'upload' | 'review'>('query');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 relative overflow-hidden">
@@ -91,6 +92,17 @@ function App() {
               <Upload className="w-6 h-6" />
               Manage Files
             </button>
+            <button
+              onClick={() => setActiveTab('review')}
+              className={`px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 flex items-center gap-3 ${
+                activeTab === 'review'
+                  ? 'bg-gradient-to-r from-emerald-600 to-blue-600 text-white shadow-lg shadow-emerald-500/50 scale-105'
+                  : 'text-blue-300 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <ListChecks className="w-6 h-6" />
+              Review Queue
+            </button>
           </div>
         </div>
 
@@ -101,8 +113,10 @@ function App() {
               <HybridQuerySection onResult={setResult} />
               {result && <HybridResultSection result={result} />}
             </>
-          ) : (
+          ) : activeTab === 'upload' ? (
             <UploadSection />
+          ) : (
+            <ReviewQueueSection />
           )}
         </div>
 

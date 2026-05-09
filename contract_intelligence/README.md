@@ -686,6 +686,89 @@ LIMIT 10
 
 ---
 
+## 🤖 ML-Assisted Hierarchy Linking
+
+When ingesting contracts, the LLM extracts a `parent_reference_number` (e.g., "this Amendment is to MSA-ABC-123"). The legacy linker only succeeded when that string matched an existing contract's `reference_number` exactly — fine for clean documents, but typos, OCR drift, paraphrasing, or simply omitted references left **~40% of children orphaned**.
+
+The platform now includes an **XGBoost-based hierarchy linker** that runs as a fallback:
+
+```
+extracted_parent_reference  →  exact ref match
+   hit  → INSERT contract_relationships (link_method='rule_based',  confidence=1.0)
+   miss → ML scoring over candidate parents (filtered by shared parties, type, dates)
+            top1 ≥ 0.85  → INSERT (link_method='ml_auto', confidence, top_features)
+            top1 ≥ 0.60  → INSERT link_review_queue (status='pending')   ← needs human
+            top1 < 0.60  → INSERT contract_relationships (parent NULL, link_method='none')
+```
+
+### How it works
+
+The model scores `(child, candidate_parent)` pairs over **32 deterministic features** spanning:
+
+| Family | Features |
+|---|---|
+| **Reference matching** | `explicit_ref_exact`, `explicit_ref_fuzzy` (token_set_ratio for OCR-corrupted refs) |
+| **Title similarity** | `title_jaccard`, `title_substring`, `title_tfidf_cosine`, `doc_tfidf_cosine` |
+| **Party overlap** | `shared_parties_count/ratio`, `all_child_parties_in_parent`, `client_match`, `vendor_match` |
+| **Temporal** | `days_between_effective`, `parent_precedes_child`, `child_within_parent_term`, `log_days_gap` |
+| **Type compatibility** | `parent_is_msa/sow/amendment/...`, `child_is_sow/amendment/...`, `type_compatible` |
+| **Legal/financial** | `governing_law_match`, `currency_match`, `child_value_lt_parent`, `value_ratio`, `amendment_language` |
+
+POC results on a 350-contract synthetic corpus: **100% accuracy** vs 60.5% for the rule-based baseline (139 children rescued).
+
+### Review queue UI
+
+Children scoring in the `[0.60, 0.85)` band land in `link_review_queue` and surface in a new **Review Queue** tab in the frontend. Reviewers see:
+
+- The child contract and the model's top candidate side-by-side
+- The 5 top contributing features (e.g., `shared_parties_ratio (5.4)`, `title_tfidf_cosine (3.1)`)
+- The original extracted reference (if any)
+- Three actions:
+  - **Confirm** — creates the relationship with `link_method='ml_review_confirmed'`
+  - **Reject** — pair becomes a labeled negative for the next retrain
+  - **Relink** — pick a different parent_id; row is recorded with `link_method='manual'`
+
+### Active learning loop
+
+`scripts/retrain_from_reviews.py` (cron-friendly) reads:
+- **Positives**: trusted links (`rule_based`, `ml_review_confirmed`, `manual`)
+- **Labeled negatives**: pairs reviewers explicitly rejected
+- **Hard negatives**: candidate-generator output minus the true parent
+- **Easy negatives**: random plausible-type contracts that share no party
+
+Retrains via `GroupKFold(5)` cross-validation when ≥ N new positives have accumulated since the last training. The model artifact lives at `data_ingestion/hierarchy_linker/models/hierarchy_linker_v1.json` and is loaded lazily by the ingestion pipeline.
+
+### Configuration
+
+All controls are env vars (also exposed as Container App settings via Bicep):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `HIERARCHY_LINKER_ENABLED` | `auto` | `auto` (on if model file present), `on`, `off` |
+| `HIERARCHY_LINKER_AUTO_THRESHOLD` | `0.85` | Confidence above which to auto-link |
+| `HIERARCHY_LINKER_REVIEW_THRESHOLD` | `0.60` | Confidence above which to queue for review |
+| `HIERARCHY_LINKER_SHADOW_MODE` | `false` | When `true`, ML decisions are computed and logged but not persisted (audit-only) |
+
+### Cold start
+
+```bash
+# 1. Apply schema migration (idempotent)
+psql -f data_ingestion/migrations/0001_add_ml_link_columns.sql
+
+# 2. Install ML deps
+pip install -e ".[hierarchy-linker]"
+
+# 3. Train initial model on synthetic corpus
+python scripts/train_hierarchy_linker.py --bootstrap
+
+# 4. Once you have ≥ 200 confirmed parent links in the DB, retrain on real data
+python scripts/train_hierarchy_linker.py --from-db --min-real-positives 200
+```
+
+See [`data_ingestion/hierarchy_linker/`](data_ingestion/hierarchy_linker/) and [`backend/app/api/review_queue.py`](backend/app/api/review_queue.py) for implementation.
+
+---
+
 ## 🔧 Technology Stack
 
 | Layer | Technology | Purpose |
@@ -699,6 +782,7 @@ LIMIT 10
 | **Graph Queries** | Apache AGE 1.6.0 | Cypher traversal with `=~` regex support |
 | **Knowledge Graph** | Microsoft GraphRAG 3.0.2 | Pattern discovery via LiteLLM |
 | **Shared Vectors** | PgVectorStore (custom) | GraphRAG vectors on shared PostgreSQL |
+| **ML Hierarchy Linker** | XGBoost 2.0+ / scikit-learn | 32-feature parent matching with active learning |
 | **LLM** | Azure OpenAI gpt-4o / gpt-5.1 | Natural language |
 | **Embeddings** | text-embedding-3-small | 1536-dimension vectors |
 | **Package Manager** | uv | Fast Python dependency installation |
@@ -728,17 +812,25 @@ contract_intelligence/
 │       └── components/      # Query interface, results, visualizations
 ├── data_ingestion/          # Dual ingestion pipeline (see data_ingestion/README.md)
 │   ├── ingestion_pipeline.py   # Unified orchestrator (4 modes)
-│   ├── postgres_ingestion.py   # PostgreSQL + AGE ingestion
+│   ├── postgres_ingestion.py   # PostgreSQL + AGE ingestion (with ML linker fallback)
 │   ├── graphrag_ingestion.py   # GraphRAG v3 indexing
-│   └── build_graph.py         # Apache AGE graph builder
+│   ├── build_graph.py         # Apache AGE graph builder
+│   ├── hierarchy_linker/       # XGBoost ML linker for parent matching
+│   │   ├── feature_extractor.py   # 32 deterministic features
+│   │   ├── candidate_generator.py # SQL-backed candidate retrieval
+│   │   ├── linker.py              # Inference + cascade orchestrator
+│   │   └── models/                # Trained model artifacts
+│   └── migrations/             # Forward-only schema migrations
 ├── data/
 │   ├── input/              # Raw contract markdown (700+ files)
 │   └── output/             # GraphRAG artifacts (parquet, lancedb)
 ├── graphrag_config/        # GraphRAG v3 settings + custom prompts
 │   ├── settings.yaml          # LiteLLM config, entity types, search params
 │   └── prompts/               # Domain-specific extraction prompts
-├── scripts/                # Deployment, seed data
-│   └── deploy-containerapp.ps1 # Azure Container Apps deployment
+├── scripts/                # Deployment, training, retrain
+│   ├── deploy-containerapp.ps1   # Azure Container Apps deployment
+│   ├── train_hierarchy_linker.py # Bootstrap or DB-backed training
+│   └── retrain_from_reviews.py   # Active-learning loop
 └── Dockerfile              # Multi-stage build (Node frontend + Python backend)
 ```
 

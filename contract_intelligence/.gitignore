@@ -19,6 +19,10 @@ test_*.py
 run_*.py
 start_*.bat
 !start_backend.bat
+# Allow real test suites under backend/tests/ and scripts directory
+!backend/tests/test_*.py
+!scripts/run_*.py
+!poc_xgboost_linker/run_*.py
 contract_analysis.txt
 
 # Logs

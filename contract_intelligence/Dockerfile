@@ -59,6 +59,13 @@ COPY data/output/ ./data/output/
 # Copy LanceDB vector store
 COPY data/output/lancedb/ ./data/output/lancedb/
 
+# Copy data_ingestion package (used at runtime by FastAPI for hierarchy_linker
+# and on-demand orphan resolution; also used by the retrain Container Apps Job)
+COPY data_ingestion/ ./data_ingestion/
+
+# Copy training scripts (used by the retrain Container Apps Job)
+COPY scripts/ ./scripts/
+
 # Copy built React frontend from stage 1
 COPY --from=frontend-builder /frontend-build/dist ./frontend/dist
 
@@ -66,11 +73,17 @@ COPY --from=frontend-builder /frontend-build/dist ./frontend/dist
 # COPY data/input/ ./data/input/  # Not needed - data/output has processed data
 
 # Set environment variables
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/app/data_ingestion
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
 # Puppeteer configuration for Docker (no sandbox for containerized environment)
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
+
+# Hierarchy linker defaults; override via Container App env vars at runtime
+ENV HIERARCHY_LINKER_ENABLED=auto
+ENV HIERARCHY_LINKER_AUTO_THRESHOLD=0.85
+ENV HIERARCHY_LINKER_REVIEW_THRESHOLD=0.60
+ENV HIERARCHY_LINKER_SHADOW_MODE=false
 
 # Expose port
 EXPOSE 8000

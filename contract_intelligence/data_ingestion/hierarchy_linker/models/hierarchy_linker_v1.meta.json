@@ -1,0 +1,195 @@
+{
+  "model_version": "hierarchy_linker_v1",
+  "trained_at": "2026-05-09T15:15:58.549238Z",
+  "training_source": "synthetic_bootstrap",
+  "feature_names": [
+    "explicit_ref_exact",
+    "explicit_ref_fuzzy",
+    "title_jaccard",
+    "title_substring",
+    "amendment_language",
+    "shared_parties_count",
+    "shared_parties_ratio",
+    "all_child_parties_in_parent",
+    "client_match",
+    "vendor_match",
+    "days_between_effective",
+    "parent_precedes_child",
+    "child_within_parent_term",
+    "log_days_gap",
+    "type_compatible",
+    "governing_law_match",
+    "currency_match",
+    "child_value_lt_parent",
+    "value_ratio",
+    "title_tfidf_cosine",
+    "doc_tfidf_cosine",
+    "parent_is_msa",
+    "parent_is_sow",
+    "parent_is_amendment",
+    "parent_is_addendum",
+    "parent_is_workorder",
+    "child_is_msa",
+    "child_is_sow",
+    "child_is_amendment",
+    "child_is_addendum",
+    "child_is_workorder",
+    "parent_is_terminated"
+  ],
+  "training_info": {
+    "n_train": 1962,
+    "n_positives": 320,
+    "n_negatives": 1642,
+    "scale_pos_weight": 2.265226258014859,
+    "num_boost_round": 150,
+    "best_iteration": 0,
+    "params": {
+      "objective": "binary:logistic",
+      "eval_metric": "aucpr",
+      "tree_method": "hist",
+      "max_depth": 6,
+      "learning_rate": 0.05,
+      "subsample": 0.85,
+      "colsample_bytree": 0.85,
+      "min_child_weight": 1.0,
+      "reg_lambda": 1.0,
+      "scale_pos_weight": 2.265226258014859,
+      "seed": 42
+    }
+  },
+  "cv_metrics": {
+    "mean_auc": 1.0,
+    "mean_aucpr": 1.0,
+    "n_folds": 5
+  },
+  "feature_importance": [
+    {
+      "feature": "shared_parties_ratio",
+      "gain": 143.10992431640625
+    },
+    {
+      "feature": "title_tfidf_cosine",
+      "gain": 114.33121490478516
+    },
+    {
+      "feature": "explicit_ref_fuzzy",
+      "gain": 54.62373733520508
+    },
+    {
+      "feature": "parent_is_msa",
+      "gain": 52.28645706176758
+    },
+    {
+      "feature": "shared_parties_count",
+      "gain": 49.09336471557617
+    },
+    {
+      "feature": "parent_is_sow",
+      "gain": 43.41530227661133
+    },
+    {
+      "feature": "currency_match",
+      "gain": 16.998149871826172
+    },
+    {
+      "feature": "title_jaccard",
+      "gain": 16.32501792907715
+    },
+    {
+      "feature": "governing_law_match",
+      "gain": 13.468334197998047
+    },
+    {
+      "feature": "child_within_parent_term",
+      "gain": 12.75883960723877
+    },
+    {
+      "feature": "days_between_effective",
+      "gain": 6.975945949554443
+    },
+    {
+      "feature": "log_days_gap",
+      "gain": 6.0473737716674805
+    },
+    {
+      "feature": "value_ratio",
+      "gain": 4.3642730712890625
+    },
+    {
+      "feature": "explicit_ref_exact",
+      "gain": 1.3251899480819702
+    },
+    {
+      "feature": "doc_tfidf_cosine",
+      "gain": 0.3569548428058624
+    },
+    {
+      "feature": "title_substring",
+      "gain": 0.0
+    },
+    {
+      "feature": "amendment_language",
+      "gain": 0.0
+    },
+    {
+      "feature": "all_child_parties_in_parent",
+      "gain": 0.0
+    },
+    {
+      "feature": "client_match",
+      "gain": 0.0
+    },
+    {
+      "feature": "vendor_match",
+      "gain": 0.0
+    },
+    {
+      "feature": "parent_precedes_child",
+      "gain": 0.0
+    },
+    {
+      "feature": "type_compatible",
+      "gain": 0.0
+    },
+    {
+      "feature": "child_value_lt_parent",
+      "gain": 0.0
+    },
+    {
+      "feature": "parent_is_amendment",
+      "gain": 0.0
+    },
+    {
+      "feature": "parent_is_addendum",
+      "gain": 0.0
+    },
+    {
+      "feature": "parent_is_workorder",
+      "gain": 0.0
+    },
+    {
+      "feature": "child_is_msa",
+      "gain": 0.0
+    },
+    {
+      "feature": "child_is_sow",
+      "gain": 0.0
+    },
+    {
+      "feature": "child_is_amendment",
+      "gain": 0.0
+    },
+    {
+      "feature": "child_is_addendum",
+      "gain": 0.0
+    },
+    {
+      "feature": "child_is_workorder",
+      "gain": 0.0
+    },
+    {
+      "feature": "parent_is_terminated",
+      "gain": 0.0
+    }
+  ]
+}

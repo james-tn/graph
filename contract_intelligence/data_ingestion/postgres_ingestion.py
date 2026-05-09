@@ -39,6 +39,153 @@ INPUT_DIR = PROJECT_ROOT / "data" / "input"
 SCHEMA_FILE = Path(__file__).parent / "schema.sql"  # schema.sql now in data_ingestion/
 
 
+# ---------------------------------------------------------------------------
+# ML hierarchy linker (lazy-loaded; falls back to rule-based-only if unavailable)
+# ---------------------------------------------------------------------------
+
+# Toggle ML fallback via env var so we can roll out gradually.
+# Default: ON if model file exists, OFF otherwise.
+HIERARCHY_LINKER_ENABLED = os.environ.get("HIERARCHY_LINKER_ENABLED", "auto").lower()
+HIERARCHY_LINKER_AUTO_THRESHOLD = float(
+    os.environ.get("HIERARCHY_LINKER_AUTO_THRESHOLD", "0.85")
+)
+HIERARCHY_LINKER_REVIEW_THRESHOLD = float(
+    os.environ.get("HIERARCHY_LINKER_REVIEW_THRESHOLD", "0.60")
+)
+# Shadow mode: run ML predictions but don't persist them. Rule-based links still
+# write normally. Useful for evaluating the ML linker against historical data
+# before flipping it to primary. Set HIERARCHY_LINKER_SHADOW_MODE=true to enable.
+HIERARCHY_LINKER_SHADOW_MODE = (
+    os.environ.get("HIERARCHY_LINKER_SHADOW_MODE", "false").lower() == "true"
+)
+
+_HIERARCHY_LINKER_CACHE = {"loaded": False, "linker": None}
+
+
+def _get_hierarchy_linker():
+    """Lazy-load the trained hierarchy linker. Returns None if unavailable."""
+    if _HIERARCHY_LINKER_CACHE["loaded"]:
+        return _HIERARCHY_LINKER_CACHE["linker"]
+    _HIERARCHY_LINKER_CACHE["loaded"] = True
+
+    if HIERARCHY_LINKER_ENABLED == "off":
+        return None
+
+    try:
+        from hierarchy_linker import HierarchyLinker
+        from hierarchy_linker.linker import DEFAULT_MODEL_PATH
+
+        if HIERARCHY_LINKER_ENABLED == "auto" and not Path(DEFAULT_MODEL_PATH).exists():
+            print("    ℹ Hierarchy linker model not found; ML fallback disabled.")
+            return None
+
+        linker = HierarchyLinker.from_disk(
+            auto_threshold=HIERARCHY_LINKER_AUTO_THRESHOLD,
+            review_threshold=HIERARCHY_LINKER_REVIEW_THRESHOLD,
+        )
+        print(f"    ✓ Hierarchy linker loaded (model={linker.model_version})")
+        _HIERARCHY_LINKER_CACHE["linker"] = linker
+        return linker
+    except ImportError as e:
+        print(f"    ⚠ Hierarchy linker dependencies missing ({e}); ML fallback disabled.")
+        return None
+    except Exception as e:
+        print(f"    ⚠ Failed to load hierarchy linker: {e}; ML fallback disabled.")
+        return None
+
+
+def _should_attempt_ml_link(metadata: dict) -> bool:
+    """ML fallback runs even when the LLM didn't extract a parent reference,
+    but only for contract types that can plausibly have a parent."""
+    if _get_hierarchy_linker() is None:
+        return False
+    contract_type = (metadata.get("contract_type") or "").lower()
+    if not contract_type:
+        return False
+    plausible_children = (
+        "amendment", "addendum", "statement of work", "sow",
+        "work order", "workorder", "maintenance",
+    )
+    return any(kw in contract_type for kw in plausible_children)
+
+
+def _run_link_cascade(
+    cur,
+    child_contract_id: int,
+    extracted_parent_reference,
+    relationship_type: str,
+    relationship_description,
+):
+    """Run rule-based + ML cascade and persist the result.
+
+    In shadow mode, ML decisions (AUTO_LINK / HUMAN_REVIEW) are computed and
+    logged but NOT persisted. Rule-based links and explicit no-link records
+    are written normally.
+    """
+    from hierarchy_linker.linker import (
+        LinkDecision,
+        link_contract,
+        write_link_result,
+    )
+
+    linker = _get_hierarchy_linker()
+    result = link_contract(
+        cur,
+        child_contract_id=child_contract_id,
+        extracted_parent_reference=extracted_parent_reference,
+        linker=linker,
+        enable_ml_fallback=linker is not None,
+        auto_threshold=HIERARCHY_LINKER_AUTO_THRESHOLD,
+        review_threshold=HIERARCHY_LINKER_REVIEW_THRESHOLD,
+    )
+
+    is_ml_decision = result.decision in (LinkDecision.AUTO_LINK, LinkDecision.HUMAN_REVIEW)
+    if HIERARCHY_LINKER_SHADOW_MODE and is_ml_decision:
+        # Don't write ML decisions to the DB; just log them so we can audit
+        # predictions before flipping shadow mode off.
+        print(
+            f"  [shadow] Skipped persisting ML {result.decision.value} "
+            f"(parent={result.parent_id}, conf={result.confidence:.3f})"
+        )
+        return result
+
+    write_link_result(
+        cur,
+        child_contract_id=child_contract_id,
+        extracted_parent_reference=extracted_parent_reference,
+        relationship_type=relationship_type,
+        result=result,
+        relationship_description=relationship_description,
+    )
+    return result
+
+
+def _log_link_outcome(result, extracted_parent_reference) -> None:
+    from hierarchy_linker.linker import LinkDecision
+
+    if result.decision == LinkDecision.RULE_LINK:
+        print(f"  ✓ Rule-based link to parent {result.parent_id} (ref match)")
+    elif result.decision == LinkDecision.AUTO_LINK:
+        print(
+            f"  ✓ ML auto-link to parent {result.parent_id} "
+            f"(conf={result.confidence:.3f}, model={result.model_version})"
+        )
+        if result.top_features:
+            top = ", ".join(f"{n}={c:.1f}" for n, c in result.top_features[:3])
+            print(f"      contributing features: {top}")
+    elif result.decision == LinkDecision.HUMAN_REVIEW:
+        print(
+            f"  📋 Queued for review: candidate parent {result.parent_id} "
+            f"(conf={result.confidence:.3f}); not auto-linked"
+        )
+    else:  # NO_LINK
+        if extracted_parent_reference:
+            print(f"  ⚠ Parent ref '{extracted_parent_reference}' unresolved; "
+                  f"recorded for later resolution")
+        else:
+            print(f"  ⚠ No confident parent candidate found; no link created")
+
+
 def get_db_connection():
     """Create a database connection."""
     return psycopg2.connect(
@@ -304,16 +451,7 @@ def ingest_contract_comprehensive(filepath: Path):
         relationship_type = metadata.get("relationship_type")
         relationship_desc = metadata.get("relationship_description")
         
-        if parent_ref:
-            print(f"  🔗 Detected relationship to parent: {parent_ref}")
-            
-            # Find parent contract in database by reference number
-            parent_contract_id = None
-            cur.execute("SELECT id FROM contracts WHERE reference_number = %s", (parent_ref,))
-            parent_row = cur.fetchone()
-            if parent_row:
-                parent_contract_id = parent_row['id']
-            
+        if parent_ref or _should_attempt_ml_link(metadata):
             # Determine relationship type from contract type if not explicitly set
             if not relationship_type:
                 contract_type_lower = metadata.get("contract_type", "").lower()
@@ -329,27 +467,23 @@ def ingest_contract_comprehensive(filepath: Path):
                     relationship_type = "maintenance"
                 else:
                     relationship_type = "related"
-            
-            # Insert relationship record (even if parent not found yet)
-            cur.execute("""
-                INSERT INTO contract_relationships (child_contract_id, parent_contract_id, 
-                                                  parent_reference_number,
-                                                  relationship_type, relationship_description)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (child_contract_id, parent_contract_id, relationship_type) DO NOTHING
-            """, (
-                contract_id,
-                parent_contract_id,  # May be NULL if parent not ingested yet
-                parent_ref,
-                relationship_type,
-                relationship_desc
-            ))
-            conn.commit()
-            
-            if parent_contract_id:
-                print(f"  ✓ Linked to parent contract (ID: {parent_contract_id}) as {relationship_type}")
+
+            if parent_ref:
+                print(f"  🔗 Detected relationship to parent: {parent_ref}")
             else:
-                print(f"  ⚠ Parent contract not yet ingested - relationship recorded for later resolution")
+                print(f"  🔗 No parent reference extracted; trying ML hierarchy linker")
+
+            # Run rule-based + ML cascade
+            link_result = _run_link_cascade(
+                cur,
+                child_contract_id=contract_id,
+                extracted_parent_reference=parent_ref,
+                relationship_type=relationship_type,
+                relationship_description=relationship_desc,
+            )
+            conn.commit()
+
+            _log_link_outcome(link_result, parent_ref)
         
         # Insert total contract value
         total_value = metadata.get("total_value")
@@ -545,45 +679,84 @@ def resolve_orphaned_relationships() -> int:
     """Resolve contract relationships where parent_contract_id was NULL.
     
     This happens when a child contract is ingested before its parent.
-    After all contracts are ingested, we can resolve these orphaned relationships.
+    After all contracts are ingested, we can resolve these orphaned relationships
+    by:
+      1. Trying an exact reference_number match (rule-based)
+      2. Falling back to the ML hierarchy linker if loaded
     """
     conn = get_db_connection()
     cur = conn.cursor()
-    
+    linker = _get_hierarchy_linker()
+
+    # Lazy imports so this works whether or not ML deps are installed
+    from hierarchy_linker.linker import (
+        LinkDecision,
+        link_contract,
+        write_link_result,
+    )
+
     try:
-        # Find relationships with NULL parent_contract_id but non-NULL parent reference
         cur.execute("""
-            SELECT id, parent_reference_number
+            SELECT id, child_contract_id, parent_reference_number, relationship_type
             FROM contract_relationships
             WHERE parent_contract_id IS NULL
-            AND parent_reference_number IS NOT NULL
+              AND link_method IN ('rule_based', 'none')
         """)
-        
+
         orphaned = cur.fetchall()
         resolved_count = 0
-        
+
         for row in orphaned:
             relationship_id = row['id']
+            child_id = row['child_contract_id']
             parent_ref = row['parent_reference_number']
-            
-            # Try to find parent by reference number
-            if parent_ref:
-                cur.execute("SELECT id FROM contracts WHERE reference_number = %s", (parent_ref,))
-                parent_row = cur.fetchone()
-                if parent_row:
-                    parent_contract_id = parent_row['id']
-                    
-                    # Update the relationship
-                    cur.execute("""
-                        UPDATE contract_relationships
-                        SET parent_contract_id = %s
-                        WHERE id = %s
-                    """, (parent_contract_id, relationship_id))
-                    resolved_count += 1
-        
+            rel_type = row['relationship_type']
+
+            # Try the cascade. We pass enable_ml_fallback so that if rule-based
+            # still misses (corrupted ref, missing ref), the ML model gets a shot.
+            result = link_contract(
+                cur,
+                child_contract_id=child_id,
+                extracted_parent_reference=parent_ref,
+                linker=linker,
+                enable_ml_fallback=linker is not None,
+                auto_threshold=HIERARCHY_LINKER_AUTO_THRESHOLD,
+                review_threshold=HIERARCHY_LINKER_REVIEW_THRESHOLD,
+            )
+
+            if result.decision in (LinkDecision.RULE_LINK, LinkDecision.AUTO_LINK):
+                # Update the existing orphan row in place so we don't lose history
+                cur.execute(
+                    """
+                    UPDATE contract_relationships
+                    SET parent_contract_id = %s,
+                        link_method = %s,
+                        confidence_score = %s,
+                        model_version = %s
+                    WHERE id = %s
+                    """,
+                    (
+                        result.parent_id,
+                        result.method,
+                        result.confidence if result.confidence > 0 else None,
+                        result.model_version,
+                        relationship_id,
+                    ),
+                )
+                resolved_count += 1
+            elif result.decision == LinkDecision.HUMAN_REVIEW:
+                # Push into the review queue without modifying the orphan row
+                write_link_result(
+                    cur,
+                    child_contract_id=child_id,
+                    extracted_parent_reference=parent_ref,
+                    relationship_type=rel_type or "related",
+                    result=result,
+                )
+
         conn.commit()
         return resolved_count
-    
+
     finally:
         cur.close()
         conn.close()

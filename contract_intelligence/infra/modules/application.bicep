@@ -28,6 +28,21 @@ param aadApiAppId string
 param aadApiAudience string
 param disableAuth string
 
+// ML hierarchy linker (Phase-1 ML-assisted parent matching)
+@allowed([
+  'auto'
+  'on'
+  'off'
+])
+param hierarchyLinkerEnabled string = 'auto'
+param hierarchyLinkerAutoThreshold string = '0.85'
+param hierarchyLinkerReviewThreshold string = '0.60'
+@allowed([
+  'true'
+  'false'
+])
+param hierarchyLinkerShadowMode string = 'false'
+
 var appName = '${baseName}-app'
 
 resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
@@ -134,6 +149,23 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'DISABLE_AUTH'
               value: disableAuth
+            }
+            // ML hierarchy linker
+            {
+              name: 'HIERARCHY_LINKER_ENABLED'
+              value: hierarchyLinkerEnabled
+            }
+            {
+              name: 'HIERARCHY_LINKER_AUTO_THRESHOLD'
+              value: hierarchyLinkerAutoThreshold
+            }
+            {
+              name: 'HIERARCHY_LINKER_REVIEW_THRESHOLD'
+              value: hierarchyLinkerReviewThreshold
+            }
+            {
+              name: 'HIERARCHY_LINKER_SHADOW_MODE'
+              value: hierarchyLinkerShadowMode
             }
           ]
           resources: {

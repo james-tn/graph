@@ -37,5 +37,10 @@ hooks:
       run: pwsh -File ./infra/scripts/preprovision.ps1
     windows:
       run: pwsh -File ./infra/scripts/preprovision.ps1
+  postprovision:
+    posix:
+      run: pwsh -File ./infra/scripts/postprovision.ps1
+    windows:
+      run: pwsh -File ./infra/scripts/postprovision.ps1
 
 # Environment configuration - Set these in .azure/<env-name>/.env to reuse existing resources

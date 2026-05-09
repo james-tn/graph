@@ -5,6 +5,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- Drop existing objects
 DROP TABLE IF EXISTS extraction_jobs CASCADE;
+DROP TABLE IF EXISTS link_review_queue CASCADE;
 DROP TABLE IF EXISTS risks CASCADE;
 DROP TABLE IF EXISTS monetary_values CASCADE;
 DROP TABLE IF EXISTS conditions CASCADE;
@@ -83,9 +84,41 @@ CREATE TABLE contract_relationships (
     parent_reference_number VARCHAR(200),  -- Parent ref captured even if not yet ingested
     relationship_type VARCHAR(50) CHECK (relationship_type IN ('amendment', 'sow', 'addendum', 'work_order', 'maintenance', 'related')),
     relationship_description TEXT,
+    -- Audit columns for ML-assisted linking (Phase 1 hierarchy linker)
+    link_method VARCHAR(30) NOT NULL DEFAULT 'rule_based',
+        -- 'rule_based' | 'ml_auto' | 'ml_review_confirmed' | 'manual' | 'none'
+    confidence_score NUMERIC(5,4),  -- 0.0000 - 1.0000, NULL when not applicable
+    model_version VARCHAR(50),       -- e.g., 'hierarchy_linker_v1'
+    top_features JSONB,              -- top contributing features (for audit)
+    reviewed_by VARCHAR(200),
+    reviewed_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(child_contract_id, parent_contract_id, relationship_type)
 );
+
+-- Review queue for ML predictions that fall in the "needs human" confidence band.
+-- These do NOT create a contract_relationships row until a human confirms.
+DROP TABLE IF EXISTS link_review_queue CASCADE;
+CREATE TABLE link_review_queue (
+    id SERIAL PRIMARY KEY,
+    tenant_id VARCHAR(50) DEFAULT 'default',
+    child_contract_id INTEGER NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
+    candidate_parent_id INTEGER REFERENCES contracts(id) ON DELETE SET NULL,
+    relationship_type VARCHAR(50),
+    extracted_parent_reference VARCHAR(200),
+    confidence_score NUMERIC(5,4),
+    model_version VARCHAR(50),
+    top_features JSONB,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',  -- 'pending' | 'confirmed' | 'rejected' | 'relinked'
+    reviewed_by VARCHAR(200),
+    reviewed_at TIMESTAMP,
+    review_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_link_review_queue_status ON link_review_queue(status);
+CREATE INDEX idx_link_review_queue_child ON link_review_queue(child_contract_id);
+CREATE INDEX idx_contract_rel_method ON contract_relationships(link_method);
 
 CREATE TABLE parties (
     id SERIAL PRIMARY KEY,

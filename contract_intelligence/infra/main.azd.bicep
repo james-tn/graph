@@ -73,6 +73,28 @@ param aadApiAudience string = ''
 @description('Disable authentication')
 param disableAuth string = 'false'
 
+// ML hierarchy linker (Phase-1 ML-assisted parent matching)
+@allowed([
+  'auto'
+  'on'
+  'off'
+])
+@description('Hierarchy linker mode: auto (on if model file is present), on (force-enable), off')
+param hierarchyLinkerEnabled string = 'auto'
+
+@description('Confidence threshold for auto-link (else queued for review)')
+param hierarchyLinkerAutoThreshold string = '0.85'
+
+@description('Confidence threshold for sending to review queue (below this, no link)')
+param hierarchyLinkerReviewThreshold string = '0.60'
+
+@allowed([
+  'true'
+  'false'
+])
+@description('When true, ML decisions are computed and logged but not persisted')
+param hierarchyLinkerShadowMode string = 'false'
+
 // Container image name (populated by azd deploy)
 param backendImageName string = ''
 
@@ -229,6 +251,10 @@ module application 'modules/application.bicep' = {
     aadApiAppId: aadApiAppId
     aadApiAudience: aadApiAudience
     disableAuth: disableAuth
+    hierarchyLinkerEnabled: hierarchyLinkerEnabled
+    hierarchyLinkerAutoThreshold: hierarchyLinkerAutoThreshold
+    hierarchyLinkerReviewThreshold: hierarchyLinkerReviewThreshold
+    hierarchyLinkerShadowMode: hierarchyLinkerShadowMode
   }
 }
 
