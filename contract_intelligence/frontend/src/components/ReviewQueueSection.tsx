@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ContractSearchHit,
   decideReviewItem,
   getReviewStats,
   listReviewItems,
   ReviewItem,
   ReviewListResponse,
   ReviewStatsResponse,
+  searchContracts,
 } from '../api';
-import { CheckCircle2, XCircle, RefreshCcw, AlertTriangle, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckCircle2, XCircle, RefreshCcw, AlertTriangle, Clock, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
 const STATUS_OPTIONS = ['pending', 'confirmed', 'rejected', 'relinked', 'all'] as const;
 type StatusFilter = (typeof STATUS_OPTIONS)[number];
@@ -35,10 +37,49 @@ interface ReviewItemCardProps {
 
 function ReviewItemCard({ item, onDecide, busy }: ReviewItemCardProps) {
   const [notes, setNotes] = useState('');
-  const [relinkId, setRelinkId] = useState<string>('');
+  const [relinkQuery, setRelinkQuery] = useState('');
+  const [relinkPick, setRelinkPick] = useState<ContractSearchHit | null>(null);
+  const [relinkResults, setRelinkResults] = useState<ContractSearchHit[]>([]);
+  const [relinkLoading, setRelinkLoading] = useState(false);
+  const [relinkError, setRelinkError] = useState<string | null>(null);
   const [showRelink, setShowRelink] = useState(false);
+  const debounceRef = useRef<number | null>(null);
   const conf = confidenceBucket(item.confidence_score);
   const isPending = item.status === 'pending';
+
+  // Debounced search whenever the query changes.
+  useEffect(() => {
+    if (!showRelink) return;
+    const trimmed = relinkQuery.trim();
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (trimmed.length < 2) {
+      setRelinkResults([]);
+      setRelinkLoading(false);
+      return;
+    }
+    setRelinkLoading(true);
+    setRelinkError(null);
+    debounceRef.current = window.setTimeout(async () => {
+      try {
+        const resp = await searchContracts({ q: trimmed, limit: 10 });
+        setRelinkResults(resp.items);
+      } catch (e: any) {
+        setRelinkError(e?.response?.data?.detail || e?.message || 'Search failed');
+        setRelinkResults([]);
+      } finally {
+        setRelinkLoading(false);
+      }
+    }, 250);
+    return () => {
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
+  }, [relinkQuery, showRelink]);
 
   const handleConfirm = async () => {
     await onDecide(item.id, 'confirm', { notes: notes || undefined });
@@ -47,9 +88,16 @@ function ReviewItemCard({ item, onDecide, busy }: ReviewItemCardProps) {
     await onDecide(item.id, 'reject', { notes: notes || undefined });
   };
   const handleRelink = async () => {
-    const id = parseInt(relinkId, 10);
-    if (!Number.isFinite(id) || id <= 0) return;
-    await onDecide(item.id, 'relink', { new_parent_contract_id: id, notes: notes || undefined });
+    if (!relinkPick) return;
+    await onDecide(item.id, 'relink', {
+      new_parent_contract_id: relinkPick.id,
+      notes: notes || undefined,
+    });
+    // reset picker
+    setRelinkPick(null);
+    setRelinkQuery('');
+    setRelinkResults([]);
+    setShowRelink(false);
   };
 
   return (
@@ -152,21 +200,78 @@ function ReviewItemCard({ item, onDecide, busy }: ReviewItemCardProps) {
           </div>
 
           {showRelink && (
-            <div className="flex gap-2 items-center mt-2">
-              <input
-                type="number"
-                placeholder="Parent contract id"
-                value={relinkId}
-                onChange={(e) => setRelinkId(e.target.value)}
-                className="bg-slate-900/60 border border-slate-700 rounded-lg p-2 text-sm text-white w-48"
-              />
-              <button
-                onClick={handleRelink}
-                disabled={busy || !relinkId}
-                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50"
-              >
-                Apply
-              </button>
+            <div className="mt-3 space-y-2 bg-slate-900/50 border border-slate-700/60 rounded-xl p-3">
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search by reference, identifier, or title…"
+                  value={relinkQuery}
+                  onChange={(e) => { setRelinkQuery(e.target.value); setRelinkPick(null); }}
+                  className="flex-1 bg-slate-900/60 border border-slate-700 rounded-lg p-2 text-sm text-white placeholder-slate-500"
+                  autoFocus
+                />
+              </div>
+
+              {relinkError && (
+                <div className="text-xs text-rose-300">{relinkError}</div>
+              )}
+
+              {relinkLoading && (
+                <div className="text-xs text-slate-400 flex items-center gap-2">
+                  <Clock className="w-3 h-3 animate-spin" /> Searching…
+                </div>
+              )}
+
+              {!relinkLoading && relinkQuery.trim().length >= 2 && relinkResults.length === 0 && !relinkError && (
+                <div className="text-xs text-slate-500 italic">No contracts match.</div>
+              )}
+
+              {relinkResults.length > 0 && (
+                <ul className="max-h-56 overflow-y-auto divide-y divide-slate-800">
+                  {relinkResults.map((hit) => {
+                    const picked = relinkPick?.id === hit.id;
+                    return (
+                      <li key={hit.id}>
+                        <button
+                          type="button"
+                          onClick={() => setRelinkPick(hit)}
+                          className={`w-full text-left p-2 rounded-md text-sm transition ${
+                            picked
+                              ? 'bg-blue-600/30 border border-blue-400/60'
+                              : 'hover:bg-slate-800/60 border border-transparent'
+                          }`}
+                        >
+                          <div className="font-semibold text-white truncate">
+                            {hit.title ?? '—'}
+                          </div>
+                          <div className="text-xs text-slate-400 truncate">
+                            #{hit.id} • {hit.contract_type ?? '—'} • {hit.reference_number ?? hit.contract_identifier ?? '—'} • {formatDate(hit.effective_date)}
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setShowRelink(false); setRelinkPick(null); setRelinkQuery(''); }}
+                  className="px-3 py-1 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRelink}
+                  disabled={busy || !relinkPick}
+                  className="px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold disabled:opacity-50"
+                >
+                  {relinkPick ? `Relink to "${relinkPick.title?.slice(0, 30) ?? '#' + relinkPick.id}"` : 'Pick a parent'}
+                </button>
+              </div>
             </div>
           )}
         </div>

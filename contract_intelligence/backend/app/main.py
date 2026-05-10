@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from backend.agents.router_agent import RouterAgent
 from backend.app.core.auth import get_current_user, get_user_email
 from backend.app.api.review_queue import router as review_queue_router
+from backend.app.api.contracts_search import router as contracts_search_router
 from backend.utils.mermaid_corrector import correct_mermaid_diagram
 
 app = FastAPI(
@@ -45,6 +46,7 @@ router_agent = RouterAgent()
 
 # Mount sub-routers
 app.include_router(review_queue_router)
+app.include_router(contracts_search_router)
 
 # Request/Response Models
 class QueryRequest(BaseModel):

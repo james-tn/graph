@@ -17,15 +17,18 @@ Public API:
     )
 """
 
+from .calibration import Calibrator, fit_calibration
 from .feature_extractor import FEATURE_NAMES, build_idf_cache, extract_features
 from .linker import HierarchyLinker, LinkDecision, LinkResult, link_contract
 
 __all__ = [
+    "Calibrator",
     "FEATURE_NAMES",
     "HierarchyLinker",
     "LinkDecision",
     "LinkResult",
     "build_idf_cache",
     "extract_features",
+    "fit_calibration",
     "link_contract",
 ]
