@@ -137,7 +137,9 @@ jobs:
           fi
 
       - name: Provision (only when infra changed or manual + not skipped)
-        if: ${{ needs.detect-changes.outputs.infra == 'true' || (github.event_name == 'workflow_dispatch' && inputs.skip_provision != true) }}
+        # Skip if the manual run explicitly asked to skip; otherwise provision when
+        # infra changed (push) or when manually dispatched.
+        if: ${{ inputs.skip_provision != true && (needs.detect-changes.outputs.infra == 'true' || github.event_name == 'workflow_dispatch') }}
         run: azd provision --no-prompt
 
       - name: Deploy backend service
