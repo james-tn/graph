@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.39.26.7824",
-      "templateHash": "12931613003437455420"
+      "templateHash": "11501491094816087132"
     }
   },
   "parameters": {
@@ -371,7 +371,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.39.26.7824",
-              "templateHash": "15185296443346819322"
+              "templateHash": "7930950552407782793"
             }
           },
           "parameters": {
@@ -409,7 +409,7 @@
             }
           },
           "variables": {
-            "defaultChatDeploymentName": "gpt-5.4",
+            "defaultChatDeploymentName": "gpt-4o",
             "defaultEmbeddingDeploymentName": "text-embedding-3-small",
             "existingResourceName": "[if(parameters('useExistingOpenAI'), split(split(parameters('existingOpenAiEndpoint'), '//')[1], '.')[0], '')]",
             "cognitiveServicesOpenAIUserRoleId": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
@@ -439,8 +439,8 @@
               "properties": {
                 "model": {
                   "format": "OpenAI",
-                  "name": "gpt-5.4",
-                  "version": "2026-04-15"
+                  "name": "gpt-4o",
+                  "version": "2024-11-20"
                 }
               },
               "sku": {
@@ -1153,7 +1153,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.39.26.7824",
-              "templateHash": "8788233935196320178"
+              "templateHash": "17351998731584376716"
             }
           },
           "parameters": {
@@ -1257,7 +1257,7 @@
               "apiVersion": "2023-05-01",
               "name": "[variables('appName')]",
               "location": "[parameters('location')]",
-              "tags": "[parameters('tags')]",
+              "tags": "[union(parameters('tags'), createObject('azd-service-name', 'backend'))]",
               "identity": {
                 "type": "UserAssigned",
                 "userAssignedIdentities": {

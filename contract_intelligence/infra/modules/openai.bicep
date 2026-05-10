@@ -10,7 +10,7 @@ param principalId string
 param principalType string = 'ServicePrincipal'
 
 // Default deployment names if creating new
-var defaultChatDeploymentName = 'gpt-5.4'
+var defaultChatDeploymentName = 'gpt-4o'
 var defaultEmbeddingDeploymentName = 'text-embedding-3-small'
 
 // Extract resource name from endpoint if using existing
@@ -37,14 +37,19 @@ resource existingOpenaiAccount 'Microsoft.CognitiveServices/accounts@2023-05-01'
 }
 
 // Chat deployment (only if creating new)
+// NOTE: This default is for the new-account path only. For all current
+// deployments we reuse the existing OpenAI account via existingOpenAiResourceId,
+// so this resource is conditionally skipped. Bumped to gpt-4o:2024-11-20 (the
+// latest non-deprecated GA SKU available across regions as of May 2026)
+// because ARM preflight still validates the resource definition.
 resource chatDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if (!useExistingOpenAI) {
   parent: openaiAccount
   name: defaultChatDeploymentName
   properties: {
     model: {
       format: 'OpenAI'
-      name: 'gpt-5.4'
-      version: '2026-04-15'
+      name: 'gpt-4o'
+      version: '2024-11-20'
     }
   }
   sku: {

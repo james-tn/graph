@@ -52,13 +52,16 @@ class GraphRAGAgent:
         self.root_dir = root_dir
         self.use_pgvector = use_pgvector
         
-        # Environment configuration
+        # Environment configuration. Either AZURE_OPENAI_API_KEY (dev) OR
+        # AZURE_CLIENT_ID (managed identity in Container Apps) is required.
         self.api_key = os.environ.get("AZURE_OPENAI_API_KEY")
+        self.client_id = os.environ.get("AZURE_CLIENT_ID")
         self.api_base = os.environ.get("AZURE_OPENAI_ENDPOINT")
-        
-        # Validate required environment variables
-        if not self.api_key:
-            raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
+
+        if not self.api_key and not self.client_id:
+            raise ValueError(
+                "Either AZURE_OPENAI_API_KEY or AZURE_CLIENT_ID (managed identity) is required"
+            )
         if not self.api_base:
             raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
         
@@ -367,9 +370,26 @@ Bold key numbers. Use pie/graph/xychart-beta/gantt charts.
 ALWAYS quote labels with special chars in Mermaid: ["Label (with parens)"]"""
         
         try:
-            from openai import OpenAI
-            
-            client = OpenAI(api_key=self.api_key, base_url=self.api_base)
+            from openai import AzureOpenAI
+
+            # Strip /openai/v1 suffix if user pasted full chat-completions URL
+            endpoint = self.api_base.rstrip("/").removesuffix("/openai/v1").removesuffix("/openai")
+            if self.api_key:
+                client = AzureOpenAI(
+                    api_key=self.api_key,
+                    azure_endpoint=endpoint,
+                    api_version=self.api_version,
+                )
+            else:
+                from azure.identity import ManagedIdentityCredential
+                token = ManagedIdentityCredential(client_id=self.client_id).get_token(
+                    "https://cognitiveservices.azure.com/.default"
+                ).token
+                client = AzureOpenAI(
+                    azure_ad_token=token,
+                    azure_endpoint=endpoint,
+                    api_version=self.api_version,
+                )
             response = client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model=self.llm_deployment,
