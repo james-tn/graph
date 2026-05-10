@@ -381,13 +381,12 @@ ALWAYS quote labels with special chars in Mermaid: ["Label (with parens)"]"""
                     api_version=self.api_version,
                 )
             else:
-                from azure.identity import ManagedIdentityCredential, get_bearer_token_provider
-                token_provider = get_bearer_token_provider(
-                    ManagedIdentityCredential(client_id=self.client_id),
-                    "https://cognitiveservices.azure.com/.default",
-                )
+                from azure.identity import ManagedIdentityCredential
+                token = ManagedIdentityCredential(client_id=self.client_id).get_token(
+                    "https://cognitiveservices.azure.com/.default"
+                ).token
                 client = AzureOpenAI(
-                    azure_ad_token_provider=token_provider,
+                    azure_ad_token=token,
                     azure_endpoint=endpoint,
                     api_version=self.api_version,
                 )

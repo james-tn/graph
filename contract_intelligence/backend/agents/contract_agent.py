@@ -64,13 +64,11 @@ def _build_embedding_client():
             api_version=api_version,
         )
     if AZURE_CLIENT_ID:
-        from azure.identity import ManagedIdentityCredential, get_bearer_token_provider
-        token_provider = get_bearer_token_provider(
-            ManagedIdentityCredential(client_id=AZURE_CLIENT_ID),
-            "https://cognitiveservices.azure.com/.default",
-        )
+        from azure.identity import ManagedIdentityCredential
+        credential = ManagedIdentityCredential(client_id=AZURE_CLIENT_ID)
+        token = credential.get_token("https://cognitiveservices.azure.com/.default").token
         return AzureOpenAI(
-            azure_ad_token_provider=token_provider,
+            azure_ad_token=token,
             azure_endpoint=endpoint,
             api_version=api_version,
         )

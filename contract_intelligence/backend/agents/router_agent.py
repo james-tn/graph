@@ -83,13 +83,11 @@ class RouterAgent:
                 api_version=api_version,
             )
         else:
-            from azure.identity import ManagedIdentityCredential, get_bearer_token_provider
+            from azure.identity import ManagedIdentityCredential
             credential = ManagedIdentityCredential(client_id=client_id)
-            token_provider = get_bearer_token_provider(
-                credential, "https://cognitiveservices.azure.com/.default"
-            )
+            token = credential.get_token("https://cognitiveservices.azure.com/.default").token
             self.openai_client = AzureOpenAI(
-                azure_ad_token_provider=token_provider,
+                azure_ad_token=token,
                 azure_endpoint=endpoint,
                 api_version=api_version,
             )
