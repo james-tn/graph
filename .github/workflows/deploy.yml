@@ -125,19 +125,63 @@ jobs:
       - name: Forward CI-provided env vars
         env:
           POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+          EXISTING_OPENAI_ENDPOINT: ${{ vars.EXISTING_OPENAI_ENDPOINT }}
+          EXISTING_OPENAI_DEPLOYMENT_NAME: ${{ vars.EXISTING_OPENAI_DEPLOYMENT_NAME }}
+          EXISTING_OPENAI_EMBEDDING_DEPLOYMENT_NAME: ${{ vars.EXISTING_OPENAI_EMBEDDING_DEPLOYMENT_NAME }}
+          EXISTING_OPENAI_RESOURCE_ID: ${{ vars.EXISTING_OPENAI_RESOURCE_ID }}
+          EXISTING_POSTGRES_HOST: ${{ vars.EXISTING_POSTGRES_HOST }}
+          EXISTING_POSTGRES_DATABASE: ${{ vars.EXISTING_POSTGRES_DATABASE }}
+          EXISTING_POSTGRES_USER: ${{ vars.EXISTING_POSTGRES_USER }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
         run: |
+          # Reuse existing resources (skip creating new OpenAI / Postgres)
+          if [ -n "$AZURE_RESOURCE_GROUP" ]; then
+            azd env set AZURE_RESOURCE_GROUP "$AZURE_RESOURCE_GROUP"
+          fi
+          if [ -n "$EXISTING_OPENAI_ENDPOINT" ]; then
+            azd env set existingOpenAiEndpoint "$EXISTING_OPENAI_ENDPOINT"
+            azd env set EXISTING_OPENAI_ENDPOINT "$EXISTING_OPENAI_ENDPOINT"
+          fi
+          if [ -n "$EXISTING_OPENAI_DEPLOYMENT_NAME" ]; then
+            azd env set existingOpenAiDeploymentName "$EXISTING_OPENAI_DEPLOYMENT_NAME"
+            azd env set EXISTING_OPENAI_DEPLOYMENT_NAME "$EXISTING_OPENAI_DEPLOYMENT_NAME"
+          fi
+          if [ -n "$EXISTING_OPENAI_EMBEDDING_DEPLOYMENT_NAME" ]; then
+            azd env set existingOpenAiEmbeddingDeploymentName "$EXISTING_OPENAI_EMBEDDING_DEPLOYMENT_NAME"
+            azd env set EXISTING_OPENAI_EMBEDDING_DEPLOYMENT_NAME "$EXISTING_OPENAI_EMBEDDING_DEPLOYMENT_NAME"
+          fi
+          if [ -n "$EXISTING_OPENAI_RESOURCE_ID" ]; then
+            azd env set existingOpenAiResourceId "$EXISTING_OPENAI_RESOURCE_ID"
+            azd env set EXISTING_OPENAI_RESOURCE_ID "$EXISTING_OPENAI_RESOURCE_ID"
+          fi
+          if [ -n "$EXISTING_POSTGRES_HOST" ]; then
+            azd env set existingPostgresHost "$EXISTING_POSTGRES_HOST"
+            azd env set EXISTING_POSTGRES_HOST "$EXISTING_POSTGRES_HOST"
+          fi
+          if [ -n "$EXISTING_POSTGRES_DATABASE" ]; then
+            azd env set existingPostgresDatabase "$EXISTING_POSTGRES_DATABASE"
+            azd env set EXISTING_POSTGRES_DATABASE "$EXISTING_POSTGRES_DATABASE"
+          fi
+          if [ -n "$EXISTING_POSTGRES_USER" ]; then
+            azd env set existingPostgresUser "$EXISTING_POSTGRES_USER"
+            azd env set EXISTING_POSTGRES_USER "$EXISTING_POSTGRES_USER"
+          fi
+          if [ -n "$POSTGRES_ADMIN_PASSWORD" ]; then
+            azd env set existingPostgresPassword "$POSTGRES_ADMIN_PASSWORD"
+            azd env set EXISTING_POSTGRES_PASSWORD "$POSTGRES_ADMIN_PASSWORD"
+            azd env set postgresAdminPassword "$POSTGRES_ADMIN_PASSWORD"
+          fi
           if [ -n "${{ vars.HIERARCHY_LINKER_ENABLED }}" ]; then
             azd env set HIERARCHYLINKERENABLED "${{ vars.HIERARCHY_LINKER_ENABLED }}"
           fi
           if [ -n "${{ vars.HIERARCHY_LINKER_RETRAIN_JOB_ENABLED }}" ]; then
             azd env set HIERARCHYLINKERRETRAINJOBENABLED "${{ vars.HIERARCHY_LINKER_RETRAIN_JOB_ENABLED }}"
           fi
-          if [ -n "$POSTGRES_ADMIN_PASSWORD" ]; then
-            azd env set postgresAdminPassword "$POSTGRES_ADMIN_PASSWORD"
-          fi
 
       - name: Provision (only when infra changed or manual + not skipped)
-        if: ${{ needs.detect-changes.outputs.infra == 'true' || (github.event_name == 'workflow_dispatch' && inputs.skip_provision != true) }}
+        # Skip if the manual run explicitly asked to skip; otherwise provision when
+        # infra changed (push) or when manually dispatched.
+        if: ${{ inputs.skip_provision != true && (needs.detect-changes.outputs.infra == 'true' || github.event_name == 'workflow_dispatch') }}
         run: azd provision --no-prompt
 
       - name: Deploy backend service
