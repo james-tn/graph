@@ -49,12 +49,35 @@ if not AZURE_OPENAI_API_KEY and not AZURE_CLIENT_ID:
 if not AZURE_OPENAI_ENDPOINT:
     raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
 
-# OpenAI client for embeddings (only when API key auth is configured)
-openai_client = (
-    OpenAI(api_key=AZURE_OPENAI_API_KEY, base_url=AZURE_OPENAI_ENDPOINT)
-    if AZURE_OPENAI_API_KEY
-    else None
-)
+# Embedding client. Use AzureOpenAI so we can speak the standard /openai/deployments/...
+# REST shape regardless of whether we authenticate by api key or managed identity.
+def _build_embedding_client():
+    if not AZURE_OPENAI_ENDPOINT:
+        return None
+    from openai import AzureOpenAI
+    endpoint = AZURE_OPENAI_ENDPOINT.rstrip("/").removesuffix("/openai/v1").removesuffix("/openai")
+    api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21")
+    if AZURE_OPENAI_API_KEY:
+        return AzureOpenAI(
+            api_key=AZURE_OPENAI_API_KEY,
+            azure_endpoint=endpoint,
+            api_version=api_version,
+        )
+    if AZURE_CLIENT_ID:
+        from azure.identity import ManagedIdentityCredential, get_bearer_token_provider
+        token_provider = get_bearer_token_provider(
+            ManagedIdentityCredential(client_id=AZURE_CLIENT_ID),
+            "https://cognitiveservices.azure.com/.default",
+        )
+        return AzureOpenAI(
+            azure_ad_token_provider=token_provider,
+            azure_endpoint=endpoint,
+            api_version=api_version,
+        )
+    return None
+
+
+openai_client = _build_embedding_client()
 
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
 

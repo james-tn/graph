@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AzureOpenAI
 
 # Load environment variables from .env file
 load_dotenv()
@@ -58,20 +58,43 @@ class RouterAgent:
     
     def __init__(self):
         """Initialize router with access to both agents."""
-        # Validate environment variables
+        # Validate environment variables. Either AZURE_OPENAI_API_KEY (dev/local)
+        # OR AZURE_CLIENT_ID (managed identity in Container Apps) is required.
         api_key = os.environ.get("AZURE_OPENAI_API_KEY")
-        base_url = os.environ.get("AZURE_OPENAI_ENDPOINT")
-        
-        if not api_key:
-            raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
-        if not base_url:
+        client_id = os.environ.get("AZURE_CLIENT_ID")
+        endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+
+        if not api_key and not client_id:
+            raise ValueError(
+                "Either AZURE_OPENAI_API_KEY or AZURE_CLIENT_ID (managed identity) is required"
+            )
+        if not endpoint:
             raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
 
-        self.openai_client = OpenAI(
-            api_key=api_key,
-            base_url=base_url
-        )
-        self.llm_model = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.1")
+        # AzureOpenAI accepts an Azure-style endpoint and adds /openai/v1
+        # automatically; strip any trailing /openai/v1 we may have stored.
+        endpoint = endpoint.rstrip("/").removesuffix("/openai/v1").removesuffix("/openai")
+        api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21")
+
+        if api_key:
+            self.openai_client = AzureOpenAI(
+                api_key=api_key,
+                azure_endpoint=endpoint,
+                api_version=api_version,
+            )
+        else:
+            from azure.identity import ManagedIdentityCredential, get_bearer_token_provider
+            credential = ManagedIdentityCredential(client_id=client_id)
+            token_provider = get_bearer_token_provider(
+                credential, "https://cognitiveservices.azure.com/.default"
+            )
+            self.openai_client = AzureOpenAI(
+                azure_ad_token_provider=token_provider,
+                azure_endpoint=endpoint,
+                api_version=api_version,
+            )
+
+        self.llm_model = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.4")
         
         # Get the project root directory (contract_intelligence/)
         # This file is in backend/agents/, so go up two levels
