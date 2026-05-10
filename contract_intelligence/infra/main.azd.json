@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.39.26.7824",
-      "templateHash": "2377138047177354459"
+      "templateHash": "12931613003437455420"
     }
   },
   "parameters": {
@@ -371,7 +371,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.39.26.7824",
-              "templateHash": "5678711201992081785"
+              "templateHash": "15185296443346819322"
             }
           },
           "parameters": {
@@ -409,7 +409,7 @@
             }
           },
           "variables": {
-            "defaultChatDeploymentName": "gpt-4o",
+            "defaultChatDeploymentName": "gpt-5.4",
             "defaultEmbeddingDeploymentName": "text-embedding-3-small",
             "existingResourceName": "[if(parameters('useExistingOpenAI'), split(split(parameters('existingOpenAiEndpoint'), '//')[1], '.')[0], '')]",
             "cognitiveServicesOpenAIUserRoleId": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
@@ -439,8 +439,8 @@
               "properties": {
                 "model": {
                   "format": "OpenAI",
-                  "name": "gpt-4o",
-                  "version": "2024-08-06"
+                  "name": "gpt-5.4",
+                  "version": "2026-04-15"
                 }
               },
               "sku": {
@@ -656,7 +656,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.39.26.7824",
-              "templateHash": "6636076152769592595"
+              "templateHash": "953118655484124850"
             }
           },
           "parameters": {
@@ -706,7 +706,8 @@
             }
           },
           "variables": {
-            "defaultAdminUsername": "pgadmin"
+            "defaultAdminUsername": "pgadmin",
+            "effectivePostgresAdminPassword": "[if(empty(parameters('postgresAdminPassword')), format('PlaceholderUnusedWhenExisting!1Az{0}', uniqueString(resourceGroup().id)), parameters('postgresAdminPassword'))]"
           },
           "resources": {
             "postgresServer": {
@@ -722,7 +723,7 @@
               },
               "properties": {
                 "administratorLogin": "[variables('defaultAdminUsername')]",
-                "administratorLoginPassword": "[parameters('postgresAdminPassword')]",
+                "administratorLoginPassword": "[variables('effectivePostgresAdminPassword')]",
                 "version": "15",
                 "storage": {
                   "storageSizeGB": 256,
@@ -795,7 +796,7 @@
             },
             "password": {
               "type": "securestring",
-              "value": "[if(parameters('useExistingPostgres'), parameters('existingPostgresPassword'), parameters('postgresAdminPassword'))]"
+              "value": "[if(parameters('useExistingPostgres'), parameters('existingPostgresPassword'), variables('effectivePostgresAdminPassword'))]"
             },
             "serverName": {
               "type": "string",
@@ -1108,15 +1109,9 @@
           "openaiEndpoint": "[if(variables('deployOpenAiModule'), createObject('value', reference('openai').outputs.endpoint.value), createObject('value', parameters('existingOpenAiEndpoint')))]",
           "openaiDeploymentName": "[if(variables('deployOpenAiModule'), createObject('value', reference('openai').outputs.chatDeploymentName.value), createObject('value', parameters('existingOpenAiDeploymentName')))]",
           "openaiEmbeddingDeploymentName": "[if(variables('deployOpenAiModule'), createObject('value', reference('openai').outputs.embeddingDeploymentName.value), createObject('value', parameters('existingOpenAiEmbeddingDeploymentName')))]",
-          "postgresHost": {
-            "value": "[reference('postgres').outputs.host.value]"
-          },
-          "postgresDatabase": {
-            "value": "[reference('postgres').outputs.databaseName.value]"
-          },
-          "postgresUser": {
-            "value": "[reference('postgres').outputs.username.value]"
-          },
+          "postgresHost": "[if(variables('useExistingPostgres'), createObject('value', parameters('existingPostgresHost')), createObject('value', reference('postgres').outputs.host.value))]",
+          "postgresDatabase": "[if(variables('useExistingPostgres'), createObject('value', parameters('existingPostgresDatabase')), createObject('value', reference('postgres').outputs.databaseName.value))]",
+          "postgresUser": "[if(variables('useExistingPostgres'), createObject('value', parameters('existingPostgresUser')), createObject('value', reference('postgres').outputs.username.value))]",
           "postgresPassword": {
             "value": "[listOutputsWithSecureValues('postgres', '2025-04-01').password]"
           },
@@ -1465,15 +1460,9 @@
           "cronExpression": {
             "value": "[parameters('hierarchyLinkerRetrainCron')]"
           },
-          "postgresHost": {
-            "value": "[reference('postgres').outputs.host.value]"
-          },
-          "postgresDatabase": {
-            "value": "[reference('postgres').outputs.databaseName.value]"
-          },
-          "postgresUser": {
-            "value": "[reference('postgres').outputs.username.value]"
-          },
+          "postgresHost": "[if(variables('useExistingPostgres'), createObject('value', parameters('existingPostgresHost')), createObject('value', reference('postgres').outputs.host.value))]",
+          "postgresDatabase": "[if(variables('useExistingPostgres'), createObject('value', parameters('existingPostgresDatabase')), createObject('value', reference('postgres').outputs.databaseName.value))]",
+          "postgresUser": "[if(variables('useExistingPostgres'), createObject('value', parameters('existingPostgresUser')), createObject('value', reference('postgres').outputs.username.value))]",
           "postgresPassword": {
             "value": "[listOutputsWithSecureValues('postgres', '2025-04-01').password]"
           },
@@ -1743,15 +1732,15 @@
     },
     "POSTGRES_HOST": {
       "type": "string",
-      "value": "[reference('postgres').outputs.host.value]"
+      "value": "[if(variables('useExistingPostgres'), parameters('existingPostgresHost'), reference('postgres').outputs.host.value)]"
     },
     "POSTGRES_DATABASE": {
       "type": "string",
-      "value": "[reference('postgres').outputs.databaseName.value]"
+      "value": "[if(variables('useExistingPostgres'), parameters('existingPostgresDatabase'), reference('postgres').outputs.databaseName.value)]"
     },
     "POSTGRES_USER": {
       "type": "string",
-      "value": "[reference('postgres').outputs.username.value]"
+      "value": "[if(variables('useExistingPostgres'), parameters('existingPostgresUser'), reference('postgres').outputs.username.value)]"
     },
     "POSTGRES_PASSWORD": {
       "type": "securestring",

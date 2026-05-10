@@ -16,6 +16,12 @@ param principalType string = 'ServicePrincipal'
 
 var defaultAdminUsername = 'pgadmin'
 
+// When useExistingPostgres is true, postgresAdminPassword is unused but ARM's
+// pre-deployment validator still inspects the conditional resource and rejects
+// an empty/null required field. Substitute a deterministic non-empty placeholder
+// to satisfy validation; the resource is still skipped at deploy time.
+var effectivePostgresAdminPassword = empty(postgresAdminPassword) ? 'PlaceholderUnusedWhenExisting!1Az${uniqueString(resourceGroup().id)}' : postgresAdminPassword
+
 // Create new PostgreSQL server (conditional)
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-preview' = if (!useExistingPostgres) {
   name: '${baseName}-pgflex'
@@ -27,7 +33,7 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-pr
   }
   properties: {
     administratorLogin: defaultAdminUsername
-    administratorLoginPassword: postgresAdminPassword
+    administratorLoginPassword: effectivePostgresAdminPassword
     version: '15'
     storage: {
       storageSizeGB: 256
@@ -81,5 +87,5 @@ output host string = useExistingPostgres ? existingPostgresHost : postgresServer
 output databaseName string = useExistingPostgres ? existingPostgresDatabase : databaseName
 output username string = useExistingPostgres ? existingPostgresUser : defaultAdminUsername
 @secure()
-output password string = useExistingPostgres ? existingPostgresPassword : postgresAdminPassword
+output password string = useExistingPostgres ? existingPostgresPassword : effectivePostgresAdminPassword
 output serverName string = useExistingPostgres ? split(existingPostgresHost, '.')[0] : postgresServer.name

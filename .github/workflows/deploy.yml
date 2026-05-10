@@ -1,0 +1,166 @@
+name: Deploy to Azure
+
+# Deploys to Azure when application code OR infra changes hit main.
+# Pure documentation changes never trigger a deploy.
+#
+# Auth: OIDC federated credential. Configure these GitHub Actions secrets
+# (Settings → Secrets and variables → Actions):
+#   AZURE_CLIENT_ID       — service principal / managed identity client id
+#   AZURE_TENANT_ID       — Azure AD tenant id
+#   AZURE_SUBSCRIPTION_ID — target subscription id
+#   AZURE_ENV_NAME        — azd environment to deploy (e.g. ci-dev)
+# Plus repository variables for any non-secret azd env values you want
+# to populate at deploy time (POSTGRES_ADMIN_PASSWORD as a secret, etc.).
+#
+# This workflow can also be triggered manually from the Actions tab.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      # Application code paths
+      - 'contract_intelligence/backend/**'
+      - 'contract_intelligence/frontend/**'
+      - 'contract_intelligence/data_ingestion/**'
+      - 'contract_intelligence/scripts/**'
+      - 'contract_intelligence/utils/**'
+      - 'contract_intelligence/Dockerfile'
+      - 'contract_intelligence/pyproject.toml'
+      # Infra paths
+      - 'contract_intelligence/infra/**'
+      - 'contract_intelligence/azure.yaml'
+      # Workflow itself
+      - '.github/workflows/deploy.yml'
+      # Never deploy on docs-only diffs
+      - '!**/*.md'
+      - '!docs/**'
+      - '!LICENSE'
+  workflow_dispatch:
+    inputs:
+      env_name:
+        description: 'azd environment name to deploy'
+        required: false
+        default: 'ci-dev'
+      skip_provision:
+        description: 'Skip azd provision (deploy only)'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  id-token: write   # required for OIDC azure/login
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false   # never cancel a deploy in flight
+
+jobs:
+  detect-changes:
+    name: Detect what changed
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'contract_intelligence/backend/**'
+              - 'contract_intelligence/frontend/**'
+              - 'contract_intelligence/data_ingestion/**'
+              - 'contract_intelligence/scripts/**'
+              - 'contract_intelligence/utils/**'
+              - 'contract_intelligence/Dockerfile'
+              - 'contract_intelligence/pyproject.toml'
+            infra:
+              - 'contract_intelligence/infra/**'
+              - 'contract_intelligence/azure.yaml'
+
+  deploy:
+    name: azd provision & deploy
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: contract_intelligence
+    env:
+      AZURE_ENV_NAME: ${{ inputs.env_name || vars.AZURE_ENV_NAME || 'ci-dev' }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'eastus2' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+
+      - name: Login to Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: azd auth login (federated)
+        run: |
+          azd auth login \
+            --client-id "${{ secrets.AZURE_CLIENT_ID }}" \
+            --federated-credential-provider github \
+            --tenant-id "${{ secrets.AZURE_TENANT_ID }}"
+
+      - name: Refresh / select azd env
+        run: |
+          azd env refresh -e "$AZURE_ENV_NAME" || \
+            azd env new "$AZURE_ENV_NAME" \
+              --subscription "${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+              --location "$AZURE_LOCATION" \
+              --no-prompt
+          azd env select "$AZURE_ENV_NAME"
+
+      - name: Forward CI-provided env vars
+        env:
+          POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+        run: |
+          if [ -n "${{ vars.HIERARCHY_LINKER_ENABLED }}" ]; then
+            azd env set HIERARCHYLINKERENABLED "${{ vars.HIERARCHY_LINKER_ENABLED }}"
+          fi
+          if [ -n "${{ vars.HIERARCHY_LINKER_RETRAIN_JOB_ENABLED }}" ]; then
+            azd env set HIERARCHYLINKERRETRAINJOBENABLED "${{ vars.HIERARCHY_LINKER_RETRAIN_JOB_ENABLED }}"
+          fi
+          if [ -n "$POSTGRES_ADMIN_PASSWORD" ]; then
+            azd env set postgresAdminPassword "$POSTGRES_ADMIN_PASSWORD"
+          fi
+
+      - name: Provision (only when infra changed or manual + not skipped)
+        if: ${{ needs.detect-changes.outputs.infra == 'true' || (github.event_name == 'workflow_dispatch' && inputs.skip_provision != true) }}
+        run: azd provision --no-prompt
+
+      - name: Deploy backend service
+        run: azd deploy backend --no-prompt
+
+      - name: Show deployed endpoint
+        run: |
+          echo "Deployed env: $AZURE_ENV_NAME"
+          azd env get-values | grep -E "APPLICATION_URL|APPLICATION_NAME|AZURE_RESOURCE_GROUP" || true
+
+      - name: Health check
+        run: |
+          url=$(azd env get-values | grep -E "^APPLICATION_URL=" | cut -d= -f2- | tr -d '"')
+          if [ -n "$url" ]; then
+            echo "Probing $url/health"
+            for i in 1 2 3 4 5; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$url/health" || echo "000")
+              echo "Attempt $i: $code"
+              if [ "$code" = "200" ]; then
+                exit 0
+              fi
+              sleep 15
+            done
+            echo "Health probe did not return 200. Container app revision may still be warming."
+            exit 1
+          fi

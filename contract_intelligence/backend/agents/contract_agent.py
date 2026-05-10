@@ -18,14 +18,11 @@ from typing import Annotated
 import psycopg2
 from dotenv import load_dotenv
 
-# Patch OpenTelemetry before importing agent_framework (rc1 compat fix)
-import backend.otel_patch  # noqa: F401
-
 from agent_framework import Agent
 
 # Load environment variables from .env file
 load_dotenv()
-from agent_framework.azure import AzureOpenAIChatClient
+from agent_framework.openai import OpenAIChatClient
 from azure.identity import AzureCliCredential
 from openai import OpenAI
 from pydantic import Field
@@ -238,16 +235,20 @@ class ContractAgent:
         if not api_key:
             raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
         
-        deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME") or os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME", "gpt-4o")
+        deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME") or os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME", "gpt-5.4")
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
-        # AzureOpenAIChatClient expects the base endpoint without /openai/v1/ suffix
+        # OpenAIChatClient (azure_endpoint mode) expects the base endpoint without /openai/v1/ suffix
         endpoint = endpoint.rstrip("/").removesuffix("/openai/v1").removesuffix("/openai")
+        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
         
         self.agent = Agent(
-            client=AzureOpenAIChatClient(
+            # agent-framework 1.3.0+: AzureOpenAIChatClient was unified into OpenAIChatClient.
+            # Pass azure_endpoint to opt into the Azure OpenAI variant.
+            client=OpenAIChatClient(
+                model=deployment_name,
                 api_key=api_key,
-                deployment_name=deployment_name,
-                endpoint=endpoint,
+                azure_endpoint=endpoint,
+                api_version=api_version,
             ),
             instructions="""You are a Contract Intelligence Assistant with PostgreSQL + Apache AGE graph database access.
 

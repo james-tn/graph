@@ -179,7 +179,7 @@ var resolvedOpenAiEndpoint = deployOpenAiModule ? openai.outputs.endpoint : exis
 var resolvedOpenAiDeploymentName = deployOpenAiModule ? openai.outputs.chatDeploymentName : existingOpenAiDeploymentName
 var resolvedOpenAiEmbeddingDeploymentName = deployOpenAiModule ? openai.outputs.embeddingDeploymentName : existingOpenAiEmbeddingDeploymentName
 
-// ==================== POSTGRESQL (conditional) ====================
+// ==================== POSTGRESQL (conditional inside the module) ====================
 module postgres 'modules/postgres.bicep' = {
   scope: rg
   name: 'postgres'
@@ -198,6 +198,10 @@ module postgres 'modules/postgres.bicep' = {
     principalType: 'ServicePrincipal'
   }
 }
+
+var resolvedPostgresHost = useExistingPostgres ? existingPostgresHost : postgres.outputs.host
+var resolvedPostgresDatabase = useExistingPostgres ? existingPostgresDatabase : postgres.outputs.databaseName
+var resolvedPostgresUser = useExistingPostgres ? existingPostgresUser : postgres.outputs.username
 
 // ==================== CONTAINER REGISTRY ====================
 module containerRegistry 'modules/container-registry.bicep' = {
@@ -250,9 +254,9 @@ module application 'modules/application.bicep' = {
     openaiEndpoint: resolvedOpenAiEndpoint
     openaiDeploymentName: resolvedOpenAiDeploymentName
     openaiEmbeddingDeploymentName: resolvedOpenAiEmbeddingDeploymentName
-    postgresHost: postgres.outputs.host
-    postgresDatabase: postgres.outputs.databaseName
-    postgresUser: postgres.outputs.username
+    postgresHost: resolvedPostgresHost
+    postgresDatabase: resolvedPostgresDatabase
+    postgresUser: resolvedPostgresUser
     postgresPassword: postgres.outputs.password
     aadFrontendClientId: aadFrontendClientId
     aadFrontendTenantId: aadFrontendTenantId
@@ -281,9 +285,9 @@ module retrainJob 'modules/retrain-job.bicep' = if (hierarchyLinkerRetrainJobEna
     userAssignedIdentityResourceId: managedIdentity.outputs.resourceId
     userAssignedIdentityClientId: managedIdentity.outputs.clientId
     cronExpression: hierarchyLinkerRetrainCron
-    postgresHost: postgres.outputs.host
-    postgresDatabase: postgres.outputs.databaseName
-    postgresUser: postgres.outputs.username
+    postgresHost: resolvedPostgresHost
+    postgresDatabase: resolvedPostgresDatabase
+    postgresUser: resolvedPostgresUser
     postgresPassword: postgres.outputs.password
     hierarchyLinkerAutoThreshold: hierarchyLinkerAutoThreshold
     hierarchyLinkerReviewThreshold: hierarchyLinkerReviewThreshold
@@ -305,9 +309,9 @@ output AZURE_OPENAI_CHAT_DEPLOYMENT string = resolvedOpenAiDeploymentName
 output AZURE_OPENAI_EMBEDDING_DEPLOYMENT string = resolvedOpenAiEmbeddingDeploymentName
 
 // PostgreSQL
-output POSTGRES_HOST string = postgres.outputs.host
-output POSTGRES_DATABASE string = postgres.outputs.databaseName
-output POSTGRES_USER string = postgres.outputs.username
+output POSTGRES_HOST string = resolvedPostgresHost
+output POSTGRES_DATABASE string = resolvedPostgresDatabase
+output POSTGRES_USER string = resolvedPostgresUser
 @secure()
 output POSTGRES_PASSWORD string = postgres.outputs.password
 

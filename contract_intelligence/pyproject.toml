@@ -15,7 +15,7 @@ dependencies = [
     "azure-identity",
     "psycopg2-binary>=2.9",
     "graphrag>=3.0.2",
-    "agent-framework>=1.0.0rc1",
+    "agent-framework>=1.3.0",
     "numpy",
     "PyPDF2",
     "pdf2image",

@@ -1,0 +1,126 @@
+name: Code CI
+
+# Runs on every push & PR that touches application code (backend, frontend,
+# data_ingestion, scripts, Dockerfile). Pure-docs changes are excluded so we
+# don't burn CI time on README edits.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'contract_intelligence/backend/**'
+      - 'contract_intelligence/frontend/**'
+      - 'contract_intelligence/data_ingestion/**'
+      - 'contract_intelligence/scripts/**'
+      - 'contract_intelligence/utils/**'
+      - 'contract_intelligence/poc_xgboost_linker/**'
+      - 'contract_intelligence/Dockerfile'
+      - 'contract_intelligence/pyproject.toml'
+      - '.github/workflows/code-ci.yml'
+      - '!**/*.md'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'contract_intelligence/backend/**'
+      - 'contract_intelligence/frontend/**'
+      - 'contract_intelligence/data_ingestion/**'
+      - 'contract_intelligence/scripts/**'
+      - 'contract_intelligence/utils/**'
+      - 'contract_intelligence/poc_xgboost_linker/**'
+      - 'contract_intelligence/Dockerfile'
+      - 'contract_intelligence/pyproject.toml'
+      - '.github/workflows/code-ci.yml'
+      - '!**/*.md'
+
+# Cancel any older runs on the same ref when a new commit lands
+concurrency:
+  group: code-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-tests:
+    name: Python tests (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: contract_intelligence
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            contract_intelligence/backend/requirements.txt
+            contract_intelligence/pyproject.toml
+
+      - name: Install backend deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-asyncio pytest-timeout
+
+      - name: Run unit + API tests
+        env:
+          DISABLE_AUTH: 'true'
+        run: |
+          python -m pytest \
+            backend/tests/test_hierarchy_linker.py \
+            backend/tests/test_review_queue_api.py \
+            backend/tests/test_contracts_search_api.py \
+            backend/tests/test_calibration.py \
+            -v --tb=short
+
+  frontend-checks:
+    name: Frontend (tsc + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: contract_intelligence/frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: contract_intelligence/frontend/package-lock.json
+
+      - name: Install deps
+        run: npm ci || npm install
+
+      - name: Type-check (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+  docker-build:
+    name: Docker build (sanity)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [python-tests]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: contract_intelligence
+          file: contract_intelligence/Dockerfile
+          push: false
+          load: false
+          tags: contract-intelligence:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
