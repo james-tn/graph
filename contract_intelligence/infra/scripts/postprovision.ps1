@@ -38,7 +38,11 @@ Write-Host ""
 $migrationsDir = Join-Path $PSScriptRoot "..\..\data_ingestion\migrations"
 $migrationsDir = (Resolve-Path $migrationsDir -ErrorAction SilentlyContinue)
 $psql = Get-Command psql -ErrorAction SilentlyContinue
-if ($migrationsDir -and $psql -and $postgresHost -and $postgresDatabase -and $postgresUser -and $postgresPassword) {
+$inCI = $env:GITHUB_ACTIONS -eq 'true' -or $env:CI -eq 'true' -or $env:TF_BUILD -eq 'True'
+if ($inCI) {
+    Write-Host "ℹ Skipping schema migrations in CI (Postgres is private; run from inside Azure or locally)." -ForegroundColor Yellow
+    Write-Host ""
+} elseif ($migrationsDir -and $psql -and $postgresHost -and $postgresDatabase -and $postgresUser -and $postgresPassword) {
     Write-Host "🗄  Applying schema migrations to $postgresHost ..." -ForegroundColor Cyan
     $env:PGPASSWORD = $postgresPassword
     $migrations = Get-ChildItem -Path $migrationsDir -Filter "*.sql" | Sort-Object Name
