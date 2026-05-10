@@ -48,7 +48,13 @@ var appName = '${baseName}-app'
 resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
   name: appName
   location: location
-  tags: tags
+  // azd locates the deploy target by the `azd-service-name` tag (matched
+  // against services.<name> in azure.yaml). Without it, `azd deploy backend`
+  // can't find the Container App and fails with
+  // "parameter containerAppName cannot be empty".
+  tags: union(tags, {
+    'azd-service-name': 'backend'
+  })
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {

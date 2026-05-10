@@ -38,16 +38,22 @@ GRAPH_NAME = "contract_intelligence"
 # Validate required environment variables
 AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY")
 AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT")
+# Container Apps deploys use Managed Identity (AZURE_CLIENT_ID is populated by
+# the user-assigned identity binding) instead of an API key. Either path works.
+AZURE_CLIENT_ID = os.environ.get("AZURE_CLIENT_ID")
 
-if not AZURE_OPENAI_API_KEY:
-    raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
+if not AZURE_OPENAI_API_KEY and not AZURE_CLIENT_ID:
+    raise ValueError(
+        "Either AZURE_OPENAI_API_KEY or AZURE_CLIENT_ID (managed identity) is required"
+    )
 if not AZURE_OPENAI_ENDPOINT:
     raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
 
-# OpenAI client for embeddings
-openai_client = OpenAI(
-    api_key=AZURE_OPENAI_API_KEY,
-    base_url=AZURE_OPENAI_ENDPOINT 
+# OpenAI client for embeddings (only when API key auth is configured)
+openai_client = (
+    OpenAI(api_key=AZURE_OPENAI_API_KEY, base_url=AZURE_OPENAI_ENDPOINT)
+    if AZURE_OPENAI_API_KEY
+    else None
 )
 
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
@@ -230,26 +236,42 @@ class ContractAgent:
     
     def __init__(self):
         """Initialize the contract agent."""
-        # Get API key from environment
+        # Auth: API key OR managed identity (Container Apps populates
+        # AZURE_CLIENT_ID with the user-assigned identity client id).
         api_key = os.getenv("AZURE_OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
-        
+        client_id = os.getenv("AZURE_CLIENT_ID")
+        if not api_key and not client_id:
+            raise ValueError(
+                "Either AZURE_OPENAI_API_KEY or AZURE_CLIENT_ID (managed identity) is required"
+            )
+
         deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME") or os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME", "gpt-5.4")
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
         # OpenAIChatClient (azure_endpoint mode) expects the base endpoint without /openai/v1/ suffix
         endpoint = endpoint.rstrip("/").removesuffix("/openai/v1").removesuffix("/openai")
         api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
-        
-        self.agent = Agent(
-            # agent-framework 1.3.0+: AzureOpenAIChatClient was unified into OpenAIChatClient.
-            # Pass azure_endpoint to opt into the Azure OpenAI variant.
-            client=OpenAIChatClient(
+
+        # agent-framework 1.3.0+: AzureOpenAIChatClient was unified into
+        # OpenAIChatClient. Pass azure_endpoint to opt into the Azure variant.
+        # Prefer managed identity in production; fall back to api_key for dev.
+        if api_key:
+            chat_client = OpenAIChatClient(
                 model=deployment_name,
                 api_key=api_key,
                 azure_endpoint=endpoint,
                 api_version=api_version,
-            ),
+            )
+        else:
+            from azure.identity import ManagedIdentityCredential
+            chat_client = OpenAIChatClient(
+                model=deployment_name,
+                credential=ManagedIdentityCredential(client_id=client_id),
+                azure_endpoint=endpoint,
+                api_version=api_version,
+            )
+
+        self.agent = Agent(
+            client=chat_client,
             instructions="""You are a Contract Intelligence Assistant with PostgreSQL + Apache AGE graph database access.
 
 ## DATABASE SCHEMA

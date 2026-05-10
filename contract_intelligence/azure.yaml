@@ -10,15 +10,22 @@ infra:
   module: main.azd
   parameters:
     location: ${AZURE_LOCATION=eastus2}
-    existingOpenAiEndpoint: env://existingOpenAiEndpoint
-    existingOpenAiDeploymentName: env://existingOpenAiDeploymentName
-    existingOpenAiEmbeddingDeploymentName: env://existingOpenAiEmbeddingDeploymentName
-    existingOpenAiResourceId: env://existingOpenAiResourceId
-    existingPostgresHost: env://existingPostgresHost
-    existingPostgresDatabase: env://existingPostgresDatabase
-    existingPostgresUser: env://existingPostgresUser
-    existingPostgresPassword: env://existingPostgresPassword
-    postgresAdminPassword: env://postgresAdminPassword
+    # ${VAR=default} syntax is the well-tested azd substitution path. The env://
+    # form was attempted but azd 1.21.3 silently resolves it to empty for these
+    # params, which then caused ARM to try to provision NEW postgres / openai
+    # accounts instead of reusing the existing ones in this tenant.
+    existingOpenAiEndpoint: ${EXISTING_OPENAI_ENDPOINT=}
+    existingOpenAiDeploymentName: ${EXISTING_OPENAI_DEPLOYMENT_NAME=}
+    existingOpenAiEmbeddingDeploymentName: ${EXISTING_OPENAI_EMBEDDING_DEPLOYMENT_NAME=}
+    existingOpenAiResourceId: ${EXISTING_OPENAI_RESOURCE_ID=}
+    existingPostgresHost: ${EXISTING_POSTGRES_HOST=}
+    existingPostgresDatabase: ${EXISTING_POSTGRES_DATABASE=}
+    existingPostgresUser: ${EXISTING_POSTGRES_USER=}
+    existingPostgresPassword: ${EXISTING_POSTGRES_PASSWORD=}
+    postgresAdminPassword: ${POSTGRES_ADMIN_PASSWORD=}
+    hierarchyLinkerEnabled: ${HIERARCHYLINKERENABLED=auto}
+    hierarchyLinkerShadowMode: ${HIERARCHYLINKERSHADOWMODE=false}
+    hierarchyLinkerRetrainJobEnabled: ${HIERARCHYLINKERRETRAINJOBENABLED=false}
 
 # Services to deploy
 services:
