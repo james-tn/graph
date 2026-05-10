@@ -1,0 +1,90 @@
+name: Infra CI
+
+# Lints + compiles the Bicep templates whenever infra files (or azure.yaml)
+# change. Doc-only changes never trigger.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'contract_intelligence/infra/**'
+      - 'contract_intelligence/azure.yaml'
+      - '.github/workflows/infra-ci.yml'
+      - '!**/*.md'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'contract_intelligence/infra/**'
+      - 'contract_intelligence/azure.yaml'
+      - '.github/workflows/infra-ci.yml'
+      - '!**/*.md'
+
+concurrency:
+  group: infra-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bicep-build:
+    name: Bicep build + lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: contract_intelligence/infra
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Bicep CLI
+        run: |
+          curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x ./bicep
+          sudo mv ./bicep /usr/local/bin/bicep
+          bicep --version
+
+      - name: Bicep build (main.azd.bicep)
+        run: bicep build main.azd.bicep --outfile main.azd.json
+
+      - name: Bicep build (main.bicep, if present)
+        run: |
+          if [ -f main.bicep ]; then
+            bicep build main.bicep --outfile main.json
+          else
+            echo "main.bicep not present — skipping"
+          fi
+
+      - name: Bicep lint (warn-only summary)
+        run: |
+          set +e
+          bicep build main.azd.bicep --outfile /tmp/main.azd.json 2>&1 | tee /tmp/bicep.log
+          warn_count=$(grep -c "Warning " /tmp/bicep.log || true)
+          err_count=$(grep -c "Error "   /tmp/bicep.log || true)
+          echo "Warnings: $warn_count"
+          echo "Errors:   $err_count"
+          # Fail only on errors
+          test "$err_count" -eq 0
+
+  azure-yaml-check:
+    name: azure.yaml schema check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+
+      - name: azd config show + sanity parse
+        working-directory: contract_intelligence
+        run: |
+          azd version
+          # Parse azure.yaml using a yaml lib to catch syntax errors early
+          python3 - <<'PY'
+          import sys, yaml, pathlib
+          y = yaml.safe_load(pathlib.Path("azure.yaml").read_text())
+          assert "name" in y, "azure.yaml missing 'name'"
+          assert "services" in y, "azure.yaml missing 'services'"
+          assert "infra" in y, "azure.yaml missing 'infra' block"
+          print("azure.yaml schema OK:", y["name"])
+          PY

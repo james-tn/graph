@@ -10,7 +10,7 @@ param principalId string
 param principalType string = 'ServicePrincipal'
 
 // Default deployment names if creating new
-var defaultChatDeploymentName = 'gpt-4o'
+var defaultChatDeploymentName = 'gpt-5.4'
 var defaultEmbeddingDeploymentName = 'text-embedding-3-small'
 
 // Extract resource name from endpoint if using existing
@@ -43,8 +43,8 @@ resource chatDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-0
   properties: {
     model: {
       format: 'OpenAI'
-      name: 'gpt-4o'
-      version: '2024-08-06'
+      name: 'gpt-5.4'
+      version: '2026-04-15'
     }
   }
   sku: {

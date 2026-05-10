@@ -77,8 +77,10 @@ README.md
 !backend/**/*.md
 docs/
 
-# Scripts (not needed at runtime)
-scripts/
+# Scripts: most are dev-only, but the hierarchy-linker retrain runner is
+# packaged in the image (see Dockerfile COPY scripts/ ./scripts/). Keep the
+# directory available to the build context; runtime trims happen in the
+# Dockerfile itself if needed.
 start_backend.bat
 *.ps1
 *.sh
@@ -92,7 +94,8 @@ test/
 # Data directories (exclude large files not needed in container)
 data/*
 !data/output/
-data_ingestion/
+# data_ingestion/ holds the Python modules used at runtime by the hierarchy
+# linker cascade and the postprovision migrations — do NOT exclude.
 
 # GraphRAG config (copy only what's needed in Dockerfile explicitly)
 graphrag_config/cache/
