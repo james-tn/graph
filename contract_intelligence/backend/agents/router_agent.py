@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
-from openai import AzureOpenAI
+from openai import OpenAI
 
 # Load environment variables from .env file
 load_dotenv()
@@ -71,28 +71,23 @@ class RouterAgent:
         if not endpoint:
             raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
 
-        # AzureOpenAI accepts an Azure-style endpoint and adds /openai/v1
-        # automatically; strip any trailing /openai/v1 we may have stored.
-        endpoint = endpoint.rstrip("/").removesuffix("/openai/v1").removesuffix("/openai")
-        api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21")
+        # Use the OpenAI-compatible v1 endpoint so we don't have to pin
+        # api-version. Accept either form of AZURE_OPENAI_ENDPOINT:
+        #   https://<acct>.openai.azure.com/
+        #   https://<acct>.openai.azure.com/openai/v1/
+        base_url = endpoint.rstrip("/")
+        if not base_url.endswith("/openai/v1"):
+            base_url = base_url.removesuffix("/openai") + "/openai/v1"
 
         if api_key:
-            self.openai_client = AzureOpenAI(
-                api_key=api_key,
-                azure_endpoint=endpoint,
-                api_version=api_version,
-            )
+            self.openai_client = OpenAI(api_key=api_key, base_url=base_url)
         else:
             from azure.identity import ManagedIdentityCredential
             credential = ManagedIdentityCredential(client_id=client_id)
             token = credential.get_token("https://cognitiveservices.azure.com/.default").token
-            self.openai_client = AzureOpenAI(
-                azure_ad_token=token,
-                azure_endpoint=endpoint,
-                api_version=api_version,
-            )
+            self.openai_client = OpenAI(api_key=token, base_url=base_url)
 
-        self.llm_model = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.4")
+        self.llm_model = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.1")
         
         # Get the project root directory (contract_intelligence/)
         # This file is in backend/agents/, so go up two levels

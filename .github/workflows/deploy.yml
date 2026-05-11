@@ -133,6 +133,12 @@ jobs:
           EXISTING_POSTGRES_DATABASE: ${{ vars.EXISTING_POSTGRES_DATABASE }}
           EXISTING_POSTGRES_USER: ${{ vars.EXISTING_POSTGRES_USER }}
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AAD_API_APP_ID: ${{ vars.AAD_API_APP_ID }}
+          AAD_API_AUDIENCE: ${{ vars.AAD_API_AUDIENCE }}
+          AAD_API_TENANT_ID: ${{ vars.AAD_API_TENANT_ID }}
+          AAD_FRONTEND_CLIENT_ID: ${{ vars.AAD_FRONTEND_CLIENT_ID }}
+          AAD_FRONTEND_TENANT_ID: ${{ vars.AAD_FRONTEND_TENANT_ID }}
+          DISABLE_AUTH: ${{ vars.DISABLE_AUTH }}
         run: |
           # Reuse existing resources (skip creating new OpenAI / Postgres)
           if [ -n "$AZURE_RESOURCE_GROUP" ]; then
@@ -177,6 +183,13 @@ jobs:
           if [ -n "${{ vars.HIERARCHY_LINKER_RETRAIN_JOB_ENABLED }}" ]; then
             azd env set HIERARCHYLINKERRETRAINJOBENABLED "${{ vars.HIERARCHY_LINKER_RETRAIN_JOB_ENABLED }}"
           fi
+          # AAD auth / DISABLE_AUTH config
+          if [ -n "$AAD_API_APP_ID" ];        then azd env set AAD_API_APP_ID        "$AAD_API_APP_ID";        fi
+          if [ -n "$AAD_API_AUDIENCE" ];      then azd env set AAD_API_AUDIENCE      "$AAD_API_AUDIENCE";      fi
+          if [ -n "$AAD_API_TENANT_ID" ];     then azd env set AAD_API_TENANT_ID     "$AAD_API_TENANT_ID";     fi
+          if [ -n "$AAD_FRONTEND_CLIENT_ID" ];then azd env set AAD_FRONTEND_CLIENT_ID "$AAD_FRONTEND_CLIENT_ID";fi
+          if [ -n "$AAD_FRONTEND_TENANT_ID" ];then azd env set AAD_FRONTEND_TENANT_ID "$AAD_FRONTEND_TENANT_ID";fi
+          if [ -n "$DISABLE_AUTH" ];          then azd env set DISABLE_AUTH          "$DISABLE_AUTH";          fi
 
       - name: Provision (only when infra changed or manual + not skipped)
         # Skip if the manual run explicitly asked to skip; otherwise provision when

@@ -64,9 +64,8 @@ class GraphRAGAgent:
             )
         if not self.api_base:
             raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
-        
-        self.api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-15-preview")
-        self.llm_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
+
+        self.llm_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.1")
         self.embedding_deployment = os.environ.get("EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
         
         # Paths to GraphRAG output
@@ -370,26 +369,21 @@ Bold key numbers. Use pie/graph/xychart-beta/gantt charts.
 ALWAYS quote labels with special chars in Mermaid: ["Label (with parens)"]"""
         
         try:
-            from openai import AzureOpenAI
+            from openai import OpenAI
 
-            # Strip /openai/v1 suffix if user pasted full chat-completions URL
-            endpoint = self.api_base.rstrip("/").removesuffix("/openai/v1").removesuffix("/openai")
+            # Use the OpenAI-compatible /openai/v1 endpoint so we don't have to
+            # pin api-version. Accept either form of AZURE_OPENAI_ENDPOINT.
+            base_url = self.api_base.rstrip("/")
+            if not base_url.endswith("/openai/v1"):
+                base_url = base_url.removesuffix("/openai") + "/openai/v1"
             if self.api_key:
-                client = AzureOpenAI(
-                    api_key=self.api_key,
-                    azure_endpoint=endpoint,
-                    api_version=self.api_version,
-                )
+                client = OpenAI(api_key=self.api_key, base_url=base_url)
             else:
                 from azure.identity import ManagedIdentityCredential
                 token = ManagedIdentityCredential(client_id=self.client_id).get_token(
                     "https://cognitiveservices.azure.com/.default"
                 ).token
-                client = AzureOpenAI(
-                    azure_ad_token=token,
-                    azure_endpoint=endpoint,
-                    api_version=self.api_version,
-                )
+                client = OpenAI(api_key=token, base_url=base_url)
             response = client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model=self.llm_deployment,
