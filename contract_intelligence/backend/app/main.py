@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.types import Scope
 from pydantic import BaseModel
 from typing import Optional, Literal, List
 import asyncio
@@ -516,10 +517,44 @@ async def get_statistics(user: dict = Depends(get_current_user)):
 # ==================== SERVE REACT FRONTEND ====================
 # Mount static files for production deployment (when running in Docker)
 frontend_dist_path = Path(__file__).parent.parent.parent / "frontend" / "dist"
+
+# Cache headers:
+#   - index.html must NEVER be cached. Vite emits content-hashed asset filenames
+#     (e.g. /assets/index-abc123.js) and embeds those names inside index.html.
+#     Each deploy changes those hashes. If the browser keeps a stale index.html,
+#     it requests chunk filenames that no longer exist on the server (404), and
+#     you get "Failed to fetch dynamically imported module" errors.
+#   - /assets/* are content-addressed (hash in filename) so they can safely be
+#     cached "forever" (immutable).
+INDEX_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
+class ImmutableStaticFiles(StaticFiles):
+    """StaticFiles that marks responses as immutably cacheable.
+
+    Safe because every file under /assets has a content-hash in its name.
+    """
+
+    async def get_response(self, path: str, scope: Scope):
+        response = await super().get_response(path, scope)
+        # Only set immutable cache for successful responses
+        if getattr(response, "status_code", 500) == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 if frontend_dist_path.exists():
-    # Mount static assets (JS, CSS, images)
-    app.mount("/assets", StaticFiles(directory=str(frontend_dist_path / "assets")), name="assets")
-    
+    # Mount static assets (JS, CSS, images) with long-lived immutable caching.
+    app.mount(
+        "/assets",
+        ImmutableStaticFiles(directory=str(frontend_dist_path / "assets")),
+        name="assets",
+    )
+
     # Serve index.html for root and all non-API routes (SPA routing)
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
@@ -527,11 +562,11 @@ if frontend_dist_path.exists():
         # Don't serve frontend for API routes
         if full_path.startswith("api/") or full_path.startswith("docs") or full_path.startswith("redoc") or full_path.startswith("openapi.json"):
             raise HTTPException(status_code=404, detail="Not found")
-        
+
         # Serve index.html for all other routes (React Router handles client-side routing)
         index_file = frontend_dist_path / "index.html"
         if index_file.exists():
-            return FileResponse(index_file)
+            return FileResponse(index_file, headers=INDEX_NO_CACHE_HEADERS)
         else:
             raise HTTPException(status_code=404, detail="Frontend not built")
 
