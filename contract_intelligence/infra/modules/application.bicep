@@ -1,6 +1,6 @@
 // Contract Intelligence Application Container App
 param location string
-param baseName string
+param name string
 param tags object = {}
 param containerAppsEnvironmentId string
 param containerRegistryName string
@@ -43,7 +43,7 @@ param hierarchyLinkerReviewThreshold string = '0.60'
 ])
 param hierarchyLinkerShadowMode string = 'false'
 
-var appName = '${baseName}-app'
+var appName = name
 
 resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
   name: appName

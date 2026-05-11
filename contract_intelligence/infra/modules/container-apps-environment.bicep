@@ -1,6 +1,6 @@
 // Container Apps Environment
 param location string
-param baseName string
+param name string
 param tags object = {}
 param logAnalyticsWorkspaceId string
 
@@ -9,7 +9,7 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10
 }
 
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
-  name: '${baseName}-ca-env'
+  name: name
   location: location
   tags: tags
   properties: {
