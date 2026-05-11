@@ -49,29 +49,22 @@ if not AZURE_OPENAI_API_KEY and not AZURE_CLIENT_ID:
 if not AZURE_OPENAI_ENDPOINT:
     raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
 
-# Embedding client. Use AzureOpenAI so we can speak the standard /openai/deployments/...
-# REST shape regardless of whether we authenticate by api key or managed identity.
+# Embedding client. Use the OpenAI-compatible /openai/v1 endpoint so we don't
+# have to pin api-version. Works for both api-key and managed-identity auth.
 def _build_embedding_client():
     if not AZURE_OPENAI_ENDPOINT:
         return None
-    from openai import AzureOpenAI
-    endpoint = AZURE_OPENAI_ENDPOINT.rstrip("/").removesuffix("/openai/v1").removesuffix("/openai")
-    api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21")
+    from openai import OpenAI
+    base_url = AZURE_OPENAI_ENDPOINT.rstrip("/")
+    if not base_url.endswith("/openai/v1"):
+        base_url = base_url.removesuffix("/openai") + "/openai/v1"
     if AZURE_OPENAI_API_KEY:
-        return AzureOpenAI(
-            api_key=AZURE_OPENAI_API_KEY,
-            azure_endpoint=endpoint,
-            api_version=api_version,
-        )
+        return OpenAI(api_key=AZURE_OPENAI_API_KEY, base_url=base_url)
     if AZURE_CLIENT_ID:
         from azure.identity import ManagedIdentityCredential
         credential = ManagedIdentityCredential(client_id=AZURE_CLIENT_ID)
         token = credential.get_token("https://cognitiveservices.azure.com/.default").token
-        return AzureOpenAI(
-            azure_ad_token=token,
-            azure_endpoint=endpoint,
-            api_version=api_version,
-        )
+        return OpenAI(api_key=token, base_url=base_url)
     return None
 
 
@@ -172,6 +165,7 @@ def execute_sql_query(
     - For cypher(), must set search_path first (handled automatically)
     - Use agtype for all cypher() return column types
     """
+    print(f"[TOOL-EXEC] execute_sql_query called: sql={sql_query[:120]!r} need_embedding={need_embedding}")
     try:
         # Validate it's a read-only query
         query_upper = sql_query.strip().upper()
@@ -266,29 +260,32 @@ class ContractAgent:
                 "Either AZURE_OPENAI_API_KEY or AZURE_CLIENT_ID (managed identity) is required"
             )
 
-        deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME") or os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME", "gpt-5.4")
+        deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME") or os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME", "gpt-5.1")
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
-        # OpenAIChatClient (azure_endpoint mode) expects the base endpoint without /openai/v1/ suffix
-        endpoint = endpoint.rstrip("/").removesuffix("/openai/v1").removesuffix("/openai")
-        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
+        # Use the OpenAI-compatible /openai/v1 endpoint so we don't have to
+        # pin api-version. Accept either form of AZURE_OPENAI_ENDPOINT.
+        base_url = endpoint.rstrip("/")
+        if not base_url.endswith("/openai/v1"):
+            base_url = base_url.removesuffix("/openai") + "/openai/v1"
 
         # agent-framework 1.3.0+: AzureOpenAIChatClient was unified into
-        # OpenAIChatClient. Pass azure_endpoint to opt into the Azure variant.
-        # Prefer managed identity in production; fall back to api_key for dev.
+        # OpenAIChatClient. Passing base_url uses the OpenAI variant against
+        # Azure's v1 endpoint. Prefer managed identity in production; fall
+        # back to api_key for dev.
         if api_key:
             chat_client = OpenAIChatClient(
                 model=deployment_name,
                 api_key=api_key,
-                azure_endpoint=endpoint,
-                api_version=api_version,
+                base_url=base_url,
             )
         else:
             from azure.identity import ManagedIdentityCredential
+            credential = ManagedIdentityCredential(client_id=client_id)
+            token = credential.get_token("https://cognitiveservices.azure.com/.default").token
             chat_client = OpenAIChatClient(
                 model=deployment_name,
-                credential=ManagedIdentityCredential(client_id=client_id),
-                azure_endpoint=endpoint,
-                api_version=api_version,
+                api_key=token,
+                base_url=base_url,
             )
 
         self.agent = Agent(

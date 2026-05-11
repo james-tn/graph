@@ -43,6 +43,24 @@
     },
     "hierarchyLinkerRetrainJobEnabled": {
       "value": "${HIERARCHYLINKERRETRAINJOBENABLED=false}"
+    },
+    "aadFrontendClientId": {
+      "value": "${AAD_FRONTEND_CLIENT_ID=}"
+    },
+    "aadFrontendTenantId": {
+      "value": "${AAD_FRONTEND_TENANT_ID=}"
+    },
+    "aadApiTenantId": {
+      "value": "${AAD_API_TENANT_ID=}"
+    },
+    "aadApiAppId": {
+      "value": "${AAD_API_APP_ID=}"
+    },
+    "aadApiAudience": {
+      "value": "${AAD_API_AUDIENCE=}"
+    },
+    "disableAuth": {
+      "value": "${DISABLE_AUTH=false}"
     }
   }
 }
