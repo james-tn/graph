@@ -1,10 +1,10 @@
 // Log Analytics Workspace for Container Apps monitoring
 param location string
-param baseName string
+param name string
 param tags object = {}
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
-  name: '${baseName}-logs'
+  name: name
   location: location
   tags: tags
   properties: {

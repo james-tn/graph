@@ -10,6 +10,16 @@ infra:
   module: main.azd
   parameters:
     location: ${AZURE_LOCATION=eastus2}
+    # Stable resource naming so CD is idempotent across runs. Override these
+    # via `azd env set` (or repo variables) to pin onto an existing stack;
+    # leave at defaults for a clean greenfield deploy.
+    baseName: ${BASE_NAME=ci}
+    resourceGroupName: ${RESOURCE_GROUP_NAME=}
+    applicationName: ${APPLICATION_NAME=}
+    containerAppsEnvName: ${CONTAINER_APPS_ENV_NAME=}
+    containerRegistryName: ${CONTAINER_REGISTRY_NAME=}
+    managedIdentityName: ${MANAGED_IDENTITY_NAME=}
+    logAnalyticsName: ${LOG_ANALYTICS_NAME=}
     # ${VAR=default} syntax is the well-tested azd substitution path. The env://
     # form was attempted but azd 1.21.3 silently resolves it to empty for these
     # params, which then caused ARM to try to provision NEW postgres / openai

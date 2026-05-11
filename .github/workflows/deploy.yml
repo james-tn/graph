@@ -133,6 +133,15 @@ jobs:
           EXISTING_POSTGRES_DATABASE: ${{ vars.EXISTING_POSTGRES_DATABASE }}
           EXISTING_POSTGRES_USER: ${{ vars.EXISTING_POSTGRES_USER }}
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          # Stable resource naming (idempotent CD). All optional — bicep
+          # derives sensible defaults from BASE_NAME when these are unset.
+          BASE_NAME: ${{ vars.BASE_NAME }}
+          RESOURCE_GROUP_NAME: ${{ vars.RESOURCE_GROUP_NAME }}
+          APPLICATION_NAME: ${{ vars.APPLICATION_NAME }}
+          CONTAINER_APPS_ENV_NAME: ${{ vars.CONTAINER_APPS_ENV_NAME }}
+          CONTAINER_REGISTRY_NAME: ${{ vars.CONTAINER_REGISTRY_NAME }}
+          MANAGED_IDENTITY_NAME: ${{ vars.MANAGED_IDENTITY_NAME }}
+          LOG_ANALYTICS_NAME: ${{ vars.LOG_ANALYTICS_NAME }}
           AAD_API_APP_ID: ${{ vars.AAD_API_APP_ID }}
           AAD_API_AUDIENCE: ${{ vars.AAD_API_AUDIENCE }}
           AAD_API_TENANT_ID: ${{ vars.AAD_API_TENANT_ID }}
@@ -143,7 +152,17 @@ jobs:
           # Reuse existing resources (skip creating new OpenAI / Postgres)
           if [ -n "$AZURE_RESOURCE_GROUP" ]; then
             azd env set AZURE_RESOURCE_GROUP "$AZURE_RESOURCE_GROUP"
+            # Mirror to the bicep param so the deployment lands in the right RG
+            azd env set RESOURCE_GROUP_NAME "$AZURE_RESOURCE_GROUP"
           fi
+          # Stable resource-name overrides (all optional)
+          if [ -n "$BASE_NAME" ];                then azd env set BASE_NAME                "$BASE_NAME";                fi
+          if [ -n "$RESOURCE_GROUP_NAME" ];      then azd env set RESOURCE_GROUP_NAME      "$RESOURCE_GROUP_NAME";      fi
+          if [ -n "$APPLICATION_NAME" ];         then azd env set APPLICATION_NAME         "$APPLICATION_NAME";         fi
+          if [ -n "$CONTAINER_APPS_ENV_NAME" ];  then azd env set CONTAINER_APPS_ENV_NAME  "$CONTAINER_APPS_ENV_NAME";  fi
+          if [ -n "$CONTAINER_REGISTRY_NAME" ];  then azd env set CONTAINER_REGISTRY_NAME  "$CONTAINER_REGISTRY_NAME";  fi
+          if [ -n "$MANAGED_IDENTITY_NAME" ];    then azd env set MANAGED_IDENTITY_NAME    "$MANAGED_IDENTITY_NAME";    fi
+          if [ -n "$LOG_ANALYTICS_NAME" ];       then azd env set LOG_ANALYTICS_NAME       "$LOG_ANALYTICS_NAME";       fi
           if [ -n "$EXISTING_OPENAI_ENDPOINT" ]; then
             azd env set existingOpenAiEndpoint "$EXISTING_OPENAI_ENDPOINT"
             azd env set EXISTING_OPENAI_ENDPOINT "$EXISTING_OPENAI_ENDPOINT"

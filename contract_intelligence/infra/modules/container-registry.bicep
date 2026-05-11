@@ -1,11 +1,11 @@
 // Azure Container Registry for storing Docker images
 param location string
-param baseName string
+param name string
 param tags object = {}
 param principalId string
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = {
-  name: replace('${baseName}-acr', '-', '')
+  name: name
   location: location
   tags: tags
   sku: {
